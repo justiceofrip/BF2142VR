@@ -1,0 +1,1793 @@
+#include "client/D3D8SharedPresentationBridge.h"
+
+#include "client/ControllerInputCache.h"
+#include "client/ControllerHaptics.h"
+#include "client/D3D8To9InteropPrimer.h"
+#include "client/D3D8To9SharedTextureProducer.h"
+#include "client/D3D8StereoProbeRecords.h"
+#include "client/ScopeViewOverlay.h"
+#include "presenter/SharedControlChannel.h"
+#include "settings/UserSettings.h"
+#include "stereo/ScopeViewMath.h"
+#include "stereo/StereoMath.h"
+
+#include <windows.h>
+
+#include <algorithm>
+#include <array>
+#include <cstdarg>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+#include <cwchar>
+#include <string>
+#include <vector>
+
+namespace
+{
+constexpr DWORD kD3DFormatA8R8G8B8 = 21;
+constexpr DWORD kD3DFormatA2B10G10R10 = 31;
+constexpr DWORD kD3DFormatA16B16G16R16F = 113;
+
+std::wstring QuoteArgument(const std::wstring& argument)
+{
+    std::wstring quoted = L"\"";
+    quoted += argument;
+    quoted += L"\"";
+    return quoted;
+}
+
+bool IsProcessRunning(HANDLE process)
+{
+    return process != nullptr &&
+        WaitForSingleObject(process, 0) == WAIT_TIMEOUT;
+}
+
+bool GetModuleDirectory(std::wstring& directory)
+{
+    HMODULE module = nullptr;
+    if (!GetModuleHandleExW(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCWSTR>(&GetModuleDirectory),
+            &module))
+    {
+        return false;
+    }
+    std::array<wchar_t, 32768> path = {};
+    const DWORD length = GetModuleFileNameW(
+        module,
+        path.data(),
+        static_cast<DWORD>(path.size()));
+    if (length == 0 || length >= path.size())
+    {
+        return false;
+    }
+    wchar_t* const separator = wcsrchr(path.data(), L'\\');
+    if (separator == nullptr)
+    {
+        return false;
+    }
+    *separator = L'\0';
+    directory = path.data();
+    return true;
+}
+
+bfvr::shared::SharedTextureRequirements ReadRequirements(
+    const bfvr::shared::ControlBlock& block,
+    UINT logicalUiWidth,
+    UINT logicalUiHeight)
+{
+    bfvr::shared::SharedTextureRequirements requirements = {};
+    requirements.adapterLuid.HighPart = block.requirements.adapterLuidHigh;
+    requirements.adapterLuid.LowPart = block.requirements.adapterLuidLow;
+    requirements.minimumFeatureLevel =
+        static_cast<D3D_FEATURE_LEVEL>(block.requirements.minimumFeatureLevel);
+    requirements.leftWorldWidth = block.requirements.leftWorldWidth;
+    requirements.leftWorldHeight = block.requirements.leftWorldHeight;
+    requirements.rightWorldWidth = block.requirements.rightWorldWidth;
+    requirements.rightWorldHeight = block.requirements.rightWorldHeight;
+    requirements.uiWidth = logicalUiWidth;
+    requirements.uiHeight = logicalUiHeight;
+    requirements.format = static_cast<DXGI_FORMAT>(block.requirements.format);
+    return requirements;
+}
+
+UINT ScaleWorldDimension(UINT dimension, float scale)
+{
+    if (dimension == 0)
+    {
+        return 0;
+    }
+    const double scaled =
+        std::round(static_cast<double>(dimension) * static_cast<double>(scale));
+    UINT result = static_cast<UINT>(std::max(2.0, scaled));
+    if ((result & 1U) != 0)
+    {
+        ++result;
+    }
+    return result;
+}
+
+bool ReadAmbientOcclusionRequested()
+{
+    const auto& runtime = bfvr::settings::ProcessUserSettingsRuntime();
+    if (runtime.IsReady())
+    {
+        return bfvr::settings::DecodeUserSettings(
+            runtime.Current()).ambientOcclusionEnabled;
+    }
+    wchar_t value[16] = {};
+    const DWORD length = GetEnvironmentVariableW(
+        L"BFVR_OPENXR_AO",
+        value,
+        static_cast<DWORD>(std::size(value)));
+    return length != 0 &&
+        !(length == 1 && value[0] == L'0');
+}
+
+bool ReadScreenSpaceGlobalIlluminationRequested()
+{
+    wchar_t value[2] = {};
+    const DWORD length = GetEnvironmentVariableW(
+        L"BFVR_OPENXR_SSGI",
+        value,
+        static_cast<DWORD>(std::size(value)));
+    // SSGI is an explicit visual experiment. Fail closed unless the owner
+    // selected exactly 1 for this launch.
+    return length == 1 && value[0] == L'1';
+}
+
+bool ReadWaterReflectionsRequested()
+{
+    const auto& runtime = bfvr::settings::ProcessUserSettingsRuntime();
+    if (runtime.IsReady())
+    {
+        return bfvr::settings::DecodeUserSettings(
+            runtime.Current()).waterReflectionsEnabled;
+    }
+    wchar_t value[2] = {};
+    const DWORD length = GetEnvironmentVariableW(
+        L"BFVR_OPENXR_WATER_SSR",
+        value,
+        static_cast<DWORD>(std::size(value)));
+    // Standalone probes without an initialized UserConfig retain the explicit
+    // environment opt-in. Normal BFVR launches use the persisted setting.
+    return length == 1 && value[0] == L'1';
+}
+
+bfvr::shared::SharedTextureRequirements MakeProducerRequirements(
+    const bfvr::shared::SharedTextureRequirements& destination,
+    float worldRenderScale)
+{
+    bfvr::shared::SharedTextureRequirements producer = destination;
+    producer.leftWorldWidth =
+        ScaleWorldDimension(destination.leftWorldWidth, worldRenderScale);
+    producer.leftWorldHeight =
+        ScaleWorldDimension(destination.leftWorldHeight, worldRenderScale);
+    producer.rightWorldWidth =
+        ScaleWorldDimension(destination.rightWorldWidth, worldRenderScale);
+    producer.rightWorldHeight =
+        ScaleWorldDimension(destination.rightWorldHeight, worldRenderScale);
+    return producer;
+}
+
+bool IsFinitePose(const bfvr::shared::SharedPresentationPose& pose)
+{
+    return
+        std::isfinite(pose.orientationX) &&
+        std::isfinite(pose.orientationY) &&
+        std::isfinite(pose.orientationZ) &&
+        std::isfinite(pose.orientationW) &&
+        std::isfinite(pose.positionX) &&
+        std::isfinite(pose.positionY) &&
+        std::isfinite(pose.positionZ);
+}
+
+bool IsFiniteUnitQuaternion(const bfvr::shared::SharedPresentationPose& pose)
+{
+    const float lengthSquared =
+        pose.orientationX * pose.orientationX +
+        pose.orientationY * pose.orientationY +
+        pose.orientationZ * pose.orientationZ +
+        pose.orientationW * pose.orientationW;
+    return std::isfinite(lengthSquared) &&
+        lengthSquared >= 0.25F && lengthSquared <= 2.25F;
+}
+
+void CopyControllerPose(
+    const bfvr::shared::SharedPresentationPose& source,
+    bfvr::D3D8RuntimeControllerPose& destination)
+{
+    destination.orientationX = source.orientationX;
+    destination.orientationY = source.orientationY;
+    destination.orientationZ = source.orientationZ;
+    destination.orientationW = source.orientationW;
+    destination.positionX = source.positionX;
+    destination.positionY = source.positionY;
+    destination.positionZ = source.positionZ;
+}
+} // namespace
+
+namespace bfvr
+{
+class D3D8SharedPresentationBridge::Impl
+{
+public:
+    ~Impl()
+    {
+        Shutdown();
+    }
+
+    bool Initialize(
+        UINT logicalUiWidth,
+        UINT logicalUiHeight,
+        float worldRenderScale,
+        D3D8PresentationCompanion requestedCompanion,
+        D3D8SharedPresentationLogCallback callback,
+        bool forceCpuTransport)
+    {
+        Shutdown();
+        ClearAcceptedControllerInput();
+        logCallback = callback;
+        if (logicalUiWidth == 0 || logicalUiHeight == 0)
+        {
+            WriteLog(L"OpenXR game bridge rejected an empty logical UI size.");
+            return false;
+        }
+        if (!std::isfinite(worldRenderScale) ||
+            worldRenderScale < 0.5F ||
+            worldRenderScale > 1.25F)
+        {
+            WriteLog(
+                L"OpenXR game bridge rejected world render scale %.3f; the supported probe range is 0.50-1.25.",
+                worldRenderScale);
+            return false;
+        }
+
+        std::wstring moduleDirectory;
+        if (!GetModuleDirectory(moduleDirectory))
+        {
+            WriteLog(L"OpenXR game bridge could not resolve the BFVR client directory.");
+            return false;
+        }
+        companion = requestedCompanion;
+        presenterPath = moduleDirectory +
+            (companion == D3D8PresentationCompanion::OfflineTransport
+                ? L"\\BFVRSharedTextureConsumerProbe.exe"
+                : L"\\BFVRPresenter.exe");
+        if (GetFileAttributesW(presenterPath.c_str()) == INVALID_FILE_ATTRIBUTES)
+        {
+            WriteLog(
+                L"D3D8 presentation bridge requires its x64 companion beside BFVRClient.dll: %s.",
+                presenterPath.c_str());
+            return false;
+        }
+
+        wchar_t channelBuffer[96] = {};
+        swprintf_s(
+            channelBuffer,
+            L"Local\\BFVR-GamePresenter-%08lX-%08lX",
+            static_cast<unsigned long>(GetCurrentProcessId()),
+            static_cast<unsigned long>(GetTickCount()));
+        channelName = channelBuffer;
+        if (!channel.Create(channelName.c_str(), GetCurrentProcessId()))
+        {
+            WriteLog(
+                L"OpenXR game bridge could not create its control mapping (error %lu).",
+                channel.LastErrorCode());
+            return false;
+        }
+        block = channel.Get();
+        RegisterControllerHapticTransport(block);
+        ambientOcclusionRequested = ReadAmbientOcclusionRequested();
+        screenSpaceGlobalIlluminationRequested =
+            ReadScreenSpaceGlobalIlluminationRequested();
+        waterReflectionsRequested = ReadWaterReflectionsRequested();
+        block->producerFlags = shared::kProducerFlagRuntimeTimedRender |
+            (ambientOcclusionRequested
+                ? shared::kProducerFlagAmbientOcclusionRequested
+                : 0) |
+            (screenSpaceGlobalIlluminationRequested
+                ? shared::kProducerFlagScreenSpaceGlobalIlluminationRequested
+                : 0) |
+            (waterReflectionsRequested
+                ? shared::kProducerFlagWaterReflectionsRequested
+                : 0);
+
+        const std::wstring presenterLog = moduleDirectory +
+            (companion == D3D8PresentationCompanion::OfflineTransport
+                ? L"\\BFVRSharedTextureConsumer-game.log"
+                : L"\\BFVRPresenter-game.log");
+        wchar_t runUntilStoppedValue[2] = {};
+        const bool runUntilStopped =
+            companion == D3D8PresentationCompanion::OpenXR &&
+            GetEnvironmentVariableW(
+                L"BFVR_PRESENTATION_RUN_UNTIL_STOPPED",
+                runUntilStoppedValue,
+                static_cast<DWORD>(
+                    std::size(runUntilStoppedValue))) == 1 &&
+            runUntilStoppedValue[0] == L'1';
+        std::wstring command =
+            QuoteArgument(presenterPath) +
+            L" --channel " + QuoteArgument(channelName) +
+            (runUntilStopped
+                ? L" --run-until-stopped"
+                : L" --duration-ms 90000") +
+            L" --log " + QuoteArgument(presenterLog);
+        std::vector<wchar_t> mutableCommand(command.begin(), command.end());
+        mutableCommand.push_back(L'\0');
+        STARTUPINFOW startupInfo = {};
+        startupInfo.cb = sizeof(startupInfo);
+        if (!CreateProcessW(
+                presenterPath.c_str(),
+                mutableCommand.data(),
+                nullptr,
+                nullptr,
+                FALSE,
+                CREATE_NO_WINDOW,
+                nullptr,
+                moduleDirectory.c_str(),
+                &startupInfo,
+                &presenterProcess))
+        {
+            WriteLog(
+                L"OpenXR game bridge could not launch its x64 companion (error %lu).",
+                GetLastError());
+            shared::PublishState(
+                &block->producerState,
+                shared::ProcessState::Failed);
+            Shutdown();
+            return false;
+        }
+        CloseHandle(presenterProcess.hThread);
+        presenterProcess.hThread = nullptr;
+
+        const DWORD waitStarted = GetTickCount();
+        while (GetTickCount() - waitStarted < 20000)
+        {
+            const shared::ProcessState state =
+                shared::ReadState(&block->presenterState);
+            if (state == shared::ProcessState::RequirementsReady)
+            {
+                break;
+            }
+            if (state == shared::ProcessState::Failed ||
+                !IsProcessRunning(presenterProcess.hProcess))
+            {
+                WriteLog(
+                    L"OpenXR game bridge companion failed before publishing requirements (state=%ld error=%ld).",
+                    static_cast<long>(state),
+                    InterlockedCompareExchange(&block->presenterError, 0, 0));
+                Shutdown();
+                return false;
+            }
+            if (channel.WaitForPresenterUpdate(5) == WAIT_FAILED)
+            {
+                Sleep(5);
+            }
+        }
+        if (shared::ReadState(&block->presenterState) !=
+            shared::ProcessState::RequirementsReady)
+        {
+            WriteLog(L"OpenXR game bridge timed out waiting for runtime requirements.");
+            Shutdown();
+            return false;
+        }
+
+        runtimeUiWidth = block->requirements.uiWidth;
+        runtimeUiHeight = block->requirements.uiHeight;
+        destinationRequirements =
+            ReadRequirements(*block, logicalUiWidth, logicalUiHeight);
+        if (destinationRequirements.format != DXGI_FORMAT_B8G8R8A8_UNORM &&
+            destinationRequirements.format !=
+                DXGI_FORMAT_B8G8R8A8_UNORM_SRGB)
+        {
+            WriteLog(
+                L"OpenXR game bridge requires BGRA8 UNORM or BGRA8 sRGB transport; runtime selected format %u.",
+                static_cast<unsigned int>(destinationRequirements.format));
+            Shutdown();
+            return false;
+        }
+        requirements =
+            MakeProducerRequirements(destinationRequirements, worldRenderScale);
+        gpuSharedTargets =
+            !forceCpuTransport && gpuProducer.Resolve();
+        if (companion == D3D8PresentationCompanion::OfflineTransport &&
+            !gpuSharedTargets)
+        {
+            WriteLog(
+                L"Offline shared-target control requires the BFVR d3d8to9 bridge ABI.");
+            Shutdown();
+            return false;
+        }
+        if (!gpuSharedTargets &&
+            !producer.Initialize(
+                channelName.c_str(),
+                requirements,
+                &Impl::ProducerLogThunk,
+                this))
+        {
+            WriteLog(L"OpenXR game bridge could not create its x86 shared textures.");
+            Shutdown();
+            return false;
+        }
+
+        if (!gpuSharedTargets)
+        {
+            producer.CopyDescriptions(
+                block->textures,
+                shared::kTextureCount);
+            shared::PublishState(
+                &block->producerState,
+                shared::ProcessState::TexturesReady);
+            (void)channel.SignalProducerUpdate();
+            texturesPublished = true;
+        }
+        initialized = true;
+        WriteLog(
+            L"D3D8 presentation bridge is ready: transport=%s synchronization=%s source world=%ux%u/%ux%u at scale %.3f, destination=%ux%u/%ux%u, logical UI=%ux%u, destinationFormat=%u.",
+            gpuSharedTargets
+                ? L"D3D9Ex legacy shared GPU targets"
+                : L"D3D8 readback plus D3D11 upload",
+            channel.HasUpdateEvents()
+                ? L"cross-process events"
+                : L"bounded polling fallback",
+            requirements.leftWorldWidth,
+            requirements.leftWorldHeight,
+            requirements.rightWorldWidth,
+            requirements.rightWorldHeight,
+            worldRenderScale,
+            destinationRequirements.leftWorldWidth,
+            destinationRequirements.leftWorldHeight,
+            destinationRequirements.rightWorldWidth,
+            destinationRequirements.rightWorldHeight,
+            requirements.uiWidth,
+            requirements.uiHeight,
+            static_cast<unsigned int>(requirements.format));
+        return true;
+    }
+
+    bool EnsureGpuFrameTargets(
+        void* d3d8Device,
+        std::array<void*, shared::kTextureCount>& surfaces,
+        std::array<void*, shared::kDepthTextureCount>& depthSurfaces,
+        std::array<void*, shared::kDepthTextureCount>& depthExportSurfaces)
+    {
+        if (!initialized || block == nullptr)
+        {
+            return false;
+        }
+        if (!gpuSharedTargets)
+        {
+            return true;
+        }
+        if (texturesPublished)
+        {
+            const bool colorTargetsReady = std::all_of(
+                surfaces.begin(),
+                surfaces.end(),
+                [](const void* surface) { return surface != nullptr; });
+            const bool depthTargetsReady = !depthTexturesPublished ||
+                (std::all_of(
+                    depthSurfaces.begin(),
+                    depthSurfaces.end(),
+                    [](const void* surface) { return surface != nullptr; }) &&
+                 std::all_of(
+                    depthExportSurfaces.begin(),
+                    depthExportSurfaces.end(),
+                    [](const void* surface) { return surface != nullptr; }));
+            return colorTargetsReady && depthTargetsReady;
+        }
+
+        std::array<shared::SharedTextureDescription, shared::kTextureCount>
+            descriptions = {};
+        if (!gpuProducer.CreateTargets(
+                d3d8Device,
+                requirements,
+                surfaces,
+                descriptions))
+        {
+            WriteLog(
+                L"D3D9Ex shared-target creation failed on the D3D8 device thread: target=%zu size=%ux%u format=%s result=0x%08lX small64=0x%08lX extended=%d cooperative=0x%08lX helperAttempts=%ld helperStage=%lu helperResult=0x%08lX createDevice=0x%08lX createTexture=0x%08lX gameOpen=0x%08lX.",
+                gpuProducer.FailedTargetIndex(),
+                gpuProducer.FailedTargetIndex() == 1
+                    ? requirements.rightWorldWidth
+                    : gpuProducer.FailedTargetIndex() == 2
+                    ? requirements.uiWidth
+                    : requirements.leftWorldWidth,
+                gpuProducer.FailedTargetIndex() == 1
+                    ? requirements.rightWorldHeight
+                    : gpuProducer.FailedTargetIndex() == 2
+                    ? requirements.uiHeight
+                    : requirements.leftWorldHeight,
+                gpuProducer.FailedTargetIndex() == 2
+                    ? L"A16B16G16R16F"
+                    : L"A2B10G10R10",
+                static_cast<unsigned long>(
+                    gpuProducer.LastCreateResult()),
+                static_cast<unsigned long>(
+                    gpuProducer.SmallProbeResult()),
+                gpuProducer.DeviceDiagnostics().extendedDevice,
+                static_cast<unsigned long>(
+                    gpuProducer.DeviceDiagnostics().cooperativeLevel),
+                gpuProducer.DeviceDiagnostics().helperAttempts,
+                static_cast<unsigned long>(
+                    gpuProducer.DeviceDiagnostics().lastHelperStage),
+                static_cast<unsigned long>(
+                    gpuProducer.DeviceDiagnostics().lastHelperResult),
+                static_cast<unsigned long>(
+                    gpuProducer.DeviceDiagnostics().
+                        lastHelperCreateDeviceResult),
+                static_cast<unsigned long>(
+                    gpuProducer.DeviceDiagnostics().
+                        lastHelperCreateTextureResult),
+                static_cast<unsigned long>(
+                    gpuProducer.DeviceDiagnostics().lastGameOpenResult));
+            shared::PublishState(
+                &block->producerState,
+                shared::ProcessState::Failed);
+            return false;
+        }
+        // Best-effort compatibility initialization for graphics stacks that
+        // reject a legacy D3D9 allocation when its first D3D11 open occurs in
+        // the separate x64 presenter. The temporary local open is released
+        // before publication and does not alter the normal transport path.
+        (void)PrimeD3D8To9D3D11SharedTextureInterop(
+            gpuProducer.DeviceDiagnostics(),
+            shared::LoadLegacySharedHandle(descriptions[0]));
+        for (std::size_t index = 0; index < descriptions.size(); ++index)
+        {
+            block->textures[index] = descriptions[index];
+        }
+
+        depthTexturesPublished = false;
+        if (ambientOcclusionRequested ||
+            screenSpaceGlobalIlluminationRequested ||
+            waterReflectionsRequested)
+        {
+            std::array<
+                shared::SharedTextureDescription,
+                shared::kDepthTextureCount> depthDescriptions = {};
+            depthTexturesPublished = gpuProducer.CreateDepthTargets(
+                d3d8Device,
+                requirements,
+                depthSurfaces,
+                depthExportSurfaces,
+                depthDescriptions);
+            if (depthTexturesPublished)
+            {
+                for (std::size_t index = 0;
+                    index < depthDescriptions.size();
+                    ++index)
+                {
+                    block->depthTextures[index] = depthDescriptions[index];
+                }
+                InterlockedExchange(
+                    &block->depthEncoding,
+                    static_cast<LONG>(
+                        shared::DepthEncoding::PackedDeviceDepthBgra8));
+                InterlockedExchange(
+                    &block->depthTextureCount,
+                    static_cast<LONG>(shared::kDepthTextureCount));
+                WriteLog(
+                    L"Published optional packed INTZ depth/water-mask exports: left=%ux%u right=%ux%u D3D9 A8R8G8B8/D3D11 B8G8R8A8_UNORM (AO=%d SSGI=%d waterSSR=%d).",
+                    requirements.leftWorldWidth,
+                    requirements.leftWorldHeight,
+                    requirements.rightWorldWidth,
+                    requirements.rightWorldHeight,
+                    ambientOcclusionRequested ? 1 : 0,
+                    screenSpaceGlobalIlluminationRequested ? 1 : 0,
+                    waterReflectionsRequested ? 1 : 0);
+            }
+            else
+            {
+                InterlockedExchange(
+                    &block->depthEncoding,
+                    static_cast<LONG>(shared::DepthEncoding::None));
+                InterlockedExchange(&block->depthTextureCount, 0);
+                WriteLog(
+                    L"Optional INTZ depth targets are unavailable (HRESULT=0x%08lX); continuing with ordinary D24S8 and depth-based AO/SSGI/water SSR disabled.",
+                    static_cast<unsigned long>(
+                        gpuProducer.LastDepthCreateResult()));
+            }
+        }
+        shared::PublishState(
+            &block->producerState,
+            shared::ProcessState::TexturesReady);
+        (void)channel.SignalProducerUpdate();
+        texturesPublished = true;
+        WriteLog(
+            L"Published Reset-owned D3D9Ex shared targets: world=%ux%u R10G10B10A2 x2, UI=%ux%u R16G16B16A16_FLOAT, helperDeviceCreations=%ld. Legacy handles are lifetime-bound resource tokens and are never passed to CloseHandle.",
+            requirements.leftWorldWidth,
+            requirements.leftWorldHeight,
+            requirements.uiWidth,
+            requirements.uiHeight,
+            gpuProducer.DeviceDiagnostics().helperDeviceCreations);
+        return true;
+    }
+
+    bool ReadControllerSample(
+        LONG sequence,
+        std::int64_t predictedDisplayTime,
+        D3D8RuntimeControllerSample& destination)
+    {
+        destination = {};
+        if (InterlockedCompareExchange(&block->controllerSampleSequence, 0, 0) !=
+            sequence)
+        {
+            WriteLog(
+                L"OpenXR controller input rejected missing or stale sample for render request %ld (sampleSequence=%ld).",
+                sequence,
+                InterlockedCompareExchange(
+                    &block->controllerSampleSequence,
+                    0,
+                    0));
+            return false;
+        }
+        MemoryBarrier();
+        const shared::SharedControllerSample source = block->controllerSample;
+        if (source.predictedDisplayTime != predictedDisplayTime ||
+            (source.flags & shared::kControllerSampleFlagSessionFocused) == 0)
+        {
+            WriteLog(
+                L"OpenXR controller input rejected sample %ld: timestamp=%lld expected=%lld flags=0x%08lX.",
+                sequence,
+                static_cast<long long>(source.predictedDisplayTime),
+                static_cast<long long>(predictedDisplayTime),
+                static_cast<unsigned long>(source.flags));
+            return false;
+        }
+        destination.mountedCameraToggleSequence =
+            source.mountedCameraToggleSequence;
+        destination.hudToggleSequence = source.hudToggleSequence;
+        for (std::size_t hand = 0; hand < destination.hands.size(); ++hand)
+        {
+            const shared::SharedControllerHandSample& sourceHand = source.hands[hand];
+            const bool finiteValues =
+                std::isfinite(sourceHand.triggerValue) &&
+                std::isfinite(sourceHand.squeezeValue) &&
+                std::isfinite(sourceHand.thumbstickX) &&
+                std::isfinite(sourceHand.thumbstickY) &&
+                sourceHand.triggerValue >= 0.0F && sourceHand.triggerValue <= 1.0F &&
+                sourceHand.squeezeValue >= 0.0F && sourceHand.squeezeValue <= 1.0F &&
+                sourceHand.thumbstickX >= -1.0F && sourceHand.thumbstickX <= 1.0F &&
+                sourceHand.thumbstickY >= -1.0F && sourceHand.thumbstickY <= 1.0F;
+            const bool aimCoordinatesValid =
+                (sourceHand.flags &
+                    (shared::kControllerHandFlagAimPositionValid |
+                     shared::kControllerHandFlagAimOrientationValid)) == 0 ||
+                (IsFinitePose(sourceHand.aimPose) &&
+                 IsFiniteUnitQuaternion(sourceHand.aimPose));
+            const bool gripCoordinatesValid =
+                (sourceHand.flags &
+                    (shared::kControllerHandFlagGripPositionValid |
+                     shared::kControllerHandFlagGripOrientationValid)) == 0 ||
+                (IsFinitePose(sourceHand.gripPose) &&
+                 IsFiniteUnitQuaternion(sourceHand.gripPose));
+            if (!finiteValues || !aimCoordinatesValid || !gripCoordinatesValid)
+            {
+                WriteLog(
+                    L"OpenXR controller input rejected invalid coordinates or ranges in sample %ld hand=%zu.",
+                    sequence,
+                    hand);
+                return false;
+            }
+            D3D8RuntimeControllerHand& destinationHand = destination.hands[hand];
+            destinationHand.flags = sourceHand.flags;
+            destinationHand.buttons = sourceHand.buttons;
+            CopyControllerPose(sourceHand.aimPose, destinationHand.aimPose);
+            CopyControllerPose(sourceHand.gripPose, destinationHand.gripPose);
+            destinationHand.triggerValue = sourceHand.triggerValue;
+            destinationHand.squeezeValue = sourceHand.squeezeValue;
+            destinationHand.thumbstickX = sourceHand.thumbstickX;
+            destinationHand.thumbstickY = sourceHand.thumbstickY;
+        }
+        destination.valid = true;
+        destination.sessionFocused = true;
+        destination.predictedDisplayTime = source.predictedDisplayTime;
+        LogControllerSample(sequence, destination);
+        return true;
+    }
+
+    void LogControllerSample(
+        LONG sequence,
+        const D3D8RuntimeControllerSample& sample)
+    {
+        // This callback runs on the frame-request bridge. A prior diagnostic
+        // reopened observer.log every five seconds for the entire session,
+        // which creates a periodic synchronous stall that is especially
+        // visible through a strongly magnified scope. One accepted sample is
+        // enough to confirm controller transport for normal runtime.
+        if (controllerSampleLogged)
+        {
+            return;
+        }
+        controllerSampleLogged = true;
+        const D3D8RuntimeControllerHand& left = sample.hands[0];
+        const D3D8RuntimeControllerHand& right = sample.hands[1];
+        WriteLog(
+            L"OpenXR controller sample %ld accepted for the local-frame overlay: left flags=0x%03lX buttons=0x%02lX trigger=%.3f squeeze=%.3f stick=(%.3f,%.3f); right flags=0x%03lX buttons=0x%02lX trigger=%.3f squeeze=%.3f stick=(%.3f,%.3f).",
+            sequence,
+            static_cast<unsigned long>(left.flags),
+            static_cast<unsigned long>(left.buttons),
+            left.triggerValue,
+            left.squeezeValue,
+            left.thumbstickX,
+            left.thumbstickY,
+            static_cast<unsigned long>(right.flags),
+            static_cast<unsigned long>(right.buttons),
+            right.triggerValue,
+            right.squeezeValue,
+            right.thumbstickX,
+            right.thumbstickY);
+    }
+
+    bool RequestRender(D3D8RuntimeRenderRequest& request, DWORD timeoutMs)
+    {
+        request = {};
+        if (!initialized || block == nullptr)
+        {
+            WriteLog(
+                L"OpenXR game bridge cannot request a render frame because it is not initialized (initialized=%d channel=%p).",
+                initialized ? 1 : 0,
+                block);
+            return false;
+        }
+        // The runtime may legitimately decline to render for a short period
+        // (for example while focus is changing).  Keep one request sequence
+        // outstanding so a nonblocking continuous-mode poll neither loses the
+        // request nor advances ahead of the x64 presenter.
+        const bool newlyRequested = pendingRenderRequest == 0;
+        const LONG sequence = newlyRequested
+            ? InterlockedIncrement(&block->renderReadySequence)
+            : pendingRenderRequest;
+        pendingRenderRequest = sequence;
+        if (newlyRequested)
+        {
+            (void)channel.SignalProducerUpdate();
+        }
+        const DWORD waitStarted = GetTickCount();
+        for (;;)
+        {
+            if (InterlockedCompareExchange(
+                    &block->renderRequestSequence,
+                    0,
+                    0) == sequence)
+            {
+                MemoryBarrier();
+                const shared::SharedRenderRequest source = block->renderRequest;
+                if (source.shouldRender == 0 || source.viewsValid == 0)
+                {
+                    WriteLog(
+                        L"OpenXR game bridge rejected render request %ld: shouldRender=%ld viewsValid=%ld presenterState=%ld presenterError=%ld.",
+                        sequence,
+                        source.shouldRender,
+                        source.viewsValid,
+                        static_cast<long>(
+                            shared::ReadState(&block->presenterState)),
+                        InterlockedCompareExchange(
+                            &block->presenterError,
+                            0,
+                            0));
+                    return false;
+                }
+                request.sequence = sequence;
+                request.predictedDisplayTime = source.predictedDisplayTime;
+                request.headPoseValid =
+                    source.headPoseValid != 0 &&
+                    IsFinitePose(source.headPose) &&
+                    IsFiniteUnitQuaternion(source.headPose);
+                request.headPoseTracked =
+                    request.headPoseValid && source.headPoseTracked != 0;
+                request.standingHeightValid =
+                    source.standingHeightValid != 0 &&
+                    std::isfinite(source.standingHeightMeters) &&
+                    source.standingHeightMeters >= 0.20F &&
+                    source.standingHeightMeters <= 3.0F;
+                request.standingHeightMeters =
+                    request.standingHeightValid
+                    ? source.standingHeightMeters
+                    : 0.0F;
+                request.recenterForwardSequence =
+                    source.recenterForwardSequence;
+                if (request.headPoseValid)
+                {
+                    request.headPose.orientationX =
+                        source.headPose.orientationX;
+                    request.headPose.orientationY =
+                        source.headPose.orientationY;
+                    request.headPose.orientationZ =
+                        source.headPose.orientationZ;
+                    request.headPose.orientationW =
+                        source.headPose.orientationW;
+                    request.headPose.positionX = source.headPose.positionX;
+                    request.headPose.positionY = source.headPose.positionY;
+                    request.headPose.positionZ = source.headPose.positionZ;
+                }
+                for (std::size_t eye = 0; eye < request.views.size(); ++eye)
+                {
+                    const shared::SharedPresentationView& sourceView =
+                        source.views[eye];
+                    D3D8RuntimeView& destination = request.views[eye];
+                    destination.orientationX = sourceView.pose.orientationX;
+                    destination.orientationY = sourceView.pose.orientationY;
+                    destination.orientationZ = sourceView.pose.orientationZ;
+                    destination.orientationW = sourceView.pose.orientationW;
+                    destination.positionX = sourceView.pose.positionX;
+                    destination.positionY = sourceView.pose.positionY;
+                    destination.positionZ = sourceView.pose.positionZ;
+                    destination.angleLeft = sourceView.fov.angleLeft;
+                    destination.angleRight = sourceView.fov.angleRight;
+                    destination.angleUp = sourceView.fov.angleUp;
+                    destination.angleDown = sourceView.fov.angleDown;
+                }
+                // A rejected controller sample still does not reject the
+                // visual frame. It clears the input cache so native input
+                // remains unchanged until a fresh focused sample arrives.
+                if (!ReadControllerSample(
+                        sequence,
+                        request.predictedDisplayTime,
+                        request.controllerInput))
+                {
+                    ClearAcceptedControllerInput();
+                }
+                pendingRenderRequest = 0;
+                return true;
+            }
+            if (!IsHealthy())
+            {
+                WriteLog(
+                    L"OpenXR game bridge became unhealthy while waiting for render request %ld: requestSequence=%ld frameSequence=%ld presenterState=%ld presenterError=%ld shutdown=%ld processRunning=%d.",
+                    sequence,
+                    InterlockedCompareExchange(
+                        &block->renderRequestSequence,
+                        0,
+                        0),
+                    InterlockedCompareExchange(
+                        &block->frameSequence,
+                        0,
+                        0),
+                    static_cast<long>(
+                        shared::ReadState(&block->presenterState)),
+                    InterlockedCompareExchange(
+                        &block->presenterError,
+                        0,
+                        0),
+                    InterlockedCompareExchange(
+                        &block->shutdownRequested,
+                        0,
+                        0),
+                    IsProcessRunning(presenterProcess.hProcess) ? 1 : 0);
+                pendingRenderRequest = 0;
+                return false;
+            }
+            if (timeoutMs == 0 || GetTickCount() - waitStarted >= timeoutMs)
+            {
+                break;
+            }
+            const DWORD elapsed = GetTickCount() - waitStarted;
+            const DWORD remaining = timeoutMs > elapsed
+                ? timeoutMs - elapsed
+                : 0;
+            const DWORD waitSlice = (std::min)(remaining, 20UL);
+            if (channel.WaitForPresenterUpdate(waitSlice) == WAIT_FAILED)
+            {
+                Sleep((std::min)(remaining, 1UL));
+            }
+        }
+        if (timeoutMs != 0)
+        {
+            WriteLog(
+                L"OpenXR game bridge timed out waiting %lu ms for render request %ld: requestSequence=%ld frameSequence=%ld presenterState=%ld presenterError=%ld.",
+                static_cast<unsigned long>(timeoutMs),
+                sequence,
+                InterlockedCompareExchange(
+                    &block->renderRequestSequence,
+                    0,
+                    0),
+                InterlockedCompareExchange(
+                    &block->frameSequence,
+                    0,
+                    0),
+                static_cast<long>(
+                    shared::ReadState(&block->presenterState)),
+                InterlockedCompareExchange(
+                    &block->presenterError,
+                    0,
+                    0));
+        }
+        return false;
+    }
+
+    bool PublishFrame(
+        const D3D8RuntimeRenderRequest& request,
+        const std::array<D3D8SharedFramePixels, 3>& frame,
+        const D3D8RuntimeUiPlacement& uiPlacement,
+        const D3D8RuntimeMovementFrame& movementFrame)
+    {
+        if (!initialized || block == nullptr || request.sequence <= 0)
+        {
+            return false;
+        }
+        std::array<shared::SharedTexturePixels, shared::kTextureCount> pixels = {};
+        for (std::size_t index = 0; index < pixels.size(); ++index)
+        {
+            pixels[index].data = frame[index].data;
+            pixels[index].rowPitch = frame[index].rowPitch;
+            pixels[index].width = frame[index].width;
+            pixels[index].height = frame[index].height;
+            pixels[index].format = requirements.format;
+        }
+        if (!producer.PublishFrame(pixels))
+        {
+            return false;
+        }
+        PublishUiPlacement(uiPlacement);
+        PublishMovementFrame(movementFrame);
+        InterlockedIncrement(&block->producedFrameCount);
+        MemoryBarrier();
+        InterlockedExchange(&block->frameSequence, request.sequence);
+        (void)channel.SignalProducerUpdate();
+        NotifyScopeViewFramePublished(request.sequence);
+        return true;
+    }
+
+    bool PublishGpuFrame(
+        void* d3d8Device,
+        const D3D8RuntimeRenderRequest& request,
+        DWORD timeoutMs,
+        const D3D8RuntimeUiPlacement& uiPlacement,
+        const D3D8RuntimeMovementFrame& movementFrame,
+        const D3D8RuntimeDepthFrame& depthFrame,
+        const std::array<void*, shared::kDepthTextureCount>& depthSurfaces,
+        const std::array<void*, shared::kDepthTextureCount>&
+            depthExportSurfaces)
+    {
+        if (!initialized ||
+            block == nullptr ||
+            !gpuSharedTargets ||
+            !texturesPublished ||
+            request.sequence <= 0)
+        {
+            return false;
+        }
+
+        bool frameDepthValid = false;
+        if (depthTexturesPublished && depthFrame.valid)
+        {
+            std::array<
+                BFVRD3D8To9DepthExportTiming,
+                shared::kDepthTextureCount> timings = {};
+            frameDepthValid = gpuProducer.ResolveDepthTargets(
+                d3d8Device,
+                depthSurfaces,
+                depthExportSurfaces,
+                timings);
+            if (frameDepthValid)
+            {
+                block->frameDepth = {};
+                std::memcpy(
+                    block->frameDepth.projections,
+                    depthFrame.projections,
+                    sizeof(block->frameDepth.projections));
+                for (std::size_t eye = 0; eye < timings.size(); ++eye)
+                {
+                    if (timings[eye].gpuTimestampsValid &&
+                        !timings[eye].gpuTimestampDisjoint &&
+                        std::isfinite(timings[eye].elapsedMilliseconds) &&
+                        depthExportGpuMilliseconds[eye].size() < 8192)
+                    {
+                        depthExportGpuMilliseconds[eye].push_back(
+                            timings[eye].elapsedMilliseconds);
+                    }
+                }
+                if (!depthResolveSuccessLogged)
+                {
+                    WriteLog(
+                        L"First live packed depth resolve succeeded: leftGpu=%.4f ms rightGpu=%.4f ms.",
+                        timings[0].elapsedMilliseconds,
+                        timings[1].elapsedMilliseconds);
+                    depthResolveSuccessLogged = true;
+                }
+            }
+            else
+            {
+                ++depthResolveFailures;
+                if (depthResolveFailures <= 3)
+                {
+                    WriteLog(
+                        L"Packed depth resolve failed for frame %ld (HRESULT=0x%08lX); publishing color/UI with AO disabled for this frame.",
+                        request.sequence,
+                        static_cast<unsigned long>(
+                            gpuProducer.LastDepthResolveResult()));
+                }
+            }
+        }
+        MemoryBarrier();
+        InterlockedExchange(
+            &block->frameDepthValid,
+            frameDepthValid ? 1 : 0);
+        InterlockedExchange(
+            &block->frameWaterMaskValid,
+            frameDepthValid && depthFrame.waterMaskValid ? 1 : 0);
+        if (!gpuProducer.WaitForGpu(d3d8Device, timeoutMs))
+        {
+            WriteLog(
+                L"D3D9Ex shared-target GPU completion timed out before frame %ld publication.",
+                request.sequence);
+            return false;
+        }
+        PublishUiPlacement(uiPlacement);
+        PublishMovementFrame(movementFrame);
+        InterlockedIncrement(&block->producedFrameCount);
+        MemoryBarrier();
+        InterlockedExchange(&block->frameSequence, request.sequence);
+        (void)channel.SignalProducerUpdate();
+        NotifyScopeViewFramePublished(request.sequence);
+        return true;
+    }
+
+    bool WaitForConsumption(LONG sequence, DWORD timeoutMs)
+    {
+        if (!initialized || block == nullptr || sequence <= 0)
+        {
+            return false;
+        }
+        const DWORD waitStarted = GetTickCount();
+        while (GetTickCount() - waitStarted < timeoutMs)
+        {
+            if (InterlockedCompareExchange(
+                    &block->consumedFrameSequence,
+                    0,
+                    0) == sequence)
+            {
+                return true;
+            }
+            if (!IsHealthy())
+            {
+                WriteLog(
+                    L"OpenXR game bridge became unhealthy while waiting for source consumption %ld: rendered=%ld consumed=%ld presenterState=%ld presenterError=%ld shutdown=%ld processRunning=%d.",
+                    sequence,
+                    InterlockedCompareExchange(
+                        &block->renderedFrameSequence,
+                        0,
+                        0),
+                    InterlockedCompareExchange(
+                        &block->consumedFrameSequence,
+                        0,
+                        0),
+                    static_cast<long>(
+                        shared::ReadState(&block->presenterState)),
+                    InterlockedCompareExchange(
+                        &block->presenterError,
+                        0,
+                        0),
+                    InterlockedCompareExchange(
+                        &block->shutdownRequested,
+                        0,
+                        0),
+                    IsProcessRunning(presenterProcess.hProcess) ? 1 : 0);
+                return false;
+            }
+            const DWORD elapsed = GetTickCount() - waitStarted;
+            const DWORD remaining = timeoutMs > elapsed
+                ? timeoutMs - elapsed
+                : 0;
+            const DWORD waitSlice = (std::min)(remaining, 50UL);
+            if (channel.WaitForPresenterUpdate(waitSlice) == WAIT_FAILED)
+            {
+                Sleep((std::min)(remaining, 2UL));
+            }
+        }
+        WriteLog(
+            L"OpenXR game bridge timed out waiting %lu ms for source consumption %ld: rendered=%ld consumed=%ld presenterState=%ld presenterError=%ld.",
+            static_cast<unsigned long>(timeoutMs),
+            sequence,
+            InterlockedCompareExchange(
+                &block->renderedFrameSequence,
+                0,
+                0),
+            InterlockedCompareExchange(
+                &block->consumedFrameSequence,
+                0,
+                0),
+            static_cast<long>(
+                shared::ReadState(&block->presenterState)),
+            InterlockedCompareExchange(
+                &block->presenterError,
+                0,
+                0));
+        return false;
+    }
+
+    bool WaitForPresentation(LONG sequence, DWORD timeoutMs)
+    {
+        if (!initialized || block == nullptr || sequence <= 0)
+        {
+            return false;
+        }
+        const DWORD waitStarted = GetTickCount();
+        while (GetTickCount() - waitStarted < timeoutMs)
+        {
+            if (InterlockedCompareExchange(
+                    &block->renderedFrameSequence,
+                    0,
+                    0) == sequence)
+            {
+                return true;
+            }
+            if (!IsHealthy())
+            {
+                WriteLog(
+                    L"OpenXR game bridge became unhealthy while waiting for presentation %ld: rendered=%ld consumed=%ld presenterState=%ld presenterError=%ld shutdown=%ld processRunning=%d.",
+                    sequence,
+                    InterlockedCompareExchange(
+                        &block->renderedFrameSequence,
+                        0,
+                        0),
+                    InterlockedCompareExchange(
+                        &block->consumedFrameSequence,
+                        0,
+                        0),
+                    static_cast<long>(
+                        shared::ReadState(&block->presenterState)),
+                    InterlockedCompareExchange(
+                        &block->presenterError,
+                        0,
+                        0),
+                    InterlockedCompareExchange(
+                        &block->shutdownRequested,
+                        0,
+                        0),
+                    IsProcessRunning(presenterProcess.hProcess) ? 1 : 0);
+                return false;
+            }
+            const DWORD elapsed = GetTickCount() - waitStarted;
+            const DWORD remaining = timeoutMs > elapsed
+                ? timeoutMs - elapsed
+                : 0;
+            const DWORD waitSlice = (std::min)(remaining, 50UL);
+            if (channel.WaitForPresenterUpdate(waitSlice) == WAIT_FAILED)
+            {
+                Sleep((std::min)(remaining, 2UL));
+            }
+        }
+        WriteLog(
+            L"OpenXR game bridge timed out waiting %lu ms for presentation %ld: rendered=%ld consumed=%ld presenterState=%ld presenterError=%ld.",
+            static_cast<unsigned long>(timeoutMs),
+            sequence,
+            InterlockedCompareExchange(
+                &block->renderedFrameSequence,
+                0,
+                0),
+            InterlockedCompareExchange(
+                &block->consumedFrameSequence,
+                0,
+                0),
+            static_cast<long>(shared::ReadState(&block->presenterState)),
+            InterlockedCompareExchange(&block->presenterError, 0, 0));
+        return false;
+    }
+
+    void PrepareForResourceRelease()
+    {
+        if (gpuSharedTargets)
+        {
+            StopCompanion();
+        }
+    }
+
+    void Shutdown()
+    {
+        ClearAcceptedControllerInput();
+        StopCompanion();
+        RegisterControllerHapticTransport(nullptr);
+        channel.Close();
+        block = nullptr;
+        requirements = {};
+        destinationRequirements = {};
+        runtimeUiWidth = 0;
+        runtimeUiHeight = 0;
+        presenterProcess = {};
+        channelName.clear();
+        presenterPath.clear();
+        gpuProducer = {};
+        companion = D3D8PresentationCompanion::OpenXR;
+        gpuSharedTargets = false;
+        texturesPublished = false;
+        ambientOcclusionRequested = false;
+        screenSpaceGlobalIlluminationRequested = false;
+        waterReflectionsRequested = false;
+        depthTexturesPublished = false;
+        depthResolveSuccessLogged = false;
+        depthTimingReported = false;
+        depthResolveFailures = 0;
+        depthExportGpuMilliseconds = {};
+        companionStopped = false;
+        pendingRenderRequest = 0;
+        controllerSampleLogged = false;
+        initialized = false;
+    }
+
+    void StopCompanion()
+    {
+        if (companionStopped)
+        {
+            return;
+        }
+        ReportDepthExportTimings();
+        if (block != nullptr)
+        {
+            shared::PublishState(
+                &block->producerState,
+                shared::ProcessState::Stopping);
+            InterlockedExchange(&block->shutdownRequested, 1);
+            (void)channel.SignalProducerUpdate();
+        }
+        if (presenterProcess.hProcess != nullptr)
+        {
+            const DWORD wait = WaitForSingleObject(
+                presenterProcess.hProcess,
+                5000);
+            if (wait == WAIT_TIMEOUT)
+            {
+                TerminateProcess(presenterProcess.hProcess, 9);
+                WaitForSingleObject(presenterProcess.hProcess, 2000);
+                WriteLog(
+                    L"D3D8 presentation bridge terminated only its owned companion after bounded shutdown timed out.");
+            }
+            CloseHandle(presenterProcess.hProcess);
+            presenterProcess.hProcess = nullptr;
+        }
+        producer.Shutdown();
+        if (block != nullptr)
+        {
+            shared::PublishState(
+                &block->producerState,
+                shared::ProcessState::Stopped);
+        }
+        companionStopped = true;
+    }
+
+    bool IsHealthy() const
+    {
+        return block != nullptr &&
+            IsProcessRunning(presenterProcess.hProcess) &&
+            shared::ReadState(&block->presenterState) !=
+                shared::ProcessState::Failed &&
+            InterlockedCompareExchange(&block->shutdownRequested, 0, 0) == 0;
+    }
+
+    static void ProducerLogThunk(void* context, const wchar_t* message)
+    {
+        static_cast<Impl*>(context)->WriteLog(L"%s", message);
+    }
+
+    void PublishUiPlacement(const D3D8RuntimeUiPlacement& placement)
+    {
+        if (block == nullptr)
+        {
+            return;
+        }
+
+        const bool eyeFillingScope = IsScopeViewActive();
+        shared::SharedPresentationPose auxiliaryUiPose = {};
+        bool auxiliaryUiPoseValid = false;
+        if (eyeFillingScope && placement.scopeOverlayRollValid &&
+            std::isfinite(placement.scopeOverlayRollRadians) &&
+            std::fabs(placement.scopeOverlayRollRadians) <=
+                3.141592654F + 0.001F)
+        {
+            const float halfRoll = placement.scopeOverlayRollRadians * 0.5F;
+            auxiliaryUiPose.orientationZ = std::sin(halfRoll);
+            auxiliaryUiPose.orientationW = std::cos(halfRoll);
+            auxiliaryUiPoseValid = true;
+        }
+        else if (!placement.headLocked && placement.worldAnchorValid)
+        {
+            auxiliaryUiPose.orientationX =
+                placement.worldAnchor.orientationX;
+            auxiliaryUiPose.orientationY =
+                placement.worldAnchor.orientationY;
+            auxiliaryUiPose.orientationZ =
+                placement.worldAnchor.orientationZ;
+            auxiliaryUiPose.orientationW =
+                placement.worldAnchor.orientationW;
+            auxiliaryUiPose.positionX = placement.worldAnchor.positionX;
+            auxiliaryUiPose.positionY = placement.worldAnchor.positionY;
+            auxiliaryUiPose.positionZ = placement.worldAnchor.positionZ;
+            auxiliaryUiPoseValid = IsFinitePose(auxiliaryUiPose) &&
+                IsFiniteUnitQuaternion(auxiliaryUiPose);
+        }
+        if (auxiliaryUiPoseValid)
+        {
+            // Protocol v23 already transports one auxiliary UI pose. Menus
+            // use it as a LOCAL anchor; an eye-filling scope uses only its
+            // orientation as a roll in VIEW. The control-block byte layout,
+            // version, handshake, and startup path remain unchanged.
+            block->frameUiWorldAnchor = auxiliaryUiPose;
+            MemoryBarrier();
+        }
+        InterlockedExchange(
+            &block->frameUiWorldAnchorValid,
+            auxiliaryUiPoseValid ? 1 : 0);
+        InterlockedExchange(
+            &block->frameUiReferenceMode,
+            static_cast<LONG>(
+                placement.headLocked
+                    ? shared::UiReferenceMode::HeadLocked
+                    : shared::UiReferenceMode::WorldLocked));
+        LONG overlayFlags = placement.backToGameVisible
+            ? shared::kFrameOverlayBackToGameVisible
+            : 0;
+        if (placement.backToGameVisible &&
+            placement.backToGameHovered)
+        {
+            overlayFlags |= shared::kFrameOverlayBackToGameHovered;
+        }
+        InterlockedExchange(
+            &block->frameOverlayFlags,
+            overlayFlags);
+        InterlockedExchange(
+            &block->framePresentationFlags,
+            eyeFillingScope
+                ? shared::kFramePresentationEyeFillingScope
+                : 0);
+        InterlockedExchange(
+            &block->mountedCameraDecoupled,
+            placement.mountedCameraDecoupled ? 1 : 0);
+    }
+
+    void PublishMovementFrame(const D3D8RuntimeMovementFrame& movement)
+    {
+        if (block == nullptr)
+        {
+            return;
+        }
+        const bool valid = movement.valid && movement.contextToken != 0 &&
+            std::isfinite(movement.worldPositionX) &&
+            std::isfinite(movement.worldPositionY) &&
+            std::isfinite(movement.worldPositionZ);
+        if (valid)
+        {
+            const std::uint64_t token = static_cast<std::uint64_t>(
+                movement.contextToken);
+            block->frameMovementContextTokenLow =
+                static_cast<DWORD>(token);
+            block->frameMovementContextTokenHigh =
+                static_cast<DWORD>(token >> 32U);
+            block->frameMovementOriginX = movement.worldPositionX;
+            block->frameMovementOriginY = movement.worldPositionY;
+            block->frameMovementOriginZ = movement.worldPositionZ;
+            MemoryBarrier();
+        }
+        InterlockedExchange(
+            &block->frameMovementOriginValid,
+            valid ? 1 : 0);
+    }
+
+    void ReportDepthExportTimings()
+    {
+        if (depthTimingReported)
+        {
+            return;
+        }
+        depthTimingReported = true;
+        for (std::size_t eye = 0;
+            eye < depthExportGpuMilliseconds.size();
+            ++eye)
+        {
+            if (depthExportGpuMilliseconds[eye].empty())
+            {
+                continue;
+            }
+            std::vector<double> sorted = depthExportGpuMilliseconds[eye];
+            std::sort(sorted.begin(), sorted.end());
+            const std::size_t p95Index = static_cast<std::size_t>(
+                std::ceil(static_cast<double>(sorted.size()) * 0.95)) - 1;
+            WriteLog(
+                L"Packed depth-export GPU summary eye=%zu samples=%zu median=%.4f ms p95=%.4f ms max=%.4f ms failures=%ld.",
+                eye,
+                sorted.size(),
+                sorted[sorted.size() / 2],
+                sorted[(std::min)(p95Index, sorted.size() - 1)],
+                sorted.back(),
+                depthResolveFailures);
+        }
+    }
+
+    void WriteLog(const wchar_t* format, ...) const
+    {
+        if (logCallback == nullptr)
+        {
+            return;
+        }
+        wchar_t message[1200] = {};
+        va_list arguments;
+        va_start(arguments, format);
+        _vsnwprintf_s(message, std::size(message), _TRUNCATE, format, arguments);
+        va_end(arguments);
+        logCallback(message);
+    }
+
+    shared::SharedControlChannel channel;
+    shared::SharedTextureProducer producer;
+    D3D8To9SharedTextureProducer gpuProducer;
+    shared::ControlBlock* block = nullptr;
+    shared::SharedTextureRequirements requirements = {};
+    shared::SharedTextureRequirements destinationRequirements = {};
+    PROCESS_INFORMATION presenterProcess = {};
+    std::wstring channelName;
+    std::wstring presenterPath;
+    D3D8SharedPresentationLogCallback logCallback = nullptr;
+    D3D8PresentationCompanion companion =
+        D3D8PresentationCompanion::OpenXR;
+    bool gpuSharedTargets = false;
+    bool texturesPublished = false;
+    bool ambientOcclusionRequested = false;
+    bool screenSpaceGlobalIlluminationRequested = false;
+    bool waterReflectionsRequested = false;
+    bool depthTexturesPublished = false;
+    bool depthResolveSuccessLogged = false;
+    bool depthTimingReported = false;
+    LONG depthResolveFailures = 0;
+    std::array<std::vector<double>, shared::kDepthTextureCount>
+        depthExportGpuMilliseconds = {};
+    bool companionStopped = false;
+    LONG pendingRenderRequest = 0;
+    bool controllerSampleLogged = false;
+    UINT runtimeUiWidth = 0;
+    UINT runtimeUiHeight = 0;
+    bool initialized = false;
+};
+
+D3D8SharedPresentationBridge::D3D8SharedPresentationBridge()
+    : impl_(std::make_unique<Impl>())
+{
+}
+
+D3D8SharedPresentationBridge::~D3D8SharedPresentationBridge() = default;
+
+bool D3D8SharedPresentationBridge::Initialize(
+    UINT logicalUiWidth,
+    UINT logicalUiHeight,
+    float worldRenderScale,
+    D3D8PresentationCompanion companion,
+    D3D8SharedPresentationLogCallback logCallback,
+    bool forceCpuTransport)
+{
+    return impl_ != nullptr &&
+        impl_->Initialize(
+            logicalUiWidth,
+            logicalUiHeight,
+            worldRenderScale,
+            companion,
+            logCallback,
+            forceCpuTransport);
+}
+
+bool D3D8SharedPresentationBridge::EnsureGpuFrameTargets(
+    void* d3d8Device,
+    std::array<void*, shared::kTextureCount>& surfaces,
+    std::array<void*, shared::kDepthTextureCount>& depthSurfaces,
+    std::array<void*, shared::kDepthTextureCount>& depthExportSurfaces)
+{
+    return impl_ != nullptr &&
+        impl_->EnsureGpuFrameTargets(
+            d3d8Device,
+            surfaces,
+            depthSurfaces,
+            depthExportSurfaces);
+}
+
+bool D3D8SharedPresentationBridge::RequestRender(
+    D3D8RuntimeRenderRequest& request,
+    DWORD timeoutMs)
+{
+    return impl_ != nullptr && impl_->RequestRender(request, timeoutMs);
+}
+
+bool D3D8SharedPresentationBridge::PublishFrame(
+    const D3D8RuntimeRenderRequest& request,
+    const std::array<D3D8SharedFramePixels, 3>& frame,
+    const D3D8RuntimeUiPlacement& uiPlacement,
+    const D3D8RuntimeMovementFrame& movementFrame)
+{
+    return impl_ != nullptr &&
+        impl_->PublishFrame(request, frame, uiPlacement, movementFrame);
+}
+
+bool D3D8SharedPresentationBridge::PublishGpuFrame(
+    void* d3d8Device,
+    const D3D8RuntimeRenderRequest& request,
+    DWORD timeoutMs,
+    const D3D8RuntimeUiPlacement& uiPlacement,
+    const D3D8RuntimeMovementFrame& movementFrame,
+    const D3D8RuntimeDepthFrame& depthFrame,
+    const std::array<void*, shared::kDepthTextureCount>& depthSurfaces,
+    const std::array<void*, shared::kDepthTextureCount>& depthExportSurfaces)
+{
+    return impl_ != nullptr &&
+        impl_->PublishGpuFrame(
+            d3d8Device,
+            request,
+            timeoutMs,
+            uiPlacement,
+            movementFrame,
+            depthFrame,
+            depthSurfaces,
+            depthExportSurfaces);
+}
+
+bool D3D8SharedPresentationBridge::WaitForConsumption(
+    LONG sequence,
+    DWORD timeoutMs)
+{
+    return impl_ != nullptr &&
+        impl_->WaitForConsumption(sequence, timeoutMs);
+}
+
+bool D3D8SharedPresentationBridge::WaitForPresentation(
+    LONG sequence,
+    DWORD timeoutMs)
+{
+    return impl_ != nullptr &&
+        impl_->WaitForPresentation(sequence, timeoutMs);
+}
+
+void D3D8SharedPresentationBridge::PrepareForResourceRelease()
+{
+    if (impl_ != nullptr)
+    {
+        impl_->PrepareForResourceRelease();
+    }
+}
+
+void D3D8SharedPresentationBridge::Shutdown()
+{
+    if (impl_ != nullptr)
+    {
+        impl_->Shutdown();
+    }
+}
+
+bool D3D8SharedPresentationBridge::UsesGpuSharedTargets() const noexcept
+{
+    return impl_ != nullptr && impl_->gpuSharedTargets;
+}
+
+bool D3D8SharedPresentationBridge::WaterReflectionsRequested() const noexcept
+{
+    return impl_ != nullptr && impl_->waterReflectionsRequested;
+}
+
+UINT D3D8SharedPresentationBridge::LeftWorldWidth() const noexcept
+{
+    return impl_ == nullptr ? 0 : impl_->requirements.leftWorldWidth;
+}
+
+UINT D3D8SharedPresentationBridge::LeftWorldHeight() const noexcept
+{
+    return impl_ == nullptr ? 0 : impl_->requirements.leftWorldHeight;
+}
+
+UINT D3D8SharedPresentationBridge::RightWorldWidth() const noexcept
+{
+    return impl_ == nullptr ? 0 : impl_->requirements.rightWorldWidth;
+}
+
+UINT D3D8SharedPresentationBridge::RightWorldHeight() const noexcept
+{
+    return impl_ == nullptr ? 0 : impl_->requirements.rightWorldHeight;
+}
+
+UINT D3D8SharedPresentationBridge::UiWidth() const noexcept
+{
+    return impl_ == nullptr ? 0 : impl_->requirements.uiWidth;
+}
+
+UINT D3D8SharedPresentationBridge::UiHeight() const noexcept
+{
+    return impl_ == nullptr ? 0 : impl_->requirements.uiHeight;
+}
+
+UINT D3D8SharedPresentationBridge::RuntimeUiWidth() const noexcept
+{
+    return impl_ == nullptr ? 0 : impl_->runtimeUiWidth;
+}
+
+UINT D3D8SharedPresentationBridge::RuntimeUiHeight() const noexcept
+{
+    return impl_ == nullptr ? 0 : impl_->runtimeUiHeight;
+}
+
+DWORD D3D8SharedPresentationBridge::WorldD3DFormat() const noexcept
+{
+    return UsesGpuSharedTargets()
+        ? kD3DFormatA2B10G10R10
+        : kD3DFormatA8R8G8B8;
+}
+
+DWORD D3D8SharedPresentationBridge::UiD3DFormat() const noexcept
+{
+    return UsesGpuSharedTargets()
+        ? kD3DFormatA16B16G16R16F
+        : kD3DFormatA8R8G8B8;
+}
+
+DXGI_FORMAT D3D8SharedPresentationBridge::Format() const noexcept
+{
+    return impl_ == nullptr ? DXGI_FORMAT_UNKNOWN : impl_->requirements.format;
+}
+
+bool BuildD3D8RuntimeStereoTransforms(
+    const D3D8RuntimeRenderRequest& request,
+    const D3D8RuntimeView& referenceHead,
+    const d3d8probe::D3DMatrix& sourceView,
+    const d3d8probe::D3DMatrix& sourceProjection,
+    d3d8probe::D3DMatrix& leftView,
+    d3d8probe::D3DMatrix& rightView,
+    d3d8probe::D3DMatrix& leftProjection,
+    d3d8probe::D3DMatrix& rightProjection)
+{
+    stereo::Matrix4 view = {};
+    stereo::Matrix4 projection = {};
+    std::memcpy(&view, &sourceView, sizeof(view));
+    std::memcpy(&projection, &sourceProjection, sizeof(projection));
+    const auto toPose = [](const D3D8RuntimeView& runtimeView)
+    {
+        return stereo::Pose{
+            {
+                runtimeView.positionX,
+                runtimeView.positionY,
+                runtimeView.positionZ},
+            {
+                runtimeView.orientationX,
+                runtimeView.orientationY,
+                runtimeView.orientationZ,
+                runtimeView.orientationW}};
+    };
+    const auto toFov = [](const D3D8RuntimeView& runtimeView)
+    {
+        return stereo::FovTangents{
+            std::tan(runtimeView.angleLeft),
+            std::tan(runtimeView.angleRight),
+            std::tan(runtimeView.angleUp),
+            std::tan(runtimeView.angleDown)};
+    };
+    const auto pair = stereo::MakeRuntimePoseD3D8StereoPair(
+        view,
+        projection,
+        toPose(referenceHead),
+        toPose(request.views[0]),
+        toPose(request.views[1]),
+        toFov(request.views[0]),
+        toFov(request.views[1]),
+        1.0F);
+    if (!pair.has_value())
+    {
+        return false;
+    }
+    stereo::D3D8StereoTransformPair adjustedPair = *pair;
+    const float scopeProjectionScale = ReadScopeViewProjectionScale();
+    if (scopeProjectionScale != 1.0F &&
+        (!stereo::ApplyD3D8ScopeProjectionScale(
+             adjustedPair.leftProjection,
+             scopeProjectionScale) ||
+         !stereo::ApplyD3D8ScopeProjectionScale(
+             adjustedPair.rightProjection,
+             scopeProjectionScale)))
+    {
+        return false;
+    }
+    RecordScopeViewProjectionReplay(
+        request.sequence,
+        projection,
+        adjustedPair.leftProjection,
+        adjustedPair.rightProjection);
+    std::memcpy(&leftView, &adjustedPair.leftView, sizeof(leftView));
+    std::memcpy(&rightView, &adjustedPair.rightView, sizeof(rightView));
+    std::memcpy(
+        &leftProjection,
+        &adjustedPair.leftProjection,
+        sizeof(leftProjection));
+    std::memcpy(
+        &rightProjection,
+        &adjustedPair.rightProjection,
+        sizeof(rightProjection));
+    return true;
+}
+
+bool BuildD3D8DiagnosticStereoTransforms(
+    const d3d8probe::D3DMatrix& sourceView,
+    const d3d8probe::D3DMatrix& sourceProjection,
+    float halfEyeOffset,
+    float convergenceDistance,
+    d3d8probe::D3DMatrix& leftView,
+    d3d8probe::D3DMatrix& rightView,
+    d3d8probe::D3DMatrix& leftProjection,
+    d3d8probe::D3DMatrix& rightProjection)
+{
+    stereo::Matrix4 view = {};
+    stereo::Matrix4 projection = {};
+    std::memcpy(&view, &sourceView, sizeof(view));
+    std::memcpy(&projection, &sourceProjection, sizeof(projection));
+    const auto pair = stereo::MakeDiagnosticD3D8StereoPair(
+        view,
+        projection,
+        halfEyeOffset,
+        convergenceDistance);
+    if (!pair.has_value())
+    {
+        return false;
+    }
+    std::memcpy(&leftView, &pair->leftView, sizeof(leftView));
+    std::memcpy(&rightView, &pair->rightView, sizeof(rightView));
+    std::memcpy(&leftProjection, &pair->leftProjection, sizeof(leftProjection));
+    std::memcpy(&rightProjection, &pair->rightProjection, sizeof(rightProjection));
+    return true;
+}
+
+D3D8RuntimeView MakeD3D8RuntimeHeadReference(
+    const D3D8RuntimeRenderRequest& request) noexcept
+{
+    if (request.headPoseValid)
+    {
+        return request.headPose;
+    }
+
+    D3D8RuntimeView reference = request.views[0];
+    const auto toPose = [](const D3D8RuntimeView& view)
+    {
+        return stereo::Pose{
+            {view.positionX, view.positionY, view.positionZ},
+            {
+                view.orientationX,
+                view.orientationY,
+                view.orientationZ,
+                view.orientationW}};
+    };
+    const auto centre =
+        stereo::ComputeCentreViewPose(toPose(request.views[0]), toPose(request.views[1]));
+    if (centre.has_value())
+    {
+        reference.orientationX = centre->orientation.x;
+        reference.orientationY = centre->orientation.y;
+        reference.orientationZ = centre->orientation.z;
+        reference.orientationW = centre->orientation.w;
+        reference.positionX = centre->position.x;
+        reference.positionY = centre->position.y;
+        reference.positionZ = centre->position.z;
+    }
+    return reference;
+}
+
+bool BuildD3D8RuntimeRotationOnlyTransforms(
+    const D3D8RuntimeRenderRequest& request,
+    const D3D8RuntimeView& referenceHead,
+    const d3d8probe::D3DMatrix& sourceView,
+    const d3d8probe::D3DMatrix& sourceProjection,
+    d3d8probe::D3DMatrix& leftView,
+    d3d8probe::D3DMatrix& rightView,
+    d3d8probe::D3DMatrix& leftProjection,
+    d3d8probe::D3DMatrix& rightProjection)
+{
+    D3D8RuntimeRenderRequest rotationOnly = request;
+    for (D3D8RuntimeView& view : rotationOnly.views)
+    {
+        view.positionX = referenceHead.positionX;
+        view.positionY = referenceHead.positionY;
+        view.positionZ = referenceHead.positionZ;
+    }
+    return BuildD3D8RuntimeStereoTransforms(
+        rotationOnly,
+        referenceHead,
+        sourceView,
+        sourceProjection,
+        leftView,
+        rightView,
+        leftProjection,
+        rightProjection);
+}
+} // namespace bfvr

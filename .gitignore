@@ -1,0 +1,33 @@
+# Local build products and runtime diagnostics.  Source, profiles, documents,
+# licenses, and the packaged OpenXR runtime loader remain versioned.
+/build/
+/BFVRClient.dll
+/BFVR.exe
+/BFVRLoader.exe
+/UserConfig.txt
+/loader.log
+/logs/
+
+# BF2142 developer and locally generated player data.
+/dist/
+/.venv/
+/.vs/
+/checkpoint/
+/generated/
+/backups/
+__pycache__/
+*.py[cod]
+*.pdb
+*.dmp
+*.obj
+*.ilk
+*.user
+*.suo
+install.json
+payload.json
+BF2142VR.ini
+BodyEquipment.bin
+LobbyScene.bin
+Weapons_client.zip
+.env
+.env.*

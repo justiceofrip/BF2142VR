@@ -1,0 +1,59 @@
+BATTLEFIELD 2142 VR - QUEST CONTROLLERS
+
+Right trigger: fire; click a menu with the laser.
+Right grip while holding equipment: click to holster it.
+Right grip while empty: squeeze the hand; it does not recall the last gun.
+Left grip near rifle foregrip: support with both hands.
+Left grip while cupping your right hand: stabilize a pistol/revolver.
+Bring a supported sight to either eye: automatic ADS, no button required.
+Knife: draw from the chest, let the grip settle, then swing/stab.
+Grenade: right trigger throws. The trajectory guide currently has known issues.
+Thumb/index touch, grip and trigger animate fingers; no bare-hand tracking.
+
+Left stick: move. Click: sprint.
+Right stick: turn. Click: recenter. Keyboard Home also recenters.
+A: jump / native parachute action. B: menu/back.
+X: reload. Y: interact / enter / exit a vehicle.
+Left trigger + X/Y while on foot: equipment cycling.
+
+BODY SLOTS
+Main weapon: behind right shoulder. Pistol: right hip. Knife: chest.
+Utility slots: left belt, rear left and rear right. Grenade: front belt.
+Move your right hand to the slot and press grip to draw.
+
+MOVEMENT
+Physically lower your head about 30 cm to crouch or 88 cm to prone.
+Stand normally and choose CALIBRATE STANDING HEIGHT in VR CONTROLS if needed.
+Physical stance can be disabled for seated play. Head-relative and left-
+controller-relative locomotion are selectable. Missing controller direction
+falls back to head direction. Snap/smooth turning and snap angle are adjustable.
+Automatic parachute deployment uses the native game's fall/deployment rules.
+On a ladder, hold either grip and pull down to ascend, up to descend; release
+stops. Left-stick up/down remains available. Ladder hands are still a work in
+progress rather than individual physical rung grips.
+
+VEHICLES AND PODS
+Hold left trigger + tap X: driver/F1.
+Hold left trigger + tap Y: cycle seats 2-8; tap again for occupied/absent seats.
+Y alone still enters/exits. Right trigger fires; right grip is alternate fire.
+APC passenger/pod seat: right grip launches its pod.
+Titan: Y enters the pod launcher; right trigger launches (right grip also works).
+Movable stock guns follow head aim within native traverse limits. Aircraft
+pilot guns stay fixed to aircraft direction; looking does not steer flight.
+Nekomata main gun follows head pitch; steer its hull for horizontal aim.
+
+MENUS
+Point your right controller at the menu and pull right trigger to select.
+B opens/backtracks the game menu. VR CONTROLS opens the mod's settings panel.
+Keyboard Insert can open/close VR CONTROLS if needed.
+
+OPTIONAL DESKTOP SIMULATOR
+F1 hold, F2 sight, F3 back slot, F4 pistol, F5 knife, F6 left belt,
+F7 rear left, F8 grenade, keypad 0 rear right.
+Right Ctrl grip, Right Shift support, F9 trigger, F10 menu, F11 tracking loss.
+Mouse aims the menu laser; F9 clicks. Brackets turn head; PageUp/Down tilts it.
+Keypad 7/9 lowers/raises head; End resets head pose; Home recenters.
+Keypad 4/6, +/- and 8/2 move right hand; Decimal speeds movement.
+Keypad 1/3 simulates right index/thumb touch; left Ctrl/Alt simulates left touch.
+Left Shift is left trigger; Left Shift + X/Y selects vehicle seats.
+The simulator must have window focus. Use Play VR.cmd for actual VR.

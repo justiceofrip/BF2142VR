@@ -1,0 +1,49 @@
+BATTLEFIELD 2142 VR - ALPHA TROUBLESHOOTING
+
+SETUP STOPS
+Extract the whole ZIP first, close the game, and select BF2142.exe.
+This alpha recognizes stock v1.51 weapons and the accepted BFVR repair. It
+stops on other weapon packs instead of overwriting them. Use a clean stock
+installation for Remaster/HD-mod conflicts.
+If the message says access denied, run Setup.cmd as administrator.
+If setup was interrupted, keep the BF2142VR folder and backups. Run its
+Uninstall.cmd to restore any completed changes before retrying.
+
+GAME OPENS FLAT
+Use the Alpha shortcut or installed Play VR.cmd. Desktop Preview.cmd is a
+simulator; the ordinary game/Hub shortcut does not inject the VR mod.
+Connect Steam Link first and make SteamVR the active OpenXR runtime, then launch.
+Do not launch two copies of the game. Close the existing session normally.
+
+LOGIN / SERVERS
+The old EA backend is closed. Use the current Reclamation Hub/OpenSpy setup:
+https://www.battlefield2142.co/help/
+This package does not include the Hub or copy anyone's account/profile data.
+Online VR gameplay is not yet advertised as working. Initial testing is bots.
+
+TRACKING / POSTURE
+Right-stick click or Home recenters. For stance, stand comfortably and select
+CALIBRATE STANDING HEIGHT in VR CONTROLS. Disable physical stance if seated.
+If wireless tracking disconnected, reconnect your headset and restart the VR
+session. Avoid treating missing tracking as a new standing-height reference.
+
+CRASH OR BAD RENDERING
+Save the exact error and what you were doing. Reports should include version
+0.1.0-alpha.1 (v30), headset/runtime, GPU, game mod, map and the failed action.
+Client/presenter logs are under BF2142VR/runtime/x86/logs. Optional branding
+messages are under BF2142VR/logs. Check logs before sharing them for any personal
+paths or account information. Do not post credentials, original game archives,
+install.json or the backups/generated folders.
+Keep the native game AA option off; the VR menu room supplies its own AA.
+Recording software is not included. The developer's OBS profile is separate.
+
+RESTORE THE GAME
+Close it, then run installed Uninstall.cmd. Only the recorded VR changes are
+restored; other game modifications are not removed. If a later mod changed a
+recorded file, automatic uninstall stops to preserve that mod and the backup.
+Do not delete backups before uninstalling. The original EXE is backed up only
+when setup needed to enable its large-address-aware memory flag.
+
+REINSTALL / MOVING THE GAME
+Uninstall before moving the game or installing another weapon pack. After
+uninstall, move the old BF2142VR folder aside and run a fresh Setup.cmd.

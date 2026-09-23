@@ -1,0 +1,39 @@
+[VR]
+; Read at launch. WorldScale is physical meters to game units.
+WorldScale=1.0
+HeightOffset=0.0
+TurnSpeed=600
+Controllers=1
+; Legacy visual-only camera mode; disabled when MotionHands is enabled.
+TrackedWeapon=0
+; Controller wrists/arms, supported firearm aiming and off-hand grip (v11).
+; Set 0 for the previous stick/mouse weapon handling.
+MotionHands=1
+; Lens-only VR optics for five calibrated rifles and the EU LMG reflex sight.
+WeaponOptics=1
+; Align either eye behind a supported sight to activate native ADS.
+; Set 0 for legacy grip-controlled ADS.
+AutomaticADS=1
+
+
+; Right squeeze at body slots selects current local inventory items.
+BodyInventory=1
+; Controller touch/analog curl for the free hand; grips remain authored.
+FingerPoses=1
+; Optional private pack generated from your own game with ExportBodyEquipment.py.
+BodyEquipmentFile=
+
+; v25 live controls menu (VR CONTROLS tile / Insert); saved immediately.
+SnapTurning=1
+SnapAngle=30
+HideCrosshair=1
+PhysicalStance=1
+; 0 auto-calibrates at the first standing session. Calibrate upright in VR.
+StandingHeight=0
+MenuRoom=1
+ToggleWeaponGrip=1
+GrenadeArc=1
+; Knife swing/stab only. Grenades use native primary trigger.
+MotionActions=1
+; Retired: v25 ignores old fade settings and keeps solid weapon geometry.
+WeaponFaceFade=0

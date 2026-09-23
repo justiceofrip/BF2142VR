@@ -1,0 +1,22 @@
+BATTLEFIELD 2142 VR 0.1.0-alpha.1 - v30 PLAYTEST PACKAGE
+
+An early PC VR alpha candidate. Multiplayer support and remote IK are pending.
+
+Includes the accepted v29 loading-memory fix and v30 vehicle/parachute work:
+head aiming for movable vehicle guns, controller seat selection and tracked
+hands while gliding. Stock turret/aircraft limits remain; see CONTROLS.txt.
+Preserves tracked weapons/hands, two-hand support, physical ADS, body holsters,
+empty hands, controller-touch finger poses, physical stance, snap/smooth turning,
+head/controller locomotion, laser menus, floating HUD and the walker hangar.
+
+Setup generates the repaired weapons, body equipment and lobby locally. Game
+files are not included. It installs the VR runtime under your game/BF2142VR,
+backs up the original weapon archive and enables large-address support only if
+needed, with a recorded backup for uninstall. The Hub/OpenSpy patch is separate.
+
+This package's installer/load checks are recorded in PACKAGE CHECKS.txt.
+Compilation and automated checks do not establish compatibility with every
+headset, GPU or game modification. New interactions remain open for feedback.
+
+No manual reloads, physical steering wheels, hand-to-hand knife transfer,
+networked waving or new cockpit geometry are included yet.

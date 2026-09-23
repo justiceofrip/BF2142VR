@@ -1,0 +1,468 @@
+# BFVR Changelog
+
+## BF2142 0.1.0-alpha.1 player package candidate
+
+- Add game-folder setup, a separate Alpha shortcut, complete runtime payload,
+  controls, installation/troubleshooting instructions and reversible uninstall.
+- Generate accepted weapon repairs, body equipment, branding and the walker
+  hangar locally using a bundled setup tool; no Python/FFmpeg install required.
+- Preserve original game files in verified backups. Enable LAA only if absent;
+  keep OpenSpy/Hub, accounts and maps unchanged. Later mod edits or damaged
+  backups stop automatic restore before any partial restoration.
+- Remove private PDB paths from shipped runtime metadata; include source-tool
+  and dependency notices. Installer/rollback/asset/ZIP-extraction checks pass.
+  Final packaged live match/headset acceptance is pending; no public upload.
+
+## BF2142 v30 vehicle controls and parachute hands (private checkpoint)
+
+- Add head-directed input for stock movable vehicle guns, including tanks,
+  walker seats, buggy gunners, aircraft gunners, stationary guns and pod cannons.
+  Keep the stereo camera anchored to the chassis so native turret follow does
+  not apply head rotation twice. Native traverse speed and angle limits remain.
+  Nekomata's hull-mounted main gun follows head pitch; yaw stays with steering.
+  Fixed aircraft pilot weapons still aim with the aircraft, not headset look.
+- Left trigger + X selects F1/driver; left trigger + Y cycles F2-F8. Seat changes
+  use native selection and honor occupied/unavailable seats. Vehicle-specific
+  help documents APC right-grip pod launch and Titan right-trigger launch.
+- Keep tracked empty hands during the exact local stock parachute state, using
+  the existing level comfort camera. Freeze weapon grip settlement in flight so
+  canopy animations cannot become the next gun's firing/support grip. No new
+  camera/root-bone writes, remote IK or vehicle physics modifications.
+- Add desktop head yaw on brackets and simulated seat shortcuts on Left Shift
+  + X/Y. Preserve v29 loading memory fix, accepted hands, weapon assets and OBS.
+- Win32/x64 builds, 60/60 CTest and 13/13 GPU fixtures pass. Read-only live-game
+  inspection confirms the native signatures and buggy/walker/static-gun parent
+  layouts. v30 aiming/seat switching and parachute hands still need in-game
+  acceptance; these checks do not establish headset comfort. Save v29 unchanged.
+
+## BF2142 v29 loading stability (private checkpoint)
+
+- Fix the reproduced legacy D3DX9 shader allocation failure during level loading.
+  Keep the verified d3dx9_29 runtime's allocations below 2 GiB using a private
+  128 MiB heap and 64 MiB page arena, committing pages as needed. The game's
+  remaining allocations retain their normal address space and allocator.
+- Preserve allocator ownership across free/realloc, reuse memory across level
+  changes, and verify the native compiler signature and every replaced import.
+  Unrecognized runtimes or existing allocator hooks are left unchanged.
+- Desktop pressure test: the original runtime fails with the same 0x8007000E
+  recorded before the owner's loading crashes. With this fix, all 1,659 cached
+  effects load concurrently and release successfully twice under the same
+  pressure. Synthetic source compilation also passes. Win32/x64 builds,
+  58/58 CTest and 13/13 rendering fixtures pass. Headset acceptance pending.
+- Preserve v28 gameplay, hands, camera, walker lobby and recording setup.
+  Keep v28 as an unchanged rollback checkpoint. No public release is implied.
+
+## BF2142 v28 hands, traversal comfort and walker hangar (private checkpoint)
+
+- Correct mirrored finger flexion: left fingers bend into +palm X, right into
+  -palm X, verified against a captured native rig. The free left arm and fingers
+  now use settled palm anatomy independently of knife/firearm animations. Keep
+  the accepted held right-hand, knife, rifle support and pistol cupping poses.
+- Recognize the local controlled LadderContainer and named stock parachute using
+  verified player/instance/template profiles. Track mount translation while
+  keeping the headset frame level and free of native seat tilt/bob. Pods and
+  unfamiliar vehicles retain their existing behavior. Physical HMD look remains.
+- Automatically pulse the native jump/parachute action after sustained falling;
+  native altitude/deployment rules remain in charge. On ladders, squeeze either
+  grip and pull down to climb up (push up to descend); release stops the gesture.
+  Left-stick up/down remains available independent of movement-heading settings.
+  Ladder grips cannot holster weapons or trigger infantry ADS/stance actions.
+- Replace the optional main-menu cube with a lit walker hangar using EU/PAC
+  vehicle meshes and textures extracted from the owner's installation. Bake
+  articulated mesh-part transforms; draw stereo geometry with depth, mipmaps
+  and 4x MSAA where available. Missing assets retain the original room. The
+  private asset pack stays outside public source and is not redistributable.
+- Win32/x64 built, 57/57 CTest and 13/13 GPU fixtures passed. The walker lobby
+  was visually reviewed; measured about 3.2 ms per 1280x720 stereo pair including
+  readback on the local GPU. No v28 live-game/headset acceptance is claimed.
+  Save v27 unchanged as fallback; grenade guide and knife transfer remain open.
+
+## BF2142 v27 turning, empty hands and movement direction (private checkpoint)
+
+- Route infantry snap turns through the signature-verified local look-input
+  caller once per stick edge. Native heading, body rotation and minimap use the
+  same turn; do not accumulate snap yaw in the XR tracking reference. Track
+  actual recoil separately so comfort retains deliberate turns. Cancel pending
+  turns on menus/recenter/reset, lost focus, stale input or changed ownership.
+- Solve shoulders and elbow poles in the same level input frame as the tracked
+  hands. Native camera/root bones remain untouched. The v26 knife attachment,
+  held firearm grips, pistol support, body slots and weapon assets are retained.
+- Squeezing an empty hand no longer redraws the last weapon. Grab a body slot or
+  select equipment to draw; a held item's grip click still returns it to its
+  holster. Empty hands use cached palm anatomy and controller-driven finger
+  bends independently of hidden native weapon animations. Held finger poses
+  and knife handling remain unchanged.
+- Add saved head-relative (default) / left-controller-relative movement to the
+  VR controls panel. Use horizontal left aim heading; fall back to head heading
+  when tracking is unavailable or the controller points nearly vertically.
+- Win32/x64 builds, 55/55 CTest and 12/12 GPU fixtures passed, including native
+  turn ownership/recoil guards and 288 rotated rifle/knife/empty-hand poses.
+  Headset acceptance of v27 is pending. The owner accepted the v26 knife and
+  general progress; the missing grenade guide and knife transfer are deferred.
+
+## BF2142 v26 knife/support and menu polish (private development checkpoint)
+
+- Replace the incorrect knife half-turn with a handle-centered controller grip:
+  the actual mesh blade +Z exits the thumb/index side of the hand. Give both
+  knife arms independent palm-space poses so native slashing/draw animations
+  cannot drag the free left hand, fingers or clavicle along with the knife.
+  Settle the reference grip before caching it; preserve ordinary firearm poses.
+- Add close two-hand support for stock EU/PAC handguns. Hold left squeeze while
+  cupping the right hand to steady small aiming rotations. Release or separate
+  hands to disengage. Do not use the short hand-to-hand baseline as barrel aim.
+- Share one tracked frag launch transform between the pre-velocity native fire
+  hook and trajectory guide; avoid camera-mapping an already moved weapon twice.
+  Include signature-verified infantry movement velocity and start the line at
+  launch time zero. Native trigger/delay, speed and inventory remain in charge.
+- Antialias menu-room lines at full output resolution with a D3D9 pixel shader.
+  Preserve render targets, depth, viewport and state; publish both eyes only
+  after a successful draw. No CPU backdrop work runs in the VR frame loop.
+- Identify the 2142 presenter explicitly in OpenXR; retain 1942's default name.
+  Add optional separate-process SteamVR registration for a 2142 title and logo
+  extracted locally from the owner's installation, never bundled publicly.
+- Win32/x64 builds, 53/53 deterministic tests and 12/12 GPU fixtures passed.
+  Room fixture: about 3 ms for 1280x720 stereo, including CPU readback. Live
+  SteamVR application title/image/process registration was verified. New
+  in-game/headset interaction acceptance is pending. Saved v25 is unchanged.
+
+## BF2142 v25 solid weapons and VR controls (private development checkpoint)
+
+- Remove the rejected near-face fade and its extra scene replays, including for
+  old INIs that enabled it. Keep the completed exterior weapon geometry. The
+  owned-asset repair removes only proven artificial inward duplicates inside
+  solid shells; thin one-sided details keep their reverse faces. Use a 6 mm
+  first-person near plane without changing the world's clipping planes.
+- Flip only the knife mesh around its handle; retain the accepted wrist/arm
+  solve, firearm grips, physical sights and motion knife attacks.
+- Click right grip away from body slots to holster/draw. Both hands can be free;
+  grab a body slot to draw that item. Gate firing until a re-grab has a fresh
+  native hand pose. Wheel/keyboard selection also draws the selected item.
+- Restore native trigger grenade throws. Add an optional approximate stereo
+  trajectory guide; it does not predict collisions or inherited player velocity.
+- Hide the named native crosshair alpha only during HUD draw; preserve the
+  floating HUD and the VR optic renderer. Add a laser-operated VR controls
+  panel, persistent smooth/snap turning (15/30/45/60 degrees), controls reference,
+  standing-height calibration, grip/arc/crosshair and 3D-menu switches.
+- Add a stereo briefing-room backdrop behind the world-anchored main menu.
+- Physical crouch/prone follows calibrated headset height, with hysteresis and
+  native stance feedback. Compensate native stance camera lowering once a
+  stable standing camera has been observed, rejecting elevated spawn cameras.
+- Win32 build, x64 presenter, 52/52 tests and 11/11 GPU fixtures passed.
+  Desktop-native stance transitions and controls-menu persistence were checked.
+  Headset acceptance remains pending. Accepted v23 remains the rollback.
+
+## BF2142 v24 motion/comfort development build
+
+- Use deliberate knife swings/stabs and controller-grip orientation for the knife.
+- Prime frags with trigger while holding grip; release grip for a velocity-based
+  throw, retaining the release frame through native animation delays.
+- Animate both thumbs and trigger fingers from controller touch while preserving
+  the accepted authored gun/support grips.
+- Fade the first-person weapon/hands near either eye using owned mesh proximity;
+  keep the tracked camera, aim, HUD and world unchanged.
+- Preserve accepted v23 as a separate rollback. Add native/policy/GPU regressions.
+- Manual reloads and multiplayer pose replication remain future work.
+
+## BF2142 v23 hand/holster corrections
+
+- Settle the firing-hand attachment after draw animation instead of locking the
+  first equip frame; exclude ADS from settlement and retain settled reload grips.
+- Derive torso heading from horizontal headset forward, preserving heading while
+  looking down; account for eye movement about the neck.
+- Keep body equipment anchored when a controller loses tracking; cancel grabs
+  and require a new squeeze edge when tracking returns.
+- Fit and orient each holster model for its slot. Rifles/knives hang below their
+  grab points; oversized deployment equipment becomes a compact belt prop.
+- Preserve the accepted sight rendering, activation, menu fixes and v20 weapons.
+
+## BF2142 v22 development batch
+
+- Add desktop VR simulation: native stereo, tracked hands, sights and menu input
+  with keyboard poses, no headset or OpenXR presenter.
+- Grab inventory from back, right hip, chest and belt with right squeeze; use
+  current local infantry inventory and cancel grabs on menu/focus/tracking loss.
+- Display stock world-model equipment on the body from a separately generated,
+  private asset pack; hide the currently equipped item and highlight hover.
+- Optional Quest controller touch drives free-hand finger extension/curl, with
+  analog fallback and full native finger-parent checks. Preserve authored grips.
+- Keep v21 ADS/deployment fixes and the user-confirmed v20 weapon asset repair.
+
+
+
+## BF2142 v21: physical sight activation and centered deployment input
+
+- Supported sights engage native ADS after either eye aligns for 180 ms and
+  release after 300 ms out of alignment. Right grip no longer forces ADS in
+  automatic mode; native reload/sprint cancellations require lowering the gun.
+- Add the EU LMG's measured 1x reflex window. Keep its normal completed model
+  during native ADS, and draw only a collimated dot inside the glass. It does
+  not request another world render or magnify a patch around the weapon.
+- Correct deployment-pointer coordinates to include the native HUD rectangle's
+  left/top origin. The native canvas is centered; zero-origin input produced
+  a half-canvas offset between the VR dot and the actual clickable point.
+- Preserve accepted v20 weapon assets, v18 hands, comfort and OBS behavior.
+
+
+This file records user-visible changes to BFVR. GitHub Release notes should use
+the v1.0.2 section exactly as written below.
+
+## BF2142 port development (unreleased)
+
+- v20 weapon assets address the actual missing geometry shown in the user's
+  rotating-gun video: v19 revealed triangle backs but did not add absent outer
+  walls. Borrow uncovered textured surfaces from the corresponding complete
+  world model for all 28 normal first-person firearm/attachment meshes.
+- Keep every existing v19 material/vertex/index unchanged and append donor
+  surfaces only where an outward surface from that rigid part is absent.
+  Subdivide coverage boundaries, retain donor UVs and textures, and inset the
+  added skin 0.5 mm to reduce overlap. Apply reviewed Voss scaling and the PAC
+  pistol bolt-part remap; skip donor faces without a known FP attachment.
+- Preserve the 50 transparent materials / 400 sort lists and every world LOD;
+  the v18 native runtime and controls remain. Fifteen mesh/completion tests and
+  full archive comparisons pass. Textured offline previews show filled rear/
+  underside openings and preserve the original detailed side; actual headset
+  appearance and reload seams remain to confirm after a full game relaunch.
+
+
+- v19 weapon assets extend the v18 culling repair from five optics rifles to
+  28 stock firearm/attachment models, including EU/PAC machine guns, SMGs,
+  handguns, shotguns, launchers and unlock rifles. The user's running v18 match
+  was equipped with eu_mg, which the previous repair did not cover.
+- Repair solid backs in every first-person mesh variant (54 total), including
+  alternate native aiming meshes, while preserving 50 transparent materials /
+  400 alpha-sort lists exactly. All world LODs and 330 unrelated ZIP entries
+  are unchanged. Keep the existing PAC rifle stock addition.
+- This is an asset update using the unchanged v18 client/presenter and accepted
+  hand/ADS recovery behavior. Nine mesh tests and full archive comparisons pass.
+  It is staged for the next full game launch when an existing match is running.
+  Reuses original UVs; does not claim new HD art or complete missing geometry
+  beyond the reviewed PAC rifle stock. Actual headset coverage remains to check.
+
+
+- v18 corrects a v17 regression reported with displaced hands and long blue
+  additive surfaces extending out of the rifle. The mesh writer discarded
+  seven of the eight depth-sorted index lists for every alpha-blended material.
+  Preserve all lists and validate every direction/range; keep transparent
+  materials byte-for-byte equivalent at the vertex/index level. The original
+  five-gun backface repair and PAC stock completion remain.
+- Remove the v17 cached ADS arm/finger pose from the client and restore the
+  accepted v16 binding/animation path. AutomaticADS now defaults to 0 and the
+  local recovery configuration uses grip-controlled native ADS; accepted v16
+  lens rendering and the v17 deployment-pointer code remain. Automatic ADS
+  remains experimental opt-in and is not claimed fixed in this recovery pass.
+- Add independent eight-direction binary fixtures that reproduce the old
+  writer's corruption and catch missing or invalid later sort lists. Private
+  original/archive comparison confirms 80 lists in 10 transparent materials,
+  all other LODs and 353 unaffected ZIP entries are preserved. The v17 headset
+  report supersedes its automated checks. Both builds, 47 CTests, eight mesh
+  tests and five renderer/stereo/scope GPU fixtures pass; v18 still needs a
+  normal headset run.
+
+
+- v17 follows the user's accepted v16 optics report. Sight alignment now engages
+  native ADS on the five calibrated stock rifles after a short dwell; right
+  grip remains an override. Lowering the gun releases automatically engaged
+  ADS. Respect native reload/sprint cancellation and keyboard-owned zoom.
+  AutomaticADS=0 restores grip-only activation on the next launch.
+- Preserve the settled arm/hand pose through supported ADS and its exit blend,
+  while keeping weapon-part animation and the accepted wrist/aim solver live.
+- Fix deployment input through the native HUD root and pointer interfaces.
+  The v15 frontend check covered Flash screens and did not fix the user's
+  class/spawn screen. Read the HUD's actual menu mode and enabled pointer,
+  map laser hits into its native GUI dimensions, and enqueue select/release
+  edges once per controller sample, with focus/stale-owner guards.
+- Add an asset-free local repair tool for the five stock optic meshes. It
+  duplicates solid first-person faces with reversed winding/normals, skips
+  transparent lens materials, and restores the PAC assault rifle's absent
+  stock from its existing third-person mesh. Other LODs/ZIP entries remain
+  intact. Owned game assets stay outside the source repository.
+- v17 passes 47 Win32 CTests, both builds, five mesh-tool tests and hidden
+  renderer/stereo/scope GPU fixtures with and without 4x MSAA. Native profiles
+  match the installed binaries. These checks do not establish headset feel:
+  deployment selection, automatic ADS thresholds, hand shape and repaired
+  textures need the next combined play session. Other guns/Remaster art are
+  outside this repair pass. Existing optics depth-occlusion limits remain.
+
+
+- v16 adds a first weapon-specific VR optics pass for EU/PAC assault rifles
+  and the EU, PAC and unlocked sniper rifles. Right-grip native ADS is retained;
+  align an eye behind the gun's measured rear aperture to see the magnified
+  world and bore-aligned reticle. Assault optics start at 2x, sniper optics at
+  4x; native zoom steps/fine tuning adjust magnification within a 1x–16x limit.
+- Keep the normal weapon mesh during supported tracked ADS instead of its
+  oversized flat aiming LOD. A signature-checked, local-owner-only adapter
+  changes the visual LOD argument; native zoom state, accuracy, recoil and
+  projectile handling are unchanged. Unknown weapons retain native handling.
+- Render one additional zero-delta world view only when an eye is aligned.
+  Clip it to the existing lens shape, with per-eye parallax and eye-relief fade.
+  Preserve normal HMD FOV, floating HUD, camera restoration and one desktop
+  window; restore a normal eye before the desktop/OBS Present.
+- v16 passes 44 CTests, both builds, renderer/stereo/scope GPU fixtures with
+  and without 4x MSAA, installed native signature checks and an isolated x86
+  zoom-adapter probe. Headset lens fit/native-game scope replay is unverified.
+  The lens compositor has no depth occlusion yet; a hand crossing the lens can
+  be overdrawn. The extra aligned-scope render has a performance cost. Remaster
+  and other weapon meshes have not been calibrated. WeaponOptics=0 restores
+  the previous ADS presentation on the next launch.
+
+- v15 follows the user's positive v14 headset report. Recognize the native
+  deployment/class-selection frontend when deciding whether to show the laser,
+  route controller buttons to menus, and capture paused UI. A hidden/null Windows
+  cursor no longer prevents that recognized menu from enabling VR interaction.
+- Validate the frontend layout and native mouse-listener relationship before
+  reading it. Re-read the current object on every query; inactive, stale and
+  unfamiliar states fall back to existing cursor detection. Keep the working
+  window-message click path, panel placement, camera comfort, grips and gun aim.
+- v15 passes 43 Win32 CTests, the x64 build, hidden renderer/stereo/MSAA checks,
+  and installed-executable signature checks. Read-only inspection matches the
+  live deployment frontend; v15 headset class/spawn selection remains untested.
+
+- v14 follows the user's acceptance of v13 hand placement. Infantry headset
+  orientation now uses a level input-heading frame instead of the animated
+  game camera. Native pitch/roll kick and visual yaw recoil cannot tilt the
+  tracking frame; physical head rotation and translation remain active.
+- Exclude the observed native horizontal recoil increment from VR heading,
+  including recoil recovery, without changing the value returned to gameplay.
+  Include both body and local look angles so body settling cannot slowly turn
+  the world. Eyes and controller hands use the same frame; preserve authored
+  grip bindings and native projectile mapping.
+- Keep the comfort source fixed across both eyes. A missing/late controller
+  packet no longer counts as evidence of lost headset focus for auto-recenter.
+  Home/right-stick reset and actual sustained focus/tracking-loss reset remain.
+- v14 passes both builds, all 42 CTests, hidden renderer/stereo/MSAA checks,
+  installed-executable signature checks and an isolated x86 recoil-adapter
+  probe. The subsequent user run reports v14 feels very good overall; it identifies
+  deployment-menu laser input as the next bug. Native position/stance is retained;
+  vehicles use the existing view path.
+
+- v13 follows the user's headset confirmation that v12 menus and gun-directed
+  shots work. Preserve those paths and the working OBS/single-window behavior.
+- Guard the renderer's missing query-record path observed in the v12 crash dump.
+  A signature-checked decision hook takes the existing ordinary draw branch
+  when lookup returns an end sentinel/null record. Valid records remain native.
+- Settle the authored off-hand binding after weapon draw rather than freezing
+  the first animation frame; reset on soldier, skeleton or weapon changes.
+  Keep the accepted right-hand attachment and firing orientation.
+- Remove the rejected floating-circle optic from active rendering and restore
+  right-grip native ADS in MotionHands mode. Proper VR scope visuals remain
+  unfinished; this restores the game action rather than claiming finished ADS.
+- v13 builds both architectures, passes all 41 CTests and renderer/stereo/MSAA
+  checks. An isolated mapped-renderer probe exercises the exact native lookup
+  and detour with missing/null and valid query records. Live crash recurrence
+  still need the next headset run; the user subsequently accepted v13 grips.
+
+- v12 routes laser clicks to the native Flash window-message listener. Trigger
+  and A click the pointed target; held inputs are suppressed on menu entry,
+  released on focus/tracking loss, and never injected into other applications.
+- Capture explicit Flash menu batches even when pause stops the world renderer.
+  Continue VR menu frames and controller updates without putting the full world
+  image onto the UI panel. B uses the native Escape character handler in menus.
+- Correct the native firing adapter: the FIRST launch matrix controls the main
+  projectile. Redirect its getter into the held gun's frame BEFORE native
+  muzzle velocity is calculated, retaining player movement and barrel offsets/
+  deviation. v11 changed only the secondary projectile path.
+- Stabilize captured wrist-to-weapon bindings across animation frames to reduce
+  hand/grip jitter. Preserve finger animations, weapon parts and support grip.
+- Recenter once after at least 750 ms of lost runtime focus/tracking. Right-stick
+  click now also recenters in menus; Home remains available on the keyboard.
+- In MotionHands mode, right grip activates a provisional gun-mounted,
+  per-eye red-dot reticle instead of native flat ADS. This is non-magnifying,
+  uses a generic lens anchor and has no scene-depth occlusion. Weapon-specific
+  scope calibration and proper magnified scopes remain unfinished.
+- The user confirms v11 headset gameplay, tracked hands and OBS recording work,
+  with the menu, aim and hand issues addressed in this batch. v12 passes all 41
+  CTests and renderer/stereo/MSAA GPU checks. The subsequent v12 headset report
+  confirms menus/aim, with a bad left grip, rejected optic and a renderer crash.
+- Preserve the single input window, accepted floating HUD/menu size and OBS
+  presentation. Missing weapon backs/stocks are deferred at the user's request.
+- Experimental native controller hands include wrists, elbow IK, sixteen weapon
+  parts and nearby left-grip support. MotionHands=0 restores legacy controls;
+  unsupported objects and failed signatures retain native handling.
+- Added separate native D3D9 launcher/client and BFVR OpenXR presenter support,
+  upright 6DoF, controller movement and full-FOV eyes. Native HUD/Flash batches
+  are isolated with matching MSAA. Eye readback precedes native Present.
+- Kept large-address-space and shader-loading behavior unchanged. Login/loading
+  transfers are capped near 30 Hz and failed D3DX calls logged. Earlier loading
+  crashes remain unproven fixed. BF1942 defaults are preserved.
+
+## [1.0.2]
+
+-Increased left hand grab radius from 12cm to 18cm.
+-Increased scope aim smoothing radius from 0.35 degrees to 1.5 degrees.
+-Doubled controller-motion turret/cannon sensitivity for land vehicles, sea vehicles, and mounted weapons compared to the original implementation and raised its input allowance to BF1942â€™s native maximum. There is now a sensitivity slider for it as well.
+-Reduced the time it takes to trigger a view recenter when holding the reload button from 2.5 seconds to 2.
+-Added a Show 'hands+arms, hands only, none' setting.
+-Added a death cam comfort vignette effect with independent toggle.
+-Added configurable 3D crosshair colors: White, Red, Blue, Green, Pink, Purple, Orange, and Yellow.
+-Added a 3D crosshair toggle for knives/throwables/gadgets (off, on, hitmarker only).
+-Added an opacity slider for 3D crosshairs.
+-Added mouse cursor smoothing in menus to reduce shakiness.
+-Added Color profiles (Original/Filmic/Vibrant).
+-Added Exposure, Contrast, and Saturation sliders.
+-Added optional Battlefield-style 'kill sound' with toggle (very satisfying!).
+-Added Broadcast messages "Roger," "Negative," and "Go go go!" to the Quick Menu.
+-VR Quick menu, settings menu, and main menu UI now use the same UI sounds BF and its mods do.
+-Added the ability to toggle the native game HUD on/off.
+-Added a toggle to keep the HUD upright or to follow your sideways head tilt.
+-A fix was implemented to allow WMR Headset users using the Oasis driver to play (hopefully!).
+-Fixed the left hand weapon grip/socket positions on the Russian DP, the MP18, Japanese Type5 rifle, Chinese AK47, and Saiga12k.
+-Removed ability for controller motion to move your camera/head view in a non-gunner passenger position in vehicles. You can still turn your view with the right stick. It may still happen in some vehicles, especially in mods.
+-Fixed ground shadow rendering for vehicles and soldiers so that they now render correctly.
+-Slightly improved the way foliage between you and the water renders with SSR Water enabled.
+-Potential improvement in performance when looking in the direction of large groups of soldiers.
+-Redid the arm IK. Elbows should now be far less likely to flail wildly in random directions.
+-Attempted to align the hands with the controllers better, but I admit it is inconsistent weapon to weapon. I have also added some sliders that allow you to align them to your liking as well.
+-Fixed an offset in the wrists that would cause the ingame hands to swing out of alignment when you twisted your controllers.
+-Fixed a bug that would leave your weapon/arms out of alignment when landing after a paradrop.
+-Changed the relationship between head tilt and controller tilt when it comes to scoped weapon views. It should feel more natural now.
+-Fixed an ambient occlusion rendering artifact that created a visible box-shaped brightness cutoff across floors, walls, and ceilings. AO now renders consistently across the full view.
+
+## [1.0.1] - 2026-08-11
+
+### Added
+
+- Added compatibility for SteamVR OpenXR and Virtual Desktop through both its
+  VDXR runtime and SteamVR mode.
+- Added two saved aircraft control options: **Aircraft Pitch + Roll on Same
+  Stick** and **Swap Aircraft Sticks**. Together they allow pitch/yaw or
+  pitch/roll on either physical stick. Both default off, preserving the v1.0.0
+  layout of left-stick throttle/roll and right-stick pitch/yaw.
+- Added structural recognition of community packages that bundle BF42++ as a
+  `dsound.dll` proxy, without restricting support to one exact proxy hash.
+
+### Changed
+
+- BFVR now supports either separately installed `bf42++.dll` or a recognized
+  bundled BF42++ `dsound.dll`. When both are present, BFVR uses the bundled
+  proxy and does not inject the second copy.
+- BFVR disables Battlefield 1942's internal frame limiter only inside the
+  BFVR-launched process, producing **far smoother gameplay** across the tested
+  packages without editing `VideoDefault.con` or changing ordinary flat-game
+  launches.
+
+### Fixed
+
+- Fixed OpenXR instance startup on runtimes that require applications to
+  request OpenXR 1.0, including the tested SteamVR and VDXR paths.
+- Fixed SteamVR presentation synchronization so BFVR's shared-image GPU work
+  overlaps the runtime's normal frame pacing instead of creating an additional
+  serial wait.
+- Isolated BFVR's D3D8-to-D3D9 presentation path from package-local dgVoodoo
+  and DXVK/Vulkan renderer files while leaving those package files unchanged
+  for ordinary Battlefield launches.
+
+### Compatibility validated
+
+- Meta Quest Link using the Meta OpenXR runtime.
+- SteamVR OpenXR.
+- Virtual Desktop using VDXR and using SteamVR mode.
+- A Battlefield 1942 Anthology non-Vulkan/dgVoodoo installation.
+- The Moongamers dgVoodoo package, which already bundles BF42++ as
+  `dsound.dll`.
+- A Battlefield 1942 Anthology VK/Vulkan installation with separately
+  installed BF42++.
+- Confirmed that BFVR will work on at least 4-6 different available versions of BF1942. The likelihood is that it will work for you.
+
+## [1.0.0] - 2026-08-10
+
+- Initial public BFVR release.

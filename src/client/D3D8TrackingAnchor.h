@@ -1,0 +1,117 @@
+#pragma once
+
+#include "client/D3D8SharedPresentationBridge.h"
+
+#include <cstdint>
+
+namespace bfvr
+{
+
+enum class D3D8TrackingContextKind : std::uint32_t
+{
+    Unavailable = 0,
+    Infantry,
+    Seat
+};
+
+struct D3D8TrackingContext
+{
+    D3D8TrackingContextKind kind = D3D8TrackingContextKind::Unavailable;
+    std::uintptr_t token = 0;
+};
+
+struct D3D8ArtificialTurnInput
+{
+    float requestedDeltaDegrees = 0.0F;
+    float infantryBodyYawRadians = 0.0F;
+    bool infantryBodyYawValid = false;
+};
+
+// A presentation controller sample is rebased against the body yaw observed
+// by the render-request thread. Native PlayerAction may advance the soldier
+// before Skeleton::transform consumes that sample. Rotate the already-rebased
+// sample into the exact newer body basis so the arm target and soldier
+// transform share one instant. This changes controller presentation only.
+[[nodiscard]] bool RebaseInfantryControllerSampleToCurrentBodyYaw(
+    const D3D8RuntimeControllerSample& source,
+    float observedBodyYawRadians,
+    float currentBodyYawRadians,
+    D3D8RuntimeControllerSample& adjusted) noexcept;
+
+// Keeps OpenXR's runtime-owned tracking origin immutable and supplies a
+// local, context-specific neutral pose to the Battlefield camera, hands, and
+// input consumers. Seated/Standing vertical placement and manual trim remain
+// infantry-only and never enter a vehicle seat.
+class D3D8TrackingAnchor
+{
+public:
+    void Reset() noexcept;
+    void Update(
+        const D3D8RuntimeView& currentHead,
+        bool headTracked,
+        D3D8TrackingContext context,
+        std::int64_t predictedDisplayTime,
+        LONG recenterForwardSequence,
+        bool standingMode,
+        bool standingHeightValid,
+        float standingHeightMeters,
+        float calibratedStandingHeightMeters,
+        float manualHeightAdjustmentMeters,
+        D3D8ArtificialTurnInput artificialTurn = {}) noexcept;
+
+    [[nodiscard]] D3D8RuntimeView ReferenceHead(
+        const D3D8RuntimeView& fallbackHead) const noexcept;
+    // Returns the physical neutral head used only by the local RenderView.
+    // Infantry body/aim compensation remains in ReferenceHead so controller
+    // and hand poses stay in the independent presentation frame.
+    [[nodiscard]] D3D8RuntimeView PresentationReferenceHead(
+        const D3D8RuntimeView& fallbackHead) const noexcept;
+    [[nodiscard]] bool ReadInfantryPresentationYaw(
+        float& yawRadians) const noexcept;
+    [[nodiscard]] D3D8RuntimeView RebaseView(
+        const D3D8RuntimeView& view) const noexcept;
+    [[nodiscard]] D3D8RuntimeControllerSample RebaseControllerSample(
+        const D3D8RuntimeControllerSample& sample) const noexcept;
+    [[nodiscard]] D3D8TrackingContext Context() const noexcept;
+    // Changes only when Capture commits a stable tracking-context handoff.
+    // Camera/body state consumers use this exact generation so their lifetime
+    // cannot reset on a separately timed vehicle/station resolver transition.
+    [[nodiscard]] std::uint32_t ContextGeneration() const noexcept;
+    [[nodiscard]] bool IsValid() const noexcept;
+    [[nodiscard]] bool IsSeatedPostureTransitionActive() const noexcept;
+
+private:
+    static constexpr std::uint32_t kContextStabilitySamples = 3;
+
+    void Capture(
+        const D3D8RuntimeView& currentHead,
+        D3D8TrackingContext context) noexcept;
+    void ClearPendingContext() noexcept;
+    void UpdateArtificialTurn(
+        const D3D8ArtificialTurnInput& artificialTurn) noexcept;
+    void ResetArtificialTurnState() noexcept;
+
+    D3D8RuntimeView baseReference_ = {};
+    D3D8TrackingContext context_ = {};
+    D3D8TrackingContext pendingContext_ = {};
+    std::uint32_t contextGeneration_ = 0;
+    std::uint32_t pendingContextSamples_ = 0;
+    LONG consumedRecenterSequence_ = 0;
+    float standingReferenceY_ = 0.0F;
+    float manualHeightAdjustmentMeters_ = 0.0F;
+    float lastSeatedStageHeightMeters_ = 0.0F;
+    float physicalReferenceYawRadians_ = 0.0F;
+    float observedInfantryBodyYawRadians_ = 0.0F;
+    float infantryPresentationYawRadians_ = 0.0F;
+    float infantryTrackingYawOffsetRadians_ = 0.0F;
+    std::int64_t lastSeatedVerticalMotionTime_ = 0;
+    bool standingMode_ = false;
+    bool standingReferenceValid_ = false;
+    bool infantryModeInitialized_ = false;
+    bool seatedPostureTransitionActive_ = false;
+    bool seatedDescentObserved_ = false;
+    bool infantryPresentationInitialized_ = false;
+    bool valid_ = false;
+};
+
+} // namespace bfvr
