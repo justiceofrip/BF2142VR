@@ -5,12 +5,14 @@ agents taking over BFVR. It explains what the major pieces do, which behaviors
 must be preserved, and how to verify changes. It is intentionally more current
 and task-oriented than the chronological `devREADME.md`.
 
-## Player package: 0.1.0-alpha.1 candidate
+## Player package: 0.1.0-alpha.1 public early playtest
 
-The owner requested a shareable ZIP and included installation instructions.
-The candidate is staged and installer-tested, but the final packaged live-game
-and headset run is pending. The source is prepared for public hosting under justiceofrip/BF2142VR; no
-player release has been published. The packaged launch reached native hooks and
+The player ZIP is public at https://github.com/justiceofrip/BF2142VR/releases/tag/v0.1.0-alpha.1.
+The owner explicitly approved publishing the unchanged candidate as an early
+playtest, waiving the final packaged-headset checklist gate for this release.
+The check is still pending, not passed. Source and player downloads are now
+available under justiceofrip/BF2142VR. All six release assets match local SHA-256
+hashes; no game archives, installed data or backups were uploaded. The packaged launch reached native hooks and
 assets, but OpenXR could not start while Steam Link was disconnected. SteamVR
 was started and reports Awaiting Wireless Connection (215). Await an actual
 headset connection before relaunching; do not treat elapsed time as acceptance.

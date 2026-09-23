@@ -2,13 +2,20 @@
 
 An early PC VR port of Battlefield 2142, based on [BFVR by JayBiggsGMG and the BFVR contributors](https://github.com/JayBiggsGMG/BFVR-Battlefield-1942-VR-Mod).
 
-Current source: **0.1.0-alpha.1 candidate / v30**. The player installer has passed local setup and rollback checks. Final acceptance of the packaged build in a headset is pending. This repository is also a starting point for contributors interested in a Battlefield 2 port.
+**[Download BF2142 VR 0.1.0-alpha.1 - Early Playtest](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.1.0-alpha.1)**
+
+Based on the v30 runtime. The player installer has passed local setup and rollback checks. Final acceptance of this exact package in a headset remains pending; it is published as an early playtest. This repository is also a starting point for contributors interested in a Battlefield 2 port.
 
 ## Play
 
 You need your own **Battlefield 2142 v1.51** installation and a working PC VR/OpenXR runtime. The initial playtest target is Quest controllers through Steam Link/SteamVR, with stock singleplayer/bot matches. Reclamation Hub/OpenSpy setup is separate; Remaster and multiplayer compatibility are unverified.
 
-Use the player ZIP when available, extract it, and run `Setup.cmd`. Select the folder containing `BF2142.exe`, then use `Play VR.cmd` or the installer-created shortcut. Connect your headset before launching. A GitHub source download is for developers and contains no compiled player client.
+1. [Download the player ZIP (17 MB)](https://github.com/justiceofrip/BF2142VR/releases/download/v0.1.0-alpha.1/BF2142-VR-0.1.0-alpha.1-playtest.zip) and extract it.
+2. Close BF2142, run `Setup.cmd`, select `BF2142.exe`, and wait for setup to finish.
+3. Connect your headset to SteamVR, then use the **Battlefield 2142 VR Alpha** shortcut or the installed `Play VR.cmd`.
+4. Load a singleplayer bot match. Right-stick click recenters.
+
+A GitHub source download is for developers and contains no compiled player client. Full installation instructions are included in the player ZIP.
 
 - [Full installation instructions](scripts/bf2142/package/START%20HERE.txt)
 - [Controls](scripts/bf2142/package/CONTROLS.txt)

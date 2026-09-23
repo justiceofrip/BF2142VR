@@ -1,6 +1,6 @@
 # BFVR Changelog
 
-## BF2142 0.1.0-alpha.1 player package candidate
+## BF2142 0.1.0-alpha.1 public early playtest
 
 - Add game-folder setup, a separate Alpha shortcut, complete runtime payload,
   controls, installation/troubleshooting instructions and reversible uninstall.
@@ -11,7 +11,9 @@
   backups stop automatic restore before any partial restoration.
 - Remove private PDB paths from shipped runtime metadata; include source-tool
   and dependency notices. Installer/rollback/asset/ZIP-extraction checks pass.
-  Final packaged live match/headset acceptance is pending; no public upload.
+  Published at the owner's explicit request with final packaged live-match/
+  headset acceptance still pending. Player ZIP bytes are unchanged; all six
+  uploaded assets match their local checksums.
 
 ## BF2142 v30 vehicle controls and parachute hands (private checkpoint)
 
@@ -288,7 +290,7 @@ the v1.0.2 section exactly as written below.
   and the EU, PAC and unlocked sniper rifles. Right-grip native ADS is retained;
   align an eye behind the gun's measured rear aperture to see the magnified
   world and bore-aligned reticle. Assault optics start at 2x, sniper optics at
-  4x; native zoom steps/fine tuning adjust magnification within a 1x�16x limit.
+  4x; native zoom steps/fine tuning adjust magnification within a 1x–16x limit.
 - Keep the normal weapon mesh during supported tracked ADS instead of its
   oversized flat aiming LOD. A signature-checked, local-owner-only adapter
   changes the visual LOD argument; native zoom state, accuracy, recoil and
@@ -389,7 +391,7 @@ the v1.0.2 section exactly as written below.
 
 -Increased left hand grab radius from 12cm to 18cm.
 -Increased scope aim smoothing radius from 0.35 degrees to 1.5 degrees.
--Doubled controller-motion turret/cannon sensitivity for land vehicles, sea vehicles, and mounted weapons compared to the original implementation and raised its input allowance to BF1942’s native maximum. There is now a sensitivity slider for it as well.
+-Doubled controller-motion turret/cannon sensitivity for land vehicles, sea vehicles, and mounted weapons compared to the original implementation and raised its input allowance to BF1942â€™s native maximum. There is now a sensitivity slider for it as well.
 -Reduced the time it takes to trigger a view recenter when holding the reload button from 2.5 seconds to 2.
 -Added a Show 'hands+arms, hands only, none' setting.
 -Added a death cam comfort vignette effect with independent toggle.

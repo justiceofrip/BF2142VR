@@ -1,7 +1,10 @@
 # BF2142 VR alpha package readiness
 
-First version: 0.1.0-alpha.1, based on the private v30 runtime. A portable ZIP
-candidate now exists; no public upload or GitHub release has been made.
+[0.1.0-alpha.1 early playtest](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.1.0-alpha.1) is public, based on the v30 runtime. The original staged ZIP was uploaded unchanged.
+
+The project owner explicitly approved publication with the final packaged-headset
+check still pending. This is a release-specific exception to the checklist, not
+a claim that the missing test passed or a change to the normal contributor rule.
 
 ## Completed package work
 
@@ -32,7 +35,7 @@ restoring other files. Normal and repeated uninstall passed; the recorded game
 files matched their initial hashes exactly. A second install from the actual
 ZIP extraction also passed with the previously repaired weapon archive.
 
-## Still required before public release
+## Outstanding validation and distribution scope
 
 - Run the exact installed package through a real match/load/respawn and headset
   acceptance session. Source/GPU tests do not establish this packaged run.
@@ -41,6 +44,7 @@ ZIP extraction also passed with the previously repaired weapon archive.
 - Publish only the original staged ZIP/checksum, never the installed BF2142VR
   folder: installation creates private game assets and backups in that folder.
 
-The candidate is saved for this final playtest. Await owner readiness for the
-packaged headset run; do not terminate their active game or infer acceptance
-from elapsed time. Do not hold the first alpha for manual reloads or remote IK.
+The final packaged headset run remains outstanding after this early publication.
+Await owner readiness; do not terminate an active game or infer acceptance from
+elapsed time. The six release assets were checked against local SHA-256 hashes.
+No generated game assets, installed folders or backups were uploaded.
