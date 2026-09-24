@@ -109,7 +109,7 @@ int Run(int argc, wchar_t** argv) {
     }
     if (options.help) {
         wprintf(L"BF2142VR development launcher\n"
-            L"Usage: BF2142VRLauncher --game-dir PATH [--mod FOLDER] [--windowed] [--inspect] [--presenter PATH]\n"
+            L"Usage: BF2142VRLauncher --game-dir PATH [--mod FOLDER] [--windowed] [--join-local PORT] [--inspect] [--presenter PATH]\n"
             L"Use --presenter with the x64 BFVRPresenter.exe to enable experimental head-tracked stereo.\n"
             L"--diagnostic-stereo uses synthetic head poses and saves local eye/UI images; no headset input is generated.\n"
             L"--desktop-vr runs stereo, native VR hands and menus with keyboard simulated controllers, without OpenXR.\n"
@@ -147,9 +147,7 @@ int Run(int argc, wchar_t** argv) {
     swprintf_s(logName, L"bf2142-renderer-%04u%02u%02u-%02u%02u%02u-%lu.log",
         now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond, GetCurrentProcessId());
     const fs::path logPath = folder / L"logs" / logName;
-    std::wstring command = bfvr::bf2142::QuoteArgument(executable.wstring()) +
-        L" +modPath " + L"mods/" + options.mod;
-    if (options.windowed) command += L" +fullscreen 0 +szx 1280 +szy 720";
+    std::wstring command = bfvr::bf2142::GameCommand(executable.wstring(), options);
     STARTUPINFOW startup{};
     startup.cb = sizeof(startup);
     Process child;

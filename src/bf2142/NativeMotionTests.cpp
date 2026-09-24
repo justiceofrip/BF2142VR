@@ -12,6 +12,10 @@ DWORD TestWindowProcess(HWND,LPDWORD id){*id=GetCurrentProcessId();return 1;}
 #undef GetWindowThreadProcessId
 namespace bfvr::bf2142 {
 bool NativeWeaponAds(void*){return false;}
+void InstallNetworkClient(LogFunction){}
+void TickNetworkClient(){}
+void ApplyRemoteNetworkPose(void*){}
+void PublishNetworkPose(void*,void*,const net::Matrix&,const net::Matrix&,const net::Matrix&,const net::Matrix&,const net::Matrix&,const net::Matrix&,bool,bool,const std::array<std::array<float,5>,2>&){}
 bool canopyTest=false;void* canopySoldier=nullptr;
 bool ReadNativeTraversal(TraversalSample* s){if(!canopyTest)return false;s->mode=TraversalMode::Parachute;s->owner=reinterpret_cast<uintptr_t>(canopySoldier);return true;}
 bool ReadNativeComfortCamera(const stereo::Matrix4&,stereo::Matrix4*,const void*){return false;}

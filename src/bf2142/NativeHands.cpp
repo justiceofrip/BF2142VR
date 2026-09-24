@@ -1,4 +1,5 @@
 #include "NativeHands.h"
+#include "multiplayer/NativeNetwork.h"
 #include "HandPoseMath.h"
 #include "FingerPose.h"
 #include "MotionActions.h"
@@ -212,6 +213,13 @@ void Apply(void* soldier){
     if(WriteBones(target,solved->bones)){
         if(!canopy && SoldierWorld(soldier,&body) && InverseRigid(body)){
             AcquireSRWLockExclusive(&sampleLock);firePose={soldier,target.weapon,Multiply(solved->bones[54],body),Multiply(native[0],body),Multiply(trackingCamera,body),s.input.predictedDisplayTime,s.tick};ReleaseSRWLockExclusive(&sampleLock);
+            // Publish anatomical palm frames separately from the accepted 1P rig.
+            if(palms.left&&palms.right){
+                const auto l=InverseRigid(palms.left->bones[0]),r=InverseRigid(palms.right->bones[0]);
+                if(l&&r)PublishNetworkPose(soldier,target.weapon,body,native[0],*head,
+                    Multiply(*l,solved->bones[7]),Multiply(*r,solved->bones[33]),solved->bones[54],
+                    f.leftValid,f.weaponHeld,filteredCurls);
+            }
         }
         InterlockedExchange(&gripTransition,0);
         InterlockedExchange(&supporting,solved->supporting?1:0);
@@ -288,7 +296,7 @@ void* __fastcall FireHook(void* receiver,void*,const M* launch,const M* parent,c
     }
     return originalFire(receiver,launch,parent,velocity);
 }
-void __fastcall Hook(void* soldier,void*,float delta){original(soldier,delta);Apply(soldier);}
+void __fastcall Hook(void* soldier,void*,float delta){original(soldier,delta);TickNetworkClient();Apply(soldier);}
 }
 bool ReadTrackedWeaponFrame(TrackedWeaponFrame* result,bool previousSample){
     if(!result || !NativeWeaponInputReady())return false;
@@ -313,7 +321,7 @@ bool InstallNativeHands(LogFunction logger){
     if(MH_EnableHook(target)!=MH_OK || MH_EnableHook(launch)!=MH_OK || MH_EnableHook(fire)!=MH_OK){
         for(auto entry:{target,launch,fire}){MH_DisableHook(entry);MH_RemoveHook(entry);}return false;
     }
-    installed=true;logger("Native hands connected: local first-person animation, pre-velocity launch pose and firearm adapters; tracking and owner guards enabled.");return true;
+    InstallNetworkClient(logger);installed=true;logger("Native hands connected: local first-person animation, pre-velocity launch pose and firearm adapters; tracking and owner guards enabled.");return true;
 }
 void PublishNativeHands(const shared::SharedControllerSample* sample,const stereo::Pose& reference,const stereo::Pose& head,float scale,float height){
     Sample s{};s.reference=reference;s.head=head;s.scale=scale;s.height=height;s.tick=GetTickCount64();

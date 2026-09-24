@@ -1,5 +1,22 @@
 # BFVR Changelog
 
+## Unreleased - local multiplayer development
+
+- Developer-only --join-local PORT launcher option for a loopback dedicated
+  server. Normal single-client protection and release behavior remain intact.
+- Add an opt-in experimental dedicated-server controller-aim adapter and local
+  pose relay, with packet freshness, slot/weapon ownership and native profile checks.
+- Add independent third-person arm IK with remote animation LOD reconstruction,
+  plus an explicit nearby-bot pose mirror for one-PC development. Correct the
+  dedicated receive pump, native AI flag and separate remote-animation callback.
+  Preserve the other arm when one target is unreachable, and handle small
+  native bone-blend scale/shear errors without weakening tracked-pose validation. Real server tracked fire
+  and desktop native arm writes have executed; visual hit/IK alignment and two
+  real VR clients remain unverified. This is not in the public ZIP.
+- Document the one-PC co-op lab, authoritative telemetry, and remaining
+  connection/aim/remote-pose checks in docs/LOCAL_MULTIPLAYER.md.
+
+
 ## BF2142 0.1.0-alpha.1 public early playtest
 
 - Add game-folder setup, a separate Alpha shortcut, complete runtime payload,
@@ -290,7 +307,7 @@ the v1.0.2 section exactly as written below.
   and the EU, PAC and unlocked sniper rifles. Right-grip native ADS is retained;
   align an eye behind the gun's measured rear aperture to see the magnified
   world and bore-aligned reticle. Assault optics start at 2x, sniper optics at
-  4x; native zoom steps/fine tuning adjust magnification within a 1x–16x limit.
+  4x; native zoom steps/fine tuning adjust magnification within a 1xÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“16x limit.
 - Keep the normal weapon mesh during supported tracked ADS instead of its
   oversized flat aiming LOD. A signature-checked, local-owner-only adapter
   changes the visual LOD argument; native zoom state, accuracy, recoil and
@@ -391,7 +408,7 @@ the v1.0.2 section exactly as written below.
 
 -Increased left hand grab radius from 12cm to 18cm.
 -Increased scope aim smoothing radius from 0.35 degrees to 1.5 degrees.
--Doubled controller-motion turret/cannon sensitivity for land vehicles, sea vehicles, and mounted weapons compared to the original implementation and raised its input allowance to BF1942â€™s native maximum. There is now a sensitivity slider for it as well.
+-Doubled controller-motion turret/cannon sensitivity for land vehicles, sea vehicles, and mounted weapons compared to the original implementation and raised its input allowance to BF1942ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s native maximum. There is now a sensitivity slider for it as well.
 -Reduced the time it takes to trigger a view recenter when holding the reload button from 2.5 seconds to 2.
 -Added a Show 'hands+arms, hands only, none' setting.
 -Added a death cam comfort vignette effect with independent toggle.

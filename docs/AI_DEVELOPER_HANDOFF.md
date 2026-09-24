@@ -5,6 +5,32 @@ agents taking over BFVR. It explains what the major pieces do, which behaviors
 must be preserved, and how to verify changes. It is intentionally more current
 and task-oriented than the chronological `devREADME.md`.
 
+## Local multiplayer development
+
+See LOCAL_MULTIPLAYER.md. Developer launcher adds --join-local PORT, targeting
+127.0.0.1 through native CLI arguments. It preserves the normal single-client
+guard. A private dedicated v1.51 co-op lab boots with eight bots and authenticated
+RCON telemetry. Direct loopback join reaches the server, but its stock content
+check rejected the VR archive. The private std_archive.md5 is now backed up and
+omitted; map checks remain active. Reconnection reached gameplay: the server
+recorded an alive remote human, death/respawn, vehicles and fired rounds.
+Experimental implementation now lives in src/bf2142/multiplayer: a loopback-only
+pose channel, native dedicated server launch/fire hooks, and a separate 80-bone
+remote arm solver. See LOCAL_MULTIPLAYER.md for explicit configuration, native
+profiles, LOD handling, test-mirror limits and verification. The accepted 1P hands
+only publish canonical poses; no first-person math was replaced. 63 CTests, x64
+build, five captured native rigs and actual-server initialization pass. The real
+headset session connected/spawned and exercised the server's tracked launch hook;
+server telemetry recorded 98 fired rounds, six damage hits and one kill in a
+snapshot. This does not establish visual hit alignment. A subsequent desktop
+simulation exercised actual server relay and native third-person arm writes.
+Visible raised-arm rendering through the real relay is now confirmed in the
+desktop bot-mirror fixture. Exact-build headset feel, consistent visual alignment
+and two real VR clients remain unverified. The rejected
+profile-isolation experiment is not in this source: native +overlayPath did not
+isolate Windows client profiles. Released alpha ZIP and accepted shortcuts stay
+unchanged. The lab is on local branch dev/local-multiplayer, not a new release.
+
 ## Player package: 0.1.0-alpha.1 public early playtest
 
 The player ZIP is public at https://github.com/justiceofrip/BF2142VR/releases/tag/v0.1.0-alpha.1.
@@ -1278,3 +1304,41 @@ and eleven GPU fixtures passed, including native firing-owner/velocity fixtures,
 tracking-gap input suppression and MSAA/non-MSAA near-face replay. These are
 simulated/native-layout fixtures; no v24 in-game or headset acceptance claimed.
 The owner's existing v23 process was left running during development.
+
+Dedicated runtime finding: v31's animation-finalize receive pump never ran on the
+headless server (confirmed by its live counter). The v31b server instead pumps
+from signature-checked PlayerManager lookup/list queries on its owning game
+thread, plus a pre-fire receive step. It keeps native query results unchanged.
+The server can restart independently while the existing headset client stays
+running; the local pose token must stay unchanged across that restart.
+
+Live combined headset session: the client connected/spawned on the private server,
+published poses, and the server logged accepted human poses and tracked launch
+frames while firing. This establishes the authoritative adapter executing, not
+visual hit alignment. isAI is player+0xd4 (vtable slot 26), verified against all
+eight bots and the human; +0x3d1 was a different flag. v31c includes that correction
+and preserves the same network token. During the live session only the exact
+source-equivalent operand in our server DLL was corrected with its game thread
+briefly suspended; no native game flag or asset was edited. Remote arm visibility
+still needs an active, focused headset view; focus loss deliberately stops sends.
+
+
+The remote client adapter hooks verified EXE+0x1efc00 after native third-person
+finalization. The accepted EXE+0x1ee980 first-person hook does not run for remote
+players. Both callbacks pump the bounded receive path, so an observer does not
+depend on a live local 1P animation. Rig writes touch only arm/finger ranges
+14..44 and item attachments 64..71 of the verified 80-bone palette. One unreachable
+hand falls back independently; it cannot cancel a reachable opposite hand.
+Unknown topology, stale poses and wrong-thread callbacks retain native animation.
+The source contains the complete server pump/AI-field and remote-hook corrections;
+private live-session bridges are not runtime dependencies and must not be shipped.
+Instant Action versus multiplayer feature differences were explicitly deferred by
+the owner. Do not change accepted first-person grips, normal shortcuts or public
+release payloads while finishing this multiplayer experiment.
+
+Remote native blend transforms must use InverseAnimatedBone, not a transpose:
+a captured near-rigid rig reproduced compounded scale/shear rejection. The exact
+3x3 inverse fixes it without relaxing the existing pose guard. v31f desktop
+validation now includes a visible raised-arm bot mirror and target-position
+sampling through the real dedicated relay. See LOCAL_MULTIPLAYER.md for the
+explicit limitations; these are simulated controllers, not a second headset.

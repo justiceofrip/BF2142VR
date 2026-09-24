@@ -5,6 +5,7 @@ namespace bfvr::bf2142 {
 struct LaunchOptions {
     std::wstring gameDirectory;
     std::wstring presenter;
+    unsigned joinLocalPort = 0;
     std::wstring mod = L"bf2142";
     bool inspect = false;
     bool help = false;
@@ -29,13 +30,22 @@ inline bool ParseOptions(const std::vector<std::wstring>& args,
         else if (args[i] == L"--diagnostic-stereo") result.diagnosticStereo = true;
         else if (args[i] == L"--desktop-vr") result.desktopVr = true;
         else if (args[i] == L"--windowed") result.windowed = true;
-        else if (args[i] == L"--game-dir" || args[i] == L"--mod" || args[i] == L"--presenter") {
+        else if (args[i] == L"--game-dir" || args[i] == L"--mod" || args[i] == L"--presenter" || args[i] == L"--join-local") {
             const auto option = args[i];
             if (++i >= args.size() || args[i].empty() || args[i].starts_with(L"--")) {
                 error = L"Missing value for " + option; return false;
             }
             if (option == L"--game-dir") result.gameDirectory = args[i];
             else if (option == L"--presenter") result.presenter = args[i];
+            else if (option == L"--join-local") {
+                unsigned port = 0;
+                for (wchar_t c : args[i]) {
+                    if (c < L'0' || c > L'9' || port > 6553) { error=L"Invalid local server port."; return false; }
+                    port = port * 10 + unsigned(c - L'0');
+                }
+                if (!port || port > 65535) { error=L"Local port must be 1-65535."; return false; }
+                result.joinLocalPort = port;
+            }
             else result.mod = args[i];
         } else { error = L"Unknown argument: " + args[i]; return false; }
     }
@@ -61,5 +71,11 @@ inline std::wstring QuoteArgument(const std::wstring& argument) {
     out.append(slashes * 2, L'\\');
     out += L'"';
     return out;
+}
+inline std::wstring GameCommand(const std::wstring& executable, const LaunchOptions& options) {
+    std::wstring command = QuoteArgument(executable) + L" +modPath mods/" + options.mod;
+    if (options.windowed) command += L" +fullscreen 0 +szx 1280 +szy 720";
+    if (options.joinLocalPort) command += L" +joinServer 127.0.0.1 +port " + std::to_wstring(options.joinLocalPort);
+    return command;
 }
 }

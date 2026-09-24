@@ -1,0 +1,3 @@
+LIBRARY BF2142VRServer
+EXPORTS
+    BF2142VRInitialize=_BF2142VRInitialize@4

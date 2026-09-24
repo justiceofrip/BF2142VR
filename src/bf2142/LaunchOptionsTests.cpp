@@ -27,6 +27,18 @@ int main() {
     check(ParseOptions({L"--game-dir",L"G:\\Game",L"--desktop-vr"},options,error)&&options.desktopVr,"headset-free desktop mode");
     check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--desktop-vr",L"--presenter",L"p.exe"},options,error),"desktop cannot start OpenXR");
     check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--desktop-vr",L"--diagnostic-stereo"},options,error),"simulation and automated fixtures are separate");
+    for (const auto& port : {L"0",L"65536",L"9999999999999999999",L"-1",L"127.0.0.1",L"17567 +foo"})
+        check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--join-local",port},options,error),"reject invalid local port");
+    check(ParseOptions({L"--game-dir",L"G:\\Game",L"--join-local",L"17567",L"--desktop-vr"},options,error),"desktop local server client");
+    auto labCommand=bfvr::bf2142::GameCommand(L"G:\\Game Space\\BF2142.exe",options);
+    int labCount=0;auto labArgs=CommandLineToArgvW(labCommand.c_str(),&labCount);
+    check(labArgs && labCount==7 && std::wstring(labArgs[0])==L"G:\\Game Space\\BF2142.exe" &&
+          std::wstring(labArgs[3])==L"+joinServer" && std::wstring(labArgs[4])==L"127.0.0.1" &&
+          std::wstring(labArgs[5])==L"+port" && std::wstring(labArgs[6])==L"17567","native local join arguments round trip");
+    if(labArgs)LocalFree(labArgs);
+    check(ParseOptions({L"--game-dir",L"G:\\Game"},options,error) && !options.joinLocalPort,
+          "local join does not leak into normal launches");
+    check(bfvr::bf2142::GameCommand(L"G:\\Game\\BF2142.exe",options).find(L"+joinServer")==std::wstring::npos,"normal launch has no autojoin");
     for (const auto& bad : {L"../outside", L"..", L"mods/bf2142", L"C:\\other", L"bf2142\" +foo"})
         check(!ParseOptions({L"--game-dir", L"G:\\Game", L"--mod", bad}, options, error),
               "reject traversal or command fragments");
