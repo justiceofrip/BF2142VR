@@ -9,6 +9,7 @@ std::optional<HandBindings> CaptureHandBindings(const HandBones& native) noexcep
 struct HandFrame {
     stereo::Matrix4 head{},leftGrip{},leftAim{},rightGrip{},rightAim{};
     std::optional<HandBindings> bindings;
+    std::optional<stereo::Matrix4> leftItem; // independently held support crate
     std::optional<stereo::Matrix4> torso; // level input frame in skeleton coordinates
     bool leftValid=false,rightValid=false,supportPressed=false,wasSupporting=false;
     bool supportReady=true;

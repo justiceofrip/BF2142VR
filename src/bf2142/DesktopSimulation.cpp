@@ -8,7 +8,7 @@
 namespace bfvr::bf2142 {
 namespace {
 float pitch=0,headYaw=0,headDrop=0;
-int preset=0;stereo::Vec3 trim{};ULONGLONG last=0;
+int preset=0,leftPreset=0;stereo::Vec3 trim{},leftTrim{};ULONGLONG last=0;
 bool Key(int k){return (GetAsyncKeyState(k)&0x8000)!=0;}
 shared::SharedPresentationPose At(float x,float y,float z){shared::SharedPresentationPose p{};p.orientationW=1;p.positionX=x;p.positionY=y;p.positionZ=z;return p;}
 }
@@ -16,9 +16,9 @@ void BlockDesktopHotkeys(ControllerCommand& c){
     if(Key(VK_LSHIFT))c.blockedPhysicalKeys[DIK_X]=c.blockedPhysicalKeys[DIK_Y]=1;
     for(unsigned key:{DIK_F1,DIK_F2,DIK_F3,DIK_F4,DIK_F5,DIK_F6,DIK_F7,DIK_F8,DIK_F9,DIK_F10,DIK_F11,DIK_F12,
         DIK_NUMPAD0,DIK_NUMPAD2,DIK_NUMPAD4,DIK_NUMPAD6,DIK_NUMPAD8,DIK_ADD,DIK_SUBTRACT,DIK_PRIOR,DIK_NEXT,DIK_END,
-        DIK_LBRACKET,DIK_RBRACKET,DIK_INSERT,DIK_NUMPAD7,DIK_NUMPAD9,DIK_DECIMAL,DIK_NUMPAD1,DIK_NUMPAD3,DIK_RCONTROL,DIK_RSHIFT,DIK_LCONTROL,DIK_LSHIFT,DIK_LMENU})c.blockedPhysicalKeys[key]=1;
+        DIK_BACKSLASH,DIK_TAB,DIK_DELETE,DIK_LBRACKET,DIK_RBRACKET,DIK_INSERT,DIK_NUMPAD7,DIK_NUMPAD9,DIK_DECIMAL,DIK_NUMPAD1,DIK_NUMPAD3,DIK_RCONTROL,DIK_RSHIFT,DIK_LCONTROL,DIK_LSHIFT,DIK_LMENU})c.blockedPhysicalKeys[key]=1;
 }
-void ResetDesktopSimulation(){preset=0;trim={};last=0;pitch=0;headYaw=0;headDrop=0;}
+void ResetDesktopSimulation(){preset=leftPreset=0;trim=leftTrim={};last=0;pitch=0;headYaw=0;headDrop=0;}
 void DesktopFrame(HWND window,shared::SharedRenderRequest& request,shared::SharedControllerSample& sample,bool menu,const stereo::Pose* menuAnchor){
     request={};sample={};const auto now=GetTickCount64();const float dt=last?std::clamp(float(now-last)*.001f,0.f,.05f):0;last=now;
     request.shouldRender=request.viewsValid=request.headPoseValid=request.headPoseTracked=1;
@@ -38,21 +38,25 @@ void DesktopFrame(HWND window,shared::SharedRenderRequest& request,shared::Share
     DWORD owner=0;GetWindowThreadProcessId(GetForegroundWindow(),&owner);
     if(owner!=GetCurrentProcessId())return;
     sample.flags=shared::kControllerSampleFlagSessionFocused;
-    for(int i=0;i<8;++i)if(Key(VK_F1+i)&&preset!=i){preset=i;trim={};}
+    const bool adjustLeft=Key(VK_TAB);auto& selectedPreset=adjustLeft?leftPreset:preset;auto& selectedTrim=adjustLeft?leftTrim:trim;
+    for(int i=0;i<8;++i)if(Key(VK_F1+i)&&selectedPreset!=i){selectedPreset=i;selectedTrim={};}
     if(Key(VK_NUMPAD0) && preset!=8){preset=8;trim={};}
     const float handSpeed=Key(VK_DECIMAL)?2.4f:.25f;
-    trim.x+=(Key(VK_NUMPAD6)-Key(VK_NUMPAD4))*handSpeed*dt;
-    trim.y+=(Key(VK_ADD)-Key(VK_SUBTRACT))*handSpeed*dt;
-    trim.z+=(Key(VK_NUMPAD2)-Key(VK_NUMPAD8))*handSpeed*dt;
+    selectedTrim.x+=(Key(VK_NUMPAD6)-Key(VK_NUMPAD4))*handSpeed*dt;
+    selectedTrim.y+=(Key(VK_ADD)-Key(VK_SUBTRACT))*handSpeed*dt;
+    selectedTrim.z+=(Key(VK_NUMPAD2)-Key(VK_NUMPAD8))*handSpeed*dt;
     stereo::Vec3 position{.18f,-.20f,-.48f};
     if(preset==1){stereo::Vec3 aligned;if(ReadNativeSightAlignmentOffset(&aligned))position=aligned;}
     else if(preset>=2)position=BodySlots()[preset-2].offset;
+    const auto lp=leftPreset>=2?BodySlots()[leftPreset-2].offset:stereo::Vec3{-.18f,-.22f,-.48f};
     constexpr DWORD flags=shared::kControllerHandFlagAimActive|shared::kControllerHandFlagAimPositionValid|
         shared::kControllerHandFlagAimOrientationValid|shared::kControllerHandFlagAimPositionTracked|shared::kControllerHandFlagAimOrientationTracked|
         shared::kControllerHandFlagGripActive|shared::kControllerHandFlagGripPositionValid|shared::kControllerHandFlagGripOrientationValid|
         shared::kControllerHandFlagGripPositionTracked|shared::kControllerHandFlagGripOrientationTracked|shared::kControllerHandFlagTriggerActive|shared::kControllerHandFlagSqueezeActive;
-    for(int i=0;i<2;++i){auto& h=sample.hands[i];h.flags=flags;h.gripPose=i?At(position.x+trim.x,1.7f+position.y+trim.y,position.z+trim.z):At(-.18f,1.48f,-.48f);h.aimPose=h.gripPose;}
-    auto& right=sample.hands[1];right.squeezeValue=Key(VK_RCONTROL)?1.f:0.f;sample.hands[0].squeezeValue=Key(VK_RSHIFT)?1.f:0.f;
+    for(int i=0;i<2;++i){auto& h=sample.hands[i];h.flags=flags;h.gripPose=i?At(position.x+trim.x,1.7f+position.y+trim.y,position.z+trim.z):At(lp.x+leftTrim.x,1.7f+lp.y+leftTrim.y,lp.z+leftTrim.z);h.aimPose=h.gripPose;}
+    sample.hands[1].flags|=shared::kControllerHandFlagThumbstickActive;
+    sample.hands[1].thumbstickX=float(Key(VK_DELETE)-Key(VK_INSERT));
+    auto& right=sample.hands[1];right.squeezeValue=Key(VK_RCONTROL)?1.f:0.f;sample.hands[0].squeezeValue=(Key(VK_RSHIFT)||Key(VK_OEM_5))?1.f:0.f;
     if(Key(VK_LSHIFT)&&Key('X'))sample.hands[0].buttons|=shared::kControllerHandButtonPrimary;
     if(Key(VK_LSHIFT)&&Key('Y'))sample.hands[0].buttons|=shared::kControllerHandButtonSecondary;
     right.triggerValue=Key(VK_F9)?1.f:0.f;if(Key(VK_F10))right.buttons|=shared::kControllerHandButtonSecondary;

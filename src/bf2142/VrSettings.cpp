@@ -32,6 +32,7 @@ VrSettings LoadVrSettings(const std::wstring& logPath) {
     s.automaticAds=GetPrivateProfileIntW(L"VR",L"AutomaticADS",1,path.c_str())!=0;
     s.bodyInventory=GetPrivateProfileIntW(L"VR",L"BodyInventory",1,path.c_str())!=0;
     s.fingerPoses=GetPrivateProfileIntW(L"VR",L"FingerPoses",1,path.c_str())!=0;
+    s.leftSupportCrates=GetPrivateProfileIntW(L"VR",L"LeftSupportCrates",1,path.c_str())!=0;
     s.motionActions=GetPrivateProfileIntW(L"VR",L"MotionActions",1,path.c_str())!=0;
     s.weaponFaceFade=false; // v24 fade rejected by the owner; old INIs cannot enable it.
     s.toggleWeaponGrip=GetPrivateProfileIntW(L"VR",L"ToggleWeaponGrip",1,path.c_str())!=0;

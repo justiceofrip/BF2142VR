@@ -39,5 +39,26 @@ int main(){
  peers[7].pose.packet.flags=0;CHECK(LaunchHook(receiver.data()+0x10,nullptr)==&source);peers[7].pose.Clear();CHECK(LaunchHook(receiver.data()+0x10,nullptr)==&source);
  // Rejected stale-name and displaced-body packets cannot take over a slot.
  p.sequence++;p.weaponName[0]='x';CHECK(client.Send(p,transport.LocalPort()));lastPump=0;Pump();CHECK(!peers[7].pose.Read(GetTickCount64()));p.weaponName=actors[7].name;p.body.values[3][0]+=10;CHECK(client.Send(p,transport.LocalPort()));lastPump=0;Pump();CHECK(!peers[7].pose.Read(GetTickCount64()));
+ // Only the exact horizontal input call consumes a snap, once per event.
+ p=peers[7].pose.packet;p.secret=settings.secret;p.session=123;p.sequence=50;p.player=7;p.body=actors[7].body;p.weaponName=actors[7].name;
+ p.camera=p.head=p.left=p.right=p.weapon=At();p.flags=LeftValid|RightValid|WeaponHeld;p.snapSerial=1;p.snapDegrees=30;
+ CHECK(client.Send(p,transport.LocalPort()));lastPump=0;Pump();CHECK(peers[7].pendingSnap==30);
+ CHECK(ServerLookInput(soldier.data(),game+0x12d4ab,2)==2);CHECK(peers[7].pendingSnap==30);
+ CHECK(ServerLookInput(soldier.data(),game+0x12d49e,2)==32);CHECK(ServerLookInput(soldier.data(),game+0x12d49e,2)==2);
+ p.sequence++;CHECK(client.Send(p,transport.LocalPort()));lastPump=0;Pump();CHECK(!peers[7].pendingSnap);
+ peers[7].pendingSnap=30;peers[7].snapTime=GetTickCount64()-500;CHECK(ServerLookInput(soldier.data(),game+0x12d49e,2)==2);
+ peers[7].pendingSnap=30;peers[7].snapTime=GetTickCount64();Put<void*>(soldier.data(),0x28c,weapon.data());
+ CHECK(ServerLookInput(soldier.data(),game+0x12d49e,2)==2);Put<void*>(soldier.data(),0x28c,nullptr);
+ // Native crate fire owns creation/cooldown; only pose/velocity is replaced.
+ memset(definition.data()+0x10,0,16);memcpy(definition.data()+0x10,"unl_hub_medic",14);Put<unsigned>(definition.data(),0x20,13);
+ Put<void*>(receiver.data(),0x10,game+0x3dbf90);CHECK(ReadRoster(manager,game,ServerProfile,&actors));
+ p.weaponName=actors[7].name;p.snapSerial=0;p.snapDegrees=0;p.flags|=LeftCrateHeld;p.throwSerial=1;p.throwLaunch=At(-.3f,1.3f,.4f);p.throwVelocity={2,1,4};p.sequence++;
+ CHECK(Validate(p,settings.secret));CHECK(client.Send(p,transport.LocalPort()));lastPump=0;Pump();
+ originalCrateLaunch=reinterpret_cast<Launch>(&LaunchStub);
+ auto crateLaunch=CrateLaunchHook(receiver.data()+0x10,nullptr);CHECK(crateLaunch==&mappedLaunch);
+ const auto crateExpected=Multiply(p.throwLaunch,actors[7].body);CHECK(Near(*crateLaunch,crateExpected));
+ FireHook(receiver.data(),nullptr,crateLaunch,&parent,&velocity);CHECK(Near(gotLaunch,crateExpected)&&gotVelocity.x==2&&gotVelocity.y==1&&gotVelocity.z==4);
+ CHECK(CrateLaunchHook(receiver.data()+0x10,nullptr)==&source);
+ p.sequence++;CHECK(client.Send(p,transport.LocalPort()));lastPump=0;Pump();CHECK(CrateLaunchHook(receiver.data()+0x10,nullptr)==&source);
  puts("Native roster validation, authenticated pose ingestion, authoritative launch/parent, unchanged velocity and owner/dropout fallback passed.");return 0;
 }

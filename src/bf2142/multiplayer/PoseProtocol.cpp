@@ -4,12 +4,22 @@
 #include <type_traits>
 namespace bfvr::bf2142::net {
 static_assert(std::is_trivially_copyable_v<Packet>);
+stereo::Vec3 TransformVelocity(stereo::Vec3 v,const Matrix& m) noexcept {
+ return {v.x*m.values[0][0]+v.y*m.values[1][0]+v.z*m.values[2][0],
+         v.x*m.values[0][1]+v.y*m.values[1][1]+v.z*m.values[2][1],
+         v.x*m.values[0][2]+v.y*m.values[1][2]+v.z*m.values[2][2]};
+}
+bool EventWindow::Accept(std::uint64_t s,std::uint32_t e,std::uint64_t now,std::uint64_t interval) noexcept {
+ if(!s||!e||!now||(accepted&&now<accepted))return false;
+ if(session==s && (!Newer(e,serial)||(accepted&&now-accepted<interval)))return false;
+ session=s;serial=e;accepted=now;return true;
+}
 float Distance(const Matrix& a,const Matrix& b) noexcept {
  float d=0;for(int i=0;i<3;++i){const auto x=a.values[3][i]-b.values[3][i];d+=x*x;}return std::sqrt(d);
 }
 bool Validate(const Packet& p,const Secret& secret) noexcept {
  if(p.magic!=Magic||p.version!=Version||p.bytes!=sizeof(Packet)||p.player>255||!p.session||
-    p.kind<Pose||p.kind>Mirror||(p.flags&~7u))return false;
+    p.kind<Pose||p.kind>Mirror||(p.flags&~15u))return false;
  unsigned difference=0;for(std::size_t i=0;i<secret.size();++i)difference|=secret[i]^p.secret[i];
  if(difference)return false;
  for(const auto* m:{&p.body,&p.camera,&p.head,&p.left,&p.right,&p.weapon})if(!InverseRigid(*m))return false;
@@ -17,6 +27,15 @@ bool Validate(const Packet& p,const Secret& secret) noexcept {
  Matrix origin{};
  for(const auto* m:{&p.camera,&p.head,&p.left,&p.right,&p.weapon})if(Distance(*m,origin)>4)return false;
  for(float f:p.curls)if(!std::isfinite(f)||f<0||f>1)return false;
+ if(p.snapSerial){if(!std::isfinite(p.snapDegrees)||std::abs(p.snapDegrees)<15||std::abs(p.snapDegrees)>90)return false;}
+ else if(p.snapDegrees!=0)return false;
+ const bool crate=!std::memcmp(p.weaponName.data(),"unl_hub_medic",14)||!std::memcmp(p.weaponName.data(),"unl_hub_ammo",13);
+ if((p.flags&LeftCrateHeld)&&(!(p.flags&LeftValid)||!crate))return false;
+ if(p.throwSerial){
+  const auto v=p.throwVelocity;const float speed=v.x*v.x+v.y*v.y+v.z*v.z;
+  if(!crate||!(p.flags&LeftCrateHeld)||!InverseRigid(p.throwLaunch)||Distance(p.throwLaunch,origin)>4||
+     !std::isfinite(speed)||speed<.01f||speed>1600.f)return false;
+ }
  bool end=false;
  for(char c:p.weaponName){if(!c){end=true;continue;}if(end||!((c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='_'))return false;}
  return end&&p.weaponName[0];

@@ -5,6 +5,42 @@ agents taking over BFVR. It explains what the major pieces do, which behaviors
 must be preserved, and how to verify changes. It is intentionally more current
 and task-oriented than the chronological `devREADME.md`.
 
+## Multiplayer turn/crate/render work: v33
+
+The accepted v32a private checkpoint remains the rollback. Protocol v2 appends
+bounded snap and support-throw events to soldier-local pose packets; it requires
+a matched client/server pair. A pose sequence is not an action event ID.
+Retransmissions must never apply a turn/throw twice. Snap events feed only the
+dedicated horizontal input getter's verified return site (0x12d49e); no soldier
+body matrices or separate VR reference-yaw offsets are written. On the native
+desktop test the client and server both settled to the same 30-degree turn.
+
+SupportCrates contains only the accepted SP utility policy. Do not import
+SandboxActions, manual-reload changes or blue-rifle-sight artwork into this
+multiplayer change. Read native replenishing-ammo energy before showing/grabbing
+a stored crate. Let the normal weapon-selection/fire path own its cooldown and
+spawn; the guarded crate launch/fire adapters supply left-palm pose and velocity.
+A held crate has its own item transform and leaves both tracked wrists independent.
+Protocol events are disabled unless the existing private network client is active.
+
+RenderStereo must not call the flat native camera just because its XR request or
+consumer fence is pending. Preserve the native outer Present behavior and
+outside-render menu capture. Preserve native rendering fallback when VR actually
+fails, and preserve ordinary loading/menu rendering.
+The real GPU fixture tests stalled consumption, scope/reflex/MSAA, extra Presents,
+opaque native time-argument preservation and paused-menu resume. Never clamp or
+accumulate an unknown native render argument while skipping a request. Keep the
+accepted renderer timing on every completed pair.
+
+Verification so far: x86 build/64 CTests, x64 presenter build, 13 real D3D9 GPU
+cases, a 30-degree dedicated/client heading match, and a native server-created
+left-hand medkit throw at the measured controller release velocity. Headset-visible
+completion and two real clients still require testing. A desktop-only viewmodel
+visibility issue reproduced with both v33 and the saved v32a DLL in the same lab;
+do not attribute it to the utility port or claim headset visual validation.
+The scene-flicker fix addresses a proven flat-render fallback at the XR consumer
+fence; whether it completely resolves the owner's headset report is still pending.
+
 ## Multiplayer regression checkpoint: v32a
 
 The owner reported physical ADS dropping out after a fraction of a second and

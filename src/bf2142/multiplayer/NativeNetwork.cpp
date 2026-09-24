@@ -5,6 +5,7 @@
 #include <bcrypt.h>
 #include <MinHook.h>
 #include <cstring>
+#include <cmath>
 namespace bfvr::bf2142 {
 namespace {
 using namespace net;
@@ -16,6 +17,16 @@ std::uint64_t session=0;std::uint32_t sequence=0;std::array<Actor,256> actors{};
 struct Binding {void* weak=nullptr;void* skeleton=nullptr;PalmBinding left{},right{};bool valid=false,reported=false,reportedSolveSkip=false;};
 BodyBones detailedReference{};PalmBinding referenceLeft{},referenceRight{};bool referenceValid=false;
 std::array<Binding,256> bindings{};Packet outgoing{};ULONGLONG outgoingTime=0;unsigned localId=256;
+struct LocalEvents {void* soldier=nullptr;void* weapon=nullptr;float snap=0;Matrix launch{};stereo::Vec3 velocity{};
+ std::uint32_t snapSerial=0,throwSerial=0;ULONGLONG snapTime=0,throwTime=0;} events;
+std::uint32_t nextSnap=0,nextThrow=0;
+void AttachEvents(Packet& p,ULONGLONG now){
+ if(localId>255||actors[localId].soldier!=events.soldier)return;
+ if(events.snapTime&&now>=events.snapTime&&now-events.snapTime<300){p.snapSerial=events.snapSerial;p.snapDegrees=events.snap;}
+ if(events.throwTime&&now>=events.throwTime&&now-events.throwTime<600&&actors[localId].weapon==events.weapon&&(p.flags&LeftCrateHeld)){
+  p.throwSerial=events.throwSerial;p.throwLaunch=events.launch;p.throwVelocity=events.velocity;
+ }
+}
 bool NativeProfile(){
  __try {
   if(!game||!render)return false;
@@ -81,16 +92,29 @@ void TickNetworkClient(){
   if(packet.kind==Mirror&&!settings.mirror)continue;
   poses[packet.player].Accept(packet,now);
  }
+ if(localId<256&&events.weapon&&events.weapon!=actors[localId].weapon){events.throwTime=0;events.weapon=nullptr;}
  for(unsigned i=0;i<256;++i)if(bindings[i].weak!=actors[i].weak){bindings[i]={};bindings[i].weak=actors[i].weak;poses[i].Clear();}
- if(outgoingTime&&now-outgoingTime<=150&&now-lastSend>=30&&localId==outgoing.player&&actors[localId].weapon){
+ if(outgoingTime&&now-outgoingTime<=150&&now-lastSend>=30&&localId==outgoing.player&&actors[localId].weapon&&actors[localId].name==outgoing.weaponName){
+  outgoing.snapSerial=outgoing.throwSerial=0;outgoing.snapDegrees=0;AttachEvents(outgoing,now);
   outgoing.sequence=++sequence;outgoing.session=session;outgoing.secret=settings.secret;
   if(Validate(outgoing,settings.secret)&&transport.Send(outgoing,settings.port)){lastSend=now;if(!reportedSend){reportedSend=true;logger("Network VR sending player %u: head, palms and held-weapon pose.",localId);}}
  }
 }
-void PublishNetworkPose(void* soldier,void* weapon,const net::Matrix& body,const net::Matrix& camera,const net::Matrix& head,const net::Matrix& leftPalm,const net::Matrix& rightPalm,const net::Matrix& weaponLocal,bool leftValid,bool held,const std::array<std::array<float,5>,2>& curls){
+void PublishNetworkPose(void* soldier,void* weapon,const net::Matrix& body,const net::Matrix& camera,const net::Matrix& head,const net::Matrix& leftPalm,const net::Matrix& rightPalm,const net::Matrix& weaponLocal,bool leftValid,bool held,const std::array<std::array<float,5>,2>& curls,bool leftCrate){
  if(!enabled||ownerThread!=GetCurrentThreadId()||localId>255||actors[localId].soldier!=soldier||actors[localId].weapon!=weapon)return;
- Packet p;p.player=localId;p.flags=RightValid|(leftValid?LeftValid:0)|(held?WeaponHeld:0);p.body=body;p.camera=camera;p.head=head;p.left=leftPalm;p.right=rightPalm;p.weapon=held?weaponLocal:rightPalm;p.weaponName=actors[localId].name;
+ Packet p;p.player=localId;p.flags=RightValid|(leftValid?LeftValid:0)|(held?WeaponHeld:0)|(leftCrate?LeftCrateHeld:0);p.body=body;p.camera=camera;p.head=head;p.left=leftPalm;p.right=rightPalm;p.weapon=(held||leftCrate)?weaponLocal:rightPalm;p.weaponName=actors[localId].name;
  for(int i=0;i<2;++i)for(int j=0;j<5;++j)p.curls[i*5+j]=curls[i][j];outgoing=p;outgoingTime=GetTickCount64();
+}
+void PublishNetworkSnap(void* soldier,float degrees){
+ if(!enabled||ownerThread!=GetCurrentThreadId()||localId>255||actors[localId].soldier!=soldier||!std::isfinite(degrees)||std::abs(degrees)<15||std::abs(degrees)>90)return;
+ if(events.soldier!=soldier){events={};events.soldier=soldier;}
+ if(!++nextSnap)++nextSnap;events.snap=degrees;events.snapSerial=nextSnap;events.snapTime=GetTickCount64();lastSend=0;
+}
+void PublishNetworkCrateThrow(void* soldier,void* weapon,const Matrix& launch,stereo::Vec3 velocity){
+ if(!enabled||ownerThread!=GetCurrentThreadId()||localId>255||actors[localId].soldier!=soldier||actors[localId].weapon!=weapon)return;
+ if(events.soldier!=soldier){events={};events.soldier=soldier;}
+ if(!++nextThrow)++nextThrow;events.weapon=weapon;events.launch=launch;events.velocity=velocity;
+ events.throwSerial=nextThrow;events.throwTime=GetTickCount64();lastSend=0;
 }
 void ApplyRemoteNetworkPose(void* soldier){
  if(!enabled||GetCurrentThreadId()!=ownerThread||localId>255||actors[localId].soldier==soldier)return;

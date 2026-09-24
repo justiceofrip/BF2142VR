@@ -213,7 +213,8 @@ std::optional<HandResult> SolveTrackedHands(const HandBones& native,const HandFr
             result.bones[shoulder-1]=Multiply(Multiply(handSource[shoulder-1],*inverse),result.bones[shoulder]);
         }
     }
-    if(!f.weaponHeld){
+    if(f.leftItem){if(!f.leftValid||!InverseRigid(*f.leftItem))return {};weapon=*f.leftItem;}
+    else if(!f.weaponHeld){
         // A rigid presentation transform keeps only the sixteen gun parts
         // outside both eye frusta. Neither arm nor the native camera moves.
         SetPos(weapon,Sub(Pos(f.head),Mul(Row(f.head,2),4.f)));

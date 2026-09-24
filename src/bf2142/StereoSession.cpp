@@ -11,6 +11,7 @@
 #include "NativeOptics.h"
 #include "BodyInventory.h"
 #include "BodyEquipment.h"
+#include "SupportCrates.h"
 #include "DesktopSimulation.h"
 #include "EyeRestore.h"
 #include "WeaponGrip.h"
@@ -50,7 +51,7 @@ HANDLE presenterProcess=nullptr;
 bool diagnostic=false,desktop=false,desktopCaptureHeld=false;
 HWND desktopWindow=nullptr;
 BodyInventory bodyInventory;WeaponGrip weaponGrip;TraversalControls traversalControls;
-BodyEquipment bodyEquipment;
+BodyEquipment bodyEquipment;SupportCrates supportCrates;SupportFrame supportFrame;
 BodyInventoryResult bodyFrame;
 InventoryNames inventoryNames{};
 int equippedItem=0;bool bodyActive=false;
@@ -64,6 +65,7 @@ bool previousGameplay=false,haveGripReference=false,homeHeld=false;
 stereo::Pose gripReference{},gripHead{};
 bool enabled=false, transport=false, nativeInstalled=false;
 bool haveReference=false, pairReady=false, insideRender=false;
+bool lastRenderResult=true;
 void* lastRenderer=nullptr;
 LONG pending=0, recenterSequence=0;
 ULONGLONG lastMenuCapture=0;
@@ -141,7 +143,7 @@ void Recenter() {
     const auto head=Pose(request.headPose);
     const auto upright=stereo::MakeYawOnlyUiAnchor(head);
     reference=upright?*upright:head;
-    menuPointer.Reset();bodyInventory.Reset();traversalControls.Reset();ResetMotionActions();
+    menuPointer.Reset();supportCrates.Reset();supportFrame={};PublishNativeSupport({});bodyInventory.Reset();traversalControls.Reset();ResetMotionActions();
     recenterSequence=request.recenterForwardSequence;haveReference=true;haveGripReference=false;
     logger("6DoF neutral pose captured; upright reference; position scale=%.3f; height offset=%.3f.",settings.worldScale,settings.heightOffset);
 }
@@ -239,7 +241,21 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
         if(!NativeWeaponInputReady()){command.buttons[0]=0;command.blockedPhysicalButtons[0]=command.blockedPhysicalButtons[1]=1;}
     }
     RequestAutomaticAds(accepted && gameplay && !showMenu && !mounted && settings.motionHands && held);
-    if(UpdateNativeMotion(accepted && gameplay && !showMenu && !mounted && settings.motionHands && held && !command.recenter && !body.key?&sample:nullptr,Pose(request.headPose),command))
+    SupportObservation obs;obs.active=inventoryValid&&body.anchorValid&&!command.recenter;
+    obs.leftCrates=settings.leftSupportCrates;obs.owner=inventoryOwner;obs.time=sample.predictedDisplayTime;
+    obs.equipped=equippedItem;obs.names=inventoryNames;obs.anchor=body.anchor;obs.left=Pose(sample.hands[0].gripPose);
+    obs.leftTracked=(sample.hands[0].flags&gripFlags)==gripFlags;
+    obs.leftGrip=std::isfinite(sample.hands[0].squeezeValue)&&sample.hands[0].squeezeValue>.65f;
+    if(obs.active&&obs.leftCrates)for(int i=1;i<10;++i)if(SupportCrateWeapon(obs.names[i].data()))ReadSupportAmmo(obs.owner,i,&obs.ammo[i]);
+    supportFrame=supportCrates.Update(obs);PublishNativeSupport(supportFrame);
+    if(supportFrame.busy){
+        command.buttons[0]=supportFrame.fire?0x80:0;command.buttons[1]=0;
+        command.blockedPhysicalButtons[0]=command.blockedPhysicalButtons[1]=1;
+        if(supportFrame.select>0&&supportFrame.select<10)command.keys[supportFrame.select+1]=0x80;
+        if(supportFrame.leftCrate)SetNativeWeaponHeld(true);
+        RequestAutomaticAds(false);
+    }
+    if(UpdateNativeMotion(accepted && gameplay && !showMenu && !mounted && settings.motionHands && held && !command.recenter && !body.key && !supportFrame.busy?&sample:nullptr,Pose(request.headPose),command))
         InterlockedIncrement(&b->hapticNativeMenuHoverSequence);
     int stance=0;
     const bool physical=accepted && gameplay && !showMenu && settings.physicalStance && inventoryValid && ReadNativeStance(&stance);
@@ -254,7 +270,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
         (diagnostic||desktop)?width:b->requirements.uiWidth,(diagnostic||desktop)?height:b->requirements.uiHeight,command,&controlsMenu,&settings);
     if(controlsMenu.RecenterRequested()){standingHeight=settings.standingHeight;haveStandingHeight=true;Recenter();}
     SetCrosshairHidden(settings.hideCrosshair);
-    if(AutomaticAdsButton(accepted && gameplay && !showMenu && !mounted && !command.recenter && !body.key))command.buttons[1]=0x80;
+    if(AutomaticAdsButton(accepted && gameplay && !showMenu && !mounted && !command.recenter && !body.key && !supportFrame.busy))command.buttons[1]=0x80;
     if(desktop)BlockDesktopHotkeys(command);
     if(accepted)PublishControllerCommand(command,true);else {ClearControllerCommand();ClearNativeHands();}
     return true;
@@ -384,7 +400,13 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
     if (insideRender || !enabled || !NativeViewsAvailable(renderer))
         return original(renderer,delta,interpolation);
     lastRenderer=renderer;
-    if (pairReady || !GetRequest(true)) return original(renderer,delta,interpolation);
+    if (pairReady || !GetRequest(true)) {
+        // A request/consumer wait is not a switch back to the flat ADS camera.
+        // Simulation/input still run in the outer game loop.
+        if(enabled)return lastRenderResult;
+        return original(renderer,delta,interpolation);
+    }
+    if(pairs==1)logger("Native renderer time argument retained: %.6f, interpolation=%.6f.",delta,double(interpolation));
     insideRender=true;
     struct RenderScope { ~RenderScope() { insideRender=false; activeEye=-1; } } rendering;
     bool result=false, rendered=false;
@@ -451,11 +473,12 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
             }
         }
         if(bodyActive && !menuPointer.Active()) {
-            const bool props=bodyEquipment.Draw(pixels[0],pixels[1],width,height,colorFormat,request,bodyFrame,inventoryNames,NativeWeaponHeld()?equippedItem:0);
+            auto visibleInventory=inventoryNames;for(int i=1;i<10;++i)if(supportFrame.unavailable[i])visibleInventory[i]={};
+            const bool props=bodyEquipment.Draw(pixels[0],pixels[1],width,height,colorFormat,request,bodyFrame,visibleInventory,NativeWeaponHeld()?equippedItem:0);
             if(!desktop && props)eyeRestore.Draw(gameDevice,pixels[0],width,height,colorFormat);
         }
         activeEye=-1;
-        pairReady=true;
+        pairReady=true;lastRenderResult=result;
         // NativeRender calls Present internally. Both calls were suppressed,
         // so eye readback happened before DISCARD could invalidate pixels.
         insideRender=false;
@@ -534,10 +557,17 @@ void StereoPresent(IDirect3DDevice9* device) {
 void StereoReset() {
     RecenterNativeVehicle();traversalControls.Reset();weaponGrip.Reset();SetNativeWeaponHeld(true);controlsMenu.Reset();physicalStance.Reset();ConfigurePhysicalCamera(false);haveStandingHeight=false;
     ClearNativeSnapTurn();ResetAutomaticAds();ClearControllerCommand();ClearNativeHands(); controllerPolicy={}; haveGripReference=false; previousGameplay=false;
-    menuPointer.Reset();bodyInventory.Reset();ResetMotionActions();lastBodyHover=-1;ResetDesktopSimulation();
+    menuPointer.Reset();supportCrates.Reset();supportFrame={};PublishNativeSupport({});bodyInventory.Reset();ResetMotionActions();lastBodyHover=-1;ResetDesktopSimulation();
     uiCapture.Reset(); uiReady=false;outsideUiReady=false;homePolicy={}; warnedUi=false;
     lastMenuCapture=0;
+    lastRenderResult=true;
     capture.Reset();eyeRestore.Reset();menuRoomGpu.Reset();scopePixels.clear(); pairReady=false; pending=0; haveReference=false; lastRenderer=nullptr;
 }
 }
 
+
+#ifdef BF2142_GPU_FIXTURE
+namespace bfvr::bf2142 {void TestHoldStereoConsumer(bool hold){
+ if(auto* b=channel.Get())InterlockedExchange(&b->consumedFrameSequence,ReadCounter(b->frameSequence)-(hold?1:0));
+}}
+#endif

@@ -1,4 +1,5 @@
 #include "NativeHands.h"
+#include "SupportCrates.h"
 #include "multiplayer/NativeNetwork.h"
 #include "HandPoseMath.h"
 #include "FingerPose.h"
@@ -25,6 +26,10 @@ using LaunchMatrix=const M*(__thiscall*)(void*);
 LaunchMatrix originalLaunch=nullptr;thread_local M trackedLaunch{};
 struct FirePose {void* soldier=nullptr;void* weapon=nullptr;M world{},camera{},tracking{};LONGLONG generation=0;ULONGLONG tick=0;};
 FirePose firePose{};
+LaunchMatrix originalCrateLaunch=nullptr;bool crateAdapterReady=false;
+struct NativeSupport {bool leftCrate=false,busy=false;ULONGLONG tick=0;} supportState;
+struct CrateThrow {FirePose owner{};M launch{};stereo::Vec3 velocity{};ULONGLONG tick=0;};
+CrateThrow crateThrow{};bool CrateName(void* weapon);
 MotionActions motionPolicy;
 bool motionEnabled=true;volatile LONG weaponHeld=1,gripTransition=0;
 struct Gesture {FirePose owner{};M launch{};stereo::Vec3 velocity{};MotionKind kind=MotionKind::None;ULONGLONG tick=0;unsigned serial=0;};
@@ -196,6 +201,13 @@ void Apply(void* soldier){
             if(dt!=0)for(size_t i=0;i<goal.size();++i)filteredCurls[h][i]+=(goal[i]-filteredCurls[h][i])*blend;}
         fingerTime=s.input.predictedDisplayTime;f.leftCurls=filteredCurls[0];f.rightCurls=filteredCurls[1];
     }
+    NativeSupport ex;AcquireSRWLockShared(&sampleLock);ex=supportState;ReleaseSRWLockShared(&sampleLock);
+    const bool exFresh=GetTickCount64()-ex.tick<150;
+    if(exFresh&&ex.busy)f.supportPressed=false;
+    if(exFresh&&ex.leftCrate&&CrateName(target.weapon)&&f.leftValid&&palms.left&&palms.right){
+        f.weaponHeld=false;f.knifeGrip=false;f.pistolGrip=false;
+        M item=f.leftGrip;for(int j=0;j<3;++j)item.values[3][j]-=.12f*item.values[1][j];f.leftItem=item;
+    }
     const auto solved=SolveTrackedHands(native,f);
     // Explicit private pose capture for diagnosing native animation callbacks.
     // No files or per-frame inspection are enabled in ordinary player sessions.
@@ -218,7 +230,7 @@ void Apply(void* soldier){
                 const auto l=InverseRigid(palms.left->bones[0]),r=InverseRigid(palms.right->bones[0]);
                 if(l&&r)PublishNetworkPose(soldier,target.weapon,body,native[0],*head,
                     Multiply(*l,solved->bones[7]),Multiply(*r,solved->bones[33]),solved->bones[54],
-                    f.leftValid,f.weaponHeld,filteredCurls);
+                    f.leftValid,f.weaponHeld,filteredCurls,f.leftItem.has_value());
             }
         }
         InterlockedExchange(&gripTransition,0);
@@ -226,10 +238,12 @@ void Apply(void* soldier){
         if(!reported){reported=true;logMessage("Native controller hands active: local 1P skeleton, wrists/arms and 16 weapon parts; fresh focused sample.");}
     }
 }
+bool CrateName(void* weapon){std::array<char,49> n{};return WeaponName(weapon,&n)&&(!std::strcmp(n.data(),"unl_hub_medic")||!std::strcmp(n.data(),"unl_hub_ammo"));}
 bool FireOwner(void* receiver,const FirePose& pose){
+    NativeSupport ex;AcquireSRWLockShared(&sampleLock);ex=supportState;ReleaseSRWLockShared(&sampleLock);
     __try {
         Target t;if(!pose.soldier||!pose.weapon||!FindTarget(pose.soldier,&t)||t.weapon!=pose.weapon)return false;
-        return Read<void*>(receiver,0xc)==t.weapon && Read<void*>(receiver,0x10)==game+0x5703c8 &&
+        return Read<void*>(receiver,0xc)==t.weapon && (Read<void*>(receiver,0x10)==game+0x5703c8 || (crateAdapterReady&&ex.leftCrate&&GetTickCount64()-ex.tick<150&&Read<void*>(receiver,0x10)==game+0x574320&&CrateName(t.weapon))) &&
             Read<BYTE*>(t.weapon,0x1b4)==static_cast<BYTE*>(receiver)+0x10;
     }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
 }
@@ -270,6 +284,16 @@ const M* __fastcall LaunchHook(void* interfaceSelf,void*){
     }
     return native;
 }
+const M* __fastcall CrateLaunchHook(void* self,void*){
+    const M* native=originalCrateLaunch(self);FirePose pose;
+    if(TrackedFire(static_cast<BYTE*>(self)-0x10,&pose)){
+        CrateThrow ct;AcquireSRWLockShared(&sampleLock);ct=crateThrow;ReleaseSRWLockShared(&sampleLock);
+        if(ct.owner.weapon==pose.weapon&&ct.owner.soldier==pose.soldier&&GetTickCount64()-ct.tick<700&&CrateName(pose.weapon)){
+            trackedLaunch=ct.launch;return &trackedLaunch;
+        }
+    }
+    return native;
+}
 void* __fastcall FireHook(void* receiver,void*,const M* launch,const M* parent,const stereo::Vec3* velocity){
     FirePose pose;
     if(!NativeWeaponInputReady()){
@@ -277,6 +301,11 @@ void* __fastcall FireHook(void* receiver,void*,const M* launch,const M* parent,c
         if(s.enabled && FireOwner(receiver,pose))return nullptr; // Local hidden item cannot fire, including queued native input.
     }
     if(TrackedFire(receiver,&pose)){
+        CrateThrow ct;AcquireSRWLockShared(&sampleLock);ct=crateThrow;ReleaseSRWLockShared(&sampleLock);
+        if(launch==&trackedLaunch&&ct.owner.weapon==pose.weapon&&ct.owner.soldier==pose.soldier&&GetTickCount64()-ct.tick<700&&CrateName(pose.weapon)){
+            const auto result=originalFire(receiver,&ct.launch,&ct.launch,&ct.velocity);
+            AcquireSRWLockExclusive(&sampleLock);crateThrow={};ReleaseSRWLockExclusive(&sampleLock);return result;
+        }
         Gesture g;
         if(launch==&trackedLaunch && PendingGesture(receiver,pose,&g) && launchGesture==g.serial){
             float speed=0;stereo::Vec3 v{};
@@ -321,6 +350,14 @@ bool InstallNativeHands(LogFunction logger){
     if(MH_EnableHook(target)!=MH_OK || MH_EnableHook(launch)!=MH_OK || MH_EnableHook(fire)!=MH_OK){
         for(auto entry:{target,launch,fire}){MH_DisableHook(entry);MH_RemoveHook(entry);}return false;
     }
+    const BYTE crateSignature[]={0x55,0x8b,0xec,0x81,0xec,0x90,0,0,0,0x53,0x56,0x57,0x8b,0xf9,0x8b,0x77,0xfc};
+    if(Read<void*>(game+0x574320,0xd4)==game+0x1e4f80&&!std::memcmp(game+0x1e4f80,crateSignature,sizeof(crateSignature))){
+        if(MH_CreateHook(game+0x1e4f80,CrateLaunchHook,reinterpret_cast<void**>(&originalCrateLaunch))==MH_OK){
+            crateAdapterReady=MH_EnableHook(game+0x1e4f80)==MH_OK;
+            if(!crateAdapterReady)MH_RemoveHook(game+0x1e4f80);
+        }
+    }
+    logger("Support crate launch profile: %s",crateAdapterReady?"available":"unavailable; off-hand crates disabled");
     InstallNetworkClient(logger);installed=true;logger("Native hands connected: local first-person animation, pre-velocity launch pose and firearm adapters; tracking and owner guards enabled.");return true;
 }
 void PublishNativeHands(const shared::SharedControllerSample* sample,const stereo::Pose& reference,const stereo::Pose& head,float scale,float height){
@@ -328,7 +365,7 @@ void PublishNativeHands(const shared::SharedControllerSample* sample,const stere
     if(sample && (sample->flags&shared::kControllerSampleFlagSessionFocused) && Tracked(sample->hands[1])){s.input=*sample;s.enabled=true;}
     AcquireSRWLockExclusive(&sampleLock);current=s;ReleaseSRWLockExclusive(&sampleLock);if(!s.enabled)InterlockedExchange(&supporting,0);
 }
-void ClearNativeHands(){AcquireSRWLockExclusive(&sampleLock);current={};firePose={};gesture={};ReleaseSRWLockExclusive(&sampleLock);InterlockedExchange(&supporting,0);}
+void ClearNativeHands(){AcquireSRWLockExclusive(&sampleLock);current={};firePose={};gesture={};supportState={};crateThrow={};ReleaseSRWLockExclusive(&sampleLock);InterlockedExchange(&supporting,0);}
 void DrawNativeOptic(std::vector<DWORD>& pixels,UINT width,UINT height,DXGI_FORMAT format,const EyeCamera& eye){
     Sample s;FirePose pose;AcquireSRWLockShared(&sampleLock);s=current;pose=firePose;ReleaseSRWLockShared(&sampleLock);
     const auto& hand=s.input.hands[1];
@@ -461,5 +498,65 @@ bool ReadNativeGrenadeTrajectory(GrenadeTrajectory* result){
     *result={{m[3][0],m[3][1],m[3][2]},
         {speed*m[2][0]+inherited.x,speed*m[2][1]+inherited.y,speed*m[2][2]+inherited.z},9.81f*.55f};
     return true;
+}
+}
+
+namespace bfvr::bf2142 {
+bool ReadSupportAmmo(std::uint64_t owner,int item,SupportAmmo* out){
+    if(!out||!installed||!owner||item<1||item>9)return false;
+    __try {
+        const auto soldier=reinterpret_cast<void*>(std::uintptr_t(owner));Target t;if(!FindTarget(soldier,&t))return false;
+        const auto begin=Read<BYTE*>(soldier,0x234),end=Read<BYTE*>(soldier,0x238);
+        if(!begin||end<begin||end-begin>128||item*4>=end-begin)return false;
+        const auto w=Read<void*>(begin,item*4);if(!w||Read<void*>(w,0)!=game+0x56cd88||!InventoryParentMatches(Read<void*>(w,0x34),soldier))return false;
+        if(!CrateName(w)||!crateAdapterReady)return false;
+        const auto ammo=Read<BYTE*>(w,0x1c4);const auto vt=game+0x570b10;
+        const BYTE getter[]={0x8b,0x49,8,0x8b,1,0xc3};
+        if(!ammo||Read<void*>(ammo,0)!=vt||Read<void*>(ammo-0x10,0xc)!=w||Read<void*>(vt,0xec)!=game+0x1f4330||
+            std::memcmp(game+0x1f4330,getter,sizeof(getter)))return false;
+        const auto mag=Read<const int*>(ammo,8),endMag=Read<const int*>(ammo,12);
+        if(!mag||endMag<=mag||endMag-mag>1000)return false;
+        int rounds=*mag;const int state=Read<int>(ammo,0x3c);
+        if(rounds<0||rounds>1000||state<0||state>10)return false;
+        if(state>1)rounds=0; // native replenishing component owns recovery
+        int deployable=-1;
+        {
+            // Stored crates refill on equip. The native reserve getter always
+            // returns at least one, so availability must use ability energy/cost.
+            const BYTE energySignature[]={0x56,0x8b,0xf1,0x8d,0x4e,0xf0,0xe8,0x75,0xfe,0xff,0xff};
+            if(Read<void*>(vt,0x28)!=game+0x1d8160||std::memcmp(game+0x1d8160,energySignature,sizeof(energySignature)))return false;
+            const auto definition=Read<BYTE*>(ammo,0x68);if(!definition)return false;
+            // Cost at +0x78 is used by native 0x1d80e0 / 0x1d8050, stock crates cost 1.
+            const float cost=Read<float>(definition,0x78);if(!std::isfinite(cost)||std::abs(cost-1.f)>.0001f)return false;
+            using Energy=float(__thiscall*)(void*);
+            const float energy=reinterpret_cast<Energy>(game+0x1d8160)(ammo);
+            if(!std::isfinite(energy)||energy<0||energy>1.001f)return false;
+            deployable=state<=1 && (rounds>0||energy>=cost-.0001f);
+        }
+        *out={true,rounds,deployable};return true;
+    }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+}
+void PublishNativeSupport(const SupportFrame& f){
+    Sample s;FirePose p;AcquireSRWLockShared(&sampleLock);s=current;p=firePose;ReleaseSRWLockShared(&sampleLock);
+    CrateThrow next{};
+    if(f.throwNow&&s.enabled&&IsLocalTrackedWeapon(p.weapon)&&CrateName(p.weapon)&&GetTickCount64()-p.tick<100){
+        auto hand=Pose(s.input.hands[0].gripPose);const auto origin=Compose(p.tracking,s,hand);
+        hand.position.x+=f.throwVelocity.x;hand.position.y+=f.throwVelocity.y;hand.position.z+=f.throwVelocity.z;
+        const auto destination=Compose(p.tracking,s,hand);
+        if(origin&&destination){
+            next={p,*origin,{},GetTickCount64()};
+            next.velocity={destination->values[3][0]-origin->values[3][0],destination->values[3][1]-origin->values[3][1],destination->values[3][2]-origin->values[3][2]};
+            // Start just beyond the palm, away from the player's collision capsule.
+            const float speed=std::sqrt(next.velocity.x*next.velocity.x+next.velocity.y*next.velocity.y+next.velocity.z*next.velocity.z);
+            if(std::isfinite(speed)&&speed>.1f&&speed<40){
+                next.launch.values[3][0]+=.09f*next.velocity.x/speed;next.launch.values[3][1]+=.09f*next.velocity.y/speed;next.launch.values[3][2]+=.09f*next.velocity.z/speed;
+            }else next={};
+        }
+    }
+    if(next.tick){M body;const auto valid=SoldierWorld(p.soldier,&body);const auto inv=valid?InverseRigid(body):std::nullopt;
+        if(inv)PublishNetworkCrateThrow(p.soldier,p.weapon,Multiply(next.launch,*inv),net::TransformVelocity(next.velocity,*inv));
+    }
+    AcquireSRWLockExclusive(&sampleLock);supportState={f.leftCrate,f.busy,GetTickCount64()};
+    if(next.tick)crateThrow=next;else if(!f.leftCrate)crateThrow={};ReleaseSRWLockExclusive(&sampleLock);
 }
 }

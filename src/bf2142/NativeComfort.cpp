@@ -1,4 +1,5 @@
 #include "NativeComfort.h"
+#include "multiplayer/NativeNetwork.h"
 #include "ComfortCamera.h"
 #include "ComfortControls.h"
 #include "TrackingMath.h"
@@ -118,7 +119,7 @@ bool RequestNativeSnapTurn(float degrees,std::int64_t sampleTime){
     Infantry owner{};if(!installed||!Focused()||!ReadInfantry(&owner))return false;
     AcquireSRWLockExclusive(&lock);
     const bool queued=turnPulse.Queue(TurnOwner(owner),degrees,sampleTime,GetTickCount64());
-    ReleaseSRWLockExclusive(&lock);return queued;
+    ReleaseSRWLockExclusive(&lock);if(queued)PublishNetworkSnap(owner.soldier,degrees);return queued;
 }
 void ClearNativeSnapTurn(){AcquireSRWLockExclusive(&lock);turnPulse.Cancel();ReleaseSRWLockExclusive(&lock);}
 bool InstallNativeComfort(LogFunction logger){

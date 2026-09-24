@@ -50,6 +50,18 @@ int main(){
  for(int i=30;i<80;++i)CHECK(Near(rendered[i],authored[i]));
  // Unreachable tracking falls back after the engine has refreshed every bone.
  poses[7].packet.left=At(-3,3,3);Frame(soldier.data());CHECK(Same(rendered,authored));
+ // Local action retransmission is independent of pose sequence and expires.
+ actors[0].weapon=localSoldier.data();localId=0;
+ PublishNetworkSnap(localSoldier.data(),30);Packet action;AttachEvents(action,GetTickCount64());
+ CHECK(action.snapSerial&&action.snapDegrees==30);const auto serial=action.snapSerial;
+ action={};AttachEvents(action,GetTickCount64());CHECK(action.snapSerial==serial);
+ action={};AttachEvents(action,events.snapTime+301);CHECK(!action.snapSerial);
+ PublishNetworkSnap(soldier.data(),-30);CHECK(events.snapSerial==serial); // remote owner rejected
+ PublishNetworkCrateThrow(localSoldier.data(),localSoldier.data(),At(-.3f,1.2f,.4f),{0,1,3});
+ action={};action.flags=LeftValid|LeftCrateHeld;AttachEvents(action,GetTickCount64());
+ CHECK(action.throwSerial&&Near(action.throwLaunch,At(-.3f,1.2f,.4f))&&action.throwVelocity.z==3);
+ action={};AttachEvents(action,GetTickCount64());CHECK(!action.throwSerial); // no held crate
+ action.flags=LeftValid|LeftCrateHeld;AttachEvents(action,events.throwTime+601);CHECK(!action.throwSerial);
  // Even without a local first-person callback, the 3P callback must pump/reset a lost roster.
  lastPump=0;render=nullptr;RemoteFinalizeHook(soldier.data(),nullptr,.0125f,17);CHECK(localId==256&&!poses[7].received&&Same(rendered,authored));
  puts("Third-person callback ordering, remote native rig writes, LOD fallback, stale/thread/local guards and observer receive pump passed.");return 0;

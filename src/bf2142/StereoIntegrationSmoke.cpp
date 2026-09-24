@@ -18,12 +18,14 @@
 #include <fstream>
 #include <vector>
 using namespace bfvr;
+namespace bfvr::bf2142 {void TestHoldStereoConsumer(bool);}
 namespace {
 IDirect3DDevice9* device=nullptr;
 bf2142::EyeCamera currentEye{};
 unsigned renders=0,presents=0,advances=0,suppressed=0,recenters=0;
 bool valid=true,scopeFixture=false,reflexFixture=false,desktopFixture=false,solidFixture=false,hiddenWeapon=false;
 std::vector<DWORD> lastDesktop;
+double expectedNativeTime=1.0/60;
 using Present=HRESULT(STDMETHODCALLTYPE*)(IDirect3DDevice9*,const RECT*,const RECT*,HWND,const RGNDATA*);
 Present nativePresent=nullptr;
 void Log(const char* format,...) {if(strstr(format,"6DoF neutral"))++recenters;va_list a;va_start(a,format);vprintf(format,a);va_end(a);puts("");}
@@ -42,7 +44,7 @@ HRESULT STDMETHODCALLTYPE PresentHook(IDirect3DDevice9* d,const RECT* a,const RE
     ++presents;return nativePresent(d,a,b,w,r);
 }
 bool __fastcall Scene(void*,void*,double delta,float) {
-    ++renders;if(delta>0)++advances;
+    ++renders;if(delta!=0){++advances;valid=valid&&delta==expectedNativeTime;}
     valid=SUCCEEDED(device->BeginScene()) && valid;
     valid=SUCCEEDED(device->Clear(0,nullptr,D3DCLEAR_TARGET,0xff102030,1,0)) && valid;
     const auto inverse=bf2142::InverseRigid(currentEye.world);
@@ -163,11 +165,18 @@ int wmain(int argc,wchar_t** argv) {
     if(!bf2142::StartStereo(desktopFixture?L"@desktop":L"@diagnostic",prefix,Log))return 3;
     bf2142::StereoDeviceCreated(device);
     for(unsigned pair=0;pair<60;++pair) {
-        valid=bf2142::RenderStereo(reinterpret_cast<void*>(1),reinterpret_cast<bf2142::NativeRender>(&Scene),1.0/60,0) && valid;
+        expectedNativeTime=1000.0+double(pair)/60; // native clock argument is opaque, not a clamped timestep
+        valid=bf2142::RenderStereo(reinterpret_cast<void*>(1),reinterpret_cast<bf2142::NativeRender>(&Scene),expectedNativeTime,0) && valid;
         // The real game's outer loop presents again after the renderer returns.
         // This must not publish a flat scene on the UI panel or recenter the next pair.
         valid=SUCCEEDED(device->Present(nullptr,nullptr,nullptr,nullptr)) && valid;
     }
+    // Hold the actual consumer fence: no flat camera, animation or Present.
+    bf2142::TestHoldStereoConsumer(true);
+    const auto beforeRenders=renders,beforePresents=presents,beforeAdvances=advances;
+    for(int i=0;i<6;++i)valid=bf2142::RenderStereo(reinterpret_cast<void*>(1),reinterpret_cast<bf2142::NativeRender>(&Scene),1.0/120,0)&&valid;
+    valid=renders==beforeRenders&&presents==beforePresents&&advances==beforeAdvances&&valid;
+    bf2142::TestHoldStereoConsumer(false);
     if(desktopFixture){
         valid=lastDesktop.size()==320u*240u && valid;
         if(!lastDesktop.empty())valid=lastDesktop.front()==0xff00ff00 && lastDesktop.back()==0xff102030 && Centroid(lastDesktop)>0 && valid;
@@ -202,7 +211,7 @@ int wmain(int argc,wchar_t** argv) {
     if(!menu.empty())valid=menu[50*320+50]==0xff00ffff && menu.front()==0 && menu.back()==0 && valid;
     for(const auto* eye:{&emptyLeft,&emptyRight})for(auto color:*eye)if(color!=0xff000000)valid=false;
     valid=renders==60*passes && advances==60 && presents==240 && recenters==1 && valid;
-    valid=bf2142::RenderStereo(reinterpret_cast<void*>(1),reinterpret_cast<bf2142::NativeRender>(&Scene),1.0/60,0) && valid;
+    valid=bf2142::RenderStereo(reinterpret_cast<void*>(1),reinterpret_cast<bf2142::NativeRender>(&Scene),expectedNativeTime,0) && valid;
     valid=renders==61*passes && advances==61 && suppressed==61*passes && recenters==1 && valid;
     printf("Pause/resume: 120 standalone UI frames, world calls=%u neutral captures=%u; no duplicated scene.\n",renders,recenters);
     bf2142::StereoReset();device->Release();DestroyWindow(window);
@@ -232,3 +241,5 @@ namespace bfvr::bf2142 {void HideNativeWeaponForReplay(bool hide){hiddenWeapon=h
     if(!solidFixture)return false;frame->world=currentEye.world;strcpy_s(frame->name.data(),frame->name.size(),"fixture");return true;}}
 
 namespace bfvr::bf2142 {void SetNativeWeaponHeld(bool){} bool NativeWeaponHeld(){return true;} bool NativeWeaponInputReady(){return true;} bool ReadNativeGrenadeTrajectory(GrenadeTrajectory*){return false;}}
+
+namespace bfvr::bf2142 {struct SupportFrame;struct SupportAmmo;void PublishNativeSupport(const SupportFrame&){} bool ReadSupportAmmo(std::uint64_t,int,SupportAmmo*){return false;}}

@@ -55,3 +55,5 @@ int main(){
  installed=false;CHECK(!NativeSnapTurnAvailable());CHECK(!RequestNativeSnapTurn(30,105));
  puts("Native turn: exact local caller, one pulse, recoil separation, focus/owner/menu/death/vehicle guards passed.");
 }
+
+namespace bfvr::bf2142 {void PublishNetworkSnap(void*,float){}}

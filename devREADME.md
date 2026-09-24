@@ -1101,3 +1101,23 @@ runtime-paced sequence. It composes centre-head motion at the renderer-camera
 boundary and leaves only residual eye poses/asymmetric FOV for D3D8 replay,
 retains the owned eye/UI targets across frames with Reset-safe cleanup, and
 reports per-stage timing. It remains diagnostic, not a release runtime.
+
+
+## BF2142 private multiplayer v33
+
+The private BF2142 adapter now uses protocol v2 for authenticated, one-shot snap
+and support-crate events alongside pose packets. This is separate from the
+historical BF1942 PlayerAction implementation above. Snap consumes the dedicated
+native horizontal input getter only at its verified input call; throw events
+override native support-crate launch/velocity without changing inventory/ammo.
+Client and server must be staged together. Accepted SP reload/sight experiments
+remain separate.
+
+Desktop test controls: Insert/Delete simulate left/right thumbstick turns.
+Hold Tab while using F3-F8 or numpad movement to position the left hand;
+right Shift or backslash grips it, and Decimal makes movement fast enough to
+exercise a release throw. These hotkeys apply only to --desktop-vr.
+
+The stereo loop skips a healthy request/consumer wait instead of rendering a
+flat-camera frame. It retains the native renderer time argument, its original
+outer Present behavior, and isolated pause/deployment UI capture.

@@ -50,6 +50,14 @@ int main(int argc,char** argv){
  Packet p=Sample(),out;CHECK(Validate(p,p.secret));CHECK(Decode(&p,sizeof(p),p.secret,&out));CHECK(!Decode(&p,sizeof(p)-1,p.secret,&out));CHECK(!Decode(&p,sizeof(p)+1,p.secret,&out));
  auto bad=p;bad.secret[2]^=1;CHECK(!Validate(bad,p.secret));bad=p;bad.player=256;CHECK(!Validate(bad,p.secret));bad=p;bad.kind=4;CHECK(!Validate(bad,p.secret));bad=p;bad.flags=8;CHECK(!Validate(bad,p.secret));bad=p;bad.session=0;CHECK(!Validate(bad,p.secret));
  bad=p;bad.version++;CHECK(!Validate(bad,p.secret));bad=p;bad.head.values[3][0]=5;CHECK(!Validate(bad,p.secret));bad=p;bad.curls[0]=1.1f;CHECK(!Validate(bad,p.secret));bad=p;bad.right.values[0][0]=std::numeric_limits<float>::quiet_NaN();CHECK(!Validate(bad,p.secret));bad=p;bad.weaponName.back()='x';CHECK(!Validate(bad,p.secret));
+ auto event=p;event.snapSerial=1;event.snapDegrees=30;CHECK(Validate(event,event.secret));
+ event.snapDegrees=91;CHECK(!Validate(event,event.secret));event.snapDegrees=0;CHECK(!Validate(event,event.secret));
+ event=p;event.throwSerial=1;event.throwLaunch=At(0,1,.2f);event.throwVelocity={1,2,3};CHECK(!Validate(event,event.secret));
+ event.weaponName={};std::memcpy(event.weaponName.data(),"unl_hub_medic",13);event.flags|=LeftCrateHeld;CHECK(Validate(event,event.secret));
+ event.throwVelocity.x=41;CHECK(!Validate(event,event.secret));event.throwVelocity.x=1;event.throwLaunch.values[3][0]=5;CHECK(!Validate(event,event.secret));
+ EventWindow events;CHECK(events.Accept(1,1,100));CHECK(!events.Accept(1,1,110));CHECK(!events.Accept(1,0,120));CHECK(events.Accept(1,2,200));
+ CHECK(!events.Accept(1,1,220));CHECK(!events.Accept(1,3,201,120));CHECK(events.Accept(1,3,400,120));CHECK(events.Accept(2,1,500));
+ const auto rotatedVelocity=TransformVelocity({0,1,3},Yaw(1.57079632679f));CHECK(std::abs(rotatedVelocity.x-3)<.001f&&rotatedVelocity.y==1&&std::abs(rotatedVelocity.z)<.001f);
  FreshPose fresh;CHECK(fresh.Accept(p,100));CHECK(!fresh.Accept(p,110));CHECK(fresh.Read(350));CHECK(!fresh.Read(351));p.sequence++;CHECK(fresh.Accept(p,400));CHECK(!fresh.Accept(p,399));p.session++;p.sequence=1;CHECK(!fresh.Accept(p,401));CHECK(fresh.Accept(p,1401));CHECK(Newer(0,0xffffffff));CHECK(!Newer(0xffffffff,0));fresh.Clear();CHECK(!fresh.Read(1401));
  // Server body yaw and position must not introduce a second tracked-gun turn.
  const auto camera=At(0,1.5f,0),gun=Multiply(Yaw(.75f),At(.3f,1.4f,.3f)),offset=At(.02f,-.03f,.4f);

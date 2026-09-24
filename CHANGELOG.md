@@ -2,6 +2,19 @@
 
 ## Unreleased - local multiplayer development
 
+- Send snap turns to the experimental dedicated server's verified native look
+  input, with one-shot event IDs, owner checks and expiry. Preserve the common
+  headset/arms/minimap frame instead of rotating a separate VR anchor.
+- Port the accepted left-hand ammo/medical crate grab, release throw, native
+  cooldown visibility and previous-weapon restoration from the SP sandbox.
+  The dedicated extension applies its tracked release pose/velocity to native
+  crate fire; native inventory, cooldown and projectile creation remain in charge.
+  This requires matching experimental protocol-v2 client and server binaries.
+- Keep healthy XR frame waits from invoking the ordinary flat ADS renderer.
+  Retain native Present behavior and explicitly captured pause/deployment menus.
+- Add desktop Insert/Delete simulated turns and Tab + F3-F8 / numpad left-hand
+  positioning for private multiplayer development without a connected headset.
+
 - Route physical ADS through ordinary native alternate-fire input in the
   experimental network client. Dedicated-server zoom now persists instead of
   being immediately corrected away. Bound each press, await native state,

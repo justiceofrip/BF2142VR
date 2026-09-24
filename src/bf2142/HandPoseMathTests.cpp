@@ -162,6 +162,9 @@ int main(){
     f.weaponHeld=false;f.fingerPoses=true;f.leftValid=true;f.leftGrip=At(-.22f,1.23f,.28f);f.leftAim=At(0,0,0);f.supportPressed=true;
     const auto empty=SolveTrackedHands(b,f);if(!empty||empty->supporting||Dist(empty->bones[33],f.rightGrip)>.001f||Dist(empty->bones[7],f.leftGrip)>.001f)return 117;
     if(empty->bones[54].values[3][2]>f.head.values[3][2]-3.9f||!Same(empty->bones[0],b[0]))return 118;
-    f.leftValid=false;if(!SolveTrackedHands(b,f))return 119;
+    f.leftItem=At(-.25f,1.1f,.3f);const auto crate=SolveTrackedHands(b,f);
+    if(!crate||!Same(crate->bones[54],*f.leftItem)||!Same(crate->bones[7],empty->bones[7])||!Same(crate->bones[33],empty->bones[33]))return 120;
+    f.leftValid=false;if(SolveTrackedHands(b,f))return 121;f.leftItem.reset();
+    if(!SolveTrackedHands(b,f))return 119;
     puts("BF2142 controller wrists, both hands' fingers, weapon attachments, knife palm grip, IK and support policy passed.");return 0;
 }

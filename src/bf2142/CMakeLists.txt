@@ -1,8 +1,8 @@
 # Opt-in BF2142 startup connection.
-add_library(BF2142VRClient SHARED BF2142VRClient.cpp NativeVehicle.cpp VehicleControls.cpp LegacyShaderMemory.cpp BF2142VRClient.def WeaponGrip.cpp GrenadeArc.cpp BodyInventory.cpp BodyEquipment.cpp DesktopSimulation.cpp NativeHudPointer.cpp NativeOptics.cpp GunOptics.cpp EyeRestore.cpp NativeStereo.cpp NativeCrosshair.cpp NativeComfort.cpp TraversalControls.cpp ComfortCamera.cpp NativeQueryGuard.cpp NativeHands.cpp MotionActions.cpp HandPoseMath.cpp ControllerHandPose.cpp HandBindingCache.cpp WeaponOptic.cpp NativeMenus.cpp StereoSession.cpp MenuPointer.cpp MenuWindowInput.cpp NativeMenuState.cpp NativeHudState.cpp
+add_library(BF2142VRClient SHARED BF2142VRClient.cpp NativeVehicle.cpp VehicleControls.cpp LegacyShaderMemory.cpp BF2142VRClient.def WeaponGrip.cpp GrenadeArc.cpp BodyInventory.cpp BodyEquipment.cpp DesktopSimulation.cpp NativeHudPointer.cpp NativeOptics.cpp GunOptics.cpp EyeRestore.cpp NativeStereo.cpp NativeCrosshair.cpp NativeComfort.cpp TraversalControls.cpp ComfortCamera.cpp NativeQueryGuard.cpp NativeHands.cpp MotionActions.cpp HandPoseMath.cpp ControllerHandPose.cpp HandBindingCache.cpp WeaponOptic.cpp NativeMenus.cpp StereoSession.cpp SupportCrates.cpp MenuPointer.cpp MenuWindowInput.cpp NativeMenuState.cpp NativeHudState.cpp
   StereoCamera.cpp StereoDiagnostics.cpp ControllerPolicy.cpp ComfortControls.cpp VrControlsMenu.cpp VrSettings.cpp MenuRoom.cpp MenuRoomGpu.cpp LobbyScene.cpp ControllerInput.cpp InputOverlay.cpp TrackingMath.cpp FrameCapture.cpp NativeUiCapture.cpp ../presenter/SharedControlChannel.cpp
   ../presenter/SharedTextureProducer.cpp ../presenter/D3DSystemRuntime.cpp)
-add_executable(BF2142VRStereoIntegrationSmoke StereoIntegrationSmoke.cpp WeaponGrip.cpp GrenadeArc.cpp BodyInventory.cpp BodyEquipment.cpp DesktopSimulation.cpp GunOptics.cpp EyeRestore.cpp TraversalControls.cpp ComfortCamera.cpp StereoSession.cpp MenuPointer.cpp MenuWindowInput.cpp NativeMenuState.cpp NativeHudState.cpp StereoCamera.cpp StereoDiagnostics.cpp TrackingMath.cpp ControllerPolicy.cpp ComfortControls.cpp VrControlsMenu.cpp VrSettings.cpp MenuRoom.cpp MenuRoomGpu.cpp LobbyScene.cpp FrameCapture.cpp NativeUiCapture.cpp ../presenter/SharedControlChannel.cpp ../presenter/SharedTextureProducer.cpp ../presenter/D3DSystemRuntime.cpp)
+add_executable(BF2142VRStereoIntegrationSmoke StereoIntegrationSmoke.cpp WeaponGrip.cpp GrenadeArc.cpp BodyInventory.cpp BodyEquipment.cpp DesktopSimulation.cpp GunOptics.cpp EyeRestore.cpp TraversalControls.cpp ComfortCamera.cpp StereoSession.cpp SupportCrates.cpp MenuPointer.cpp MenuWindowInput.cpp NativeMenuState.cpp NativeHudState.cpp StereoCamera.cpp StereoDiagnostics.cpp TrackingMath.cpp ControllerPolicy.cpp ComfortControls.cpp VrControlsMenu.cpp VrSettings.cpp MenuRoom.cpp MenuRoomGpu.cpp LobbyScene.cpp FrameCapture.cpp NativeUiCapture.cpp ../presenter/SharedControlChannel.cpp ../presenter/SharedTextureProducer.cpp ../presenter/D3DSystemRuntime.cpp)
 target_link_libraries(BF2142VRStereoIntegrationSmoke PRIVATE minhook d3d9 d3dcompiler user32 gdi32 BFVRStereoMath)
 add_executable(BF2142VRLauncher BF2142VRLauncher.cpp)
 add_executable(BF2142VRLaunchOptionsTests LaunchOptionsTests.cpp)
@@ -270,4 +270,16 @@ set_property(TARGET BF2142VRClientNetworkTests PROPERTY MSVC_RUNTIME_LIBRARY "Mu
 target_link_libraries(BF2142VRClientNetworkTests PRIVATE minhook BFVRStereoMath ws2_32 bcrypt kernel32)
 if(BUILD_TESTING)
  add_test(NAME BF2142VRClientNetworkTests COMMAND BF2142VRClientNetworkTests)
+endif()
+
+target_compile_definitions(BF2142VRStereoIntegrationSmoke PRIVATE BF2142_GPU_FIXTURE)
+target_sources(BF2142VRNativeMotionTests PRIVATE multiplayer/PoseProtocol.cpp)
+add_executable(BF2142VRSupportCratesTests SupportCratesTests.cpp SupportCrates.cpp BodyInventory.cpp)
+target_link_libraries(BF2142VRSupportCratesTests PRIVATE BFVRStereoMath)
+target_include_directories(BF2142VRSupportCratesTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
+target_compile_definitions(BF2142VRSupportCratesTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_compile_options(BF2142VRSupportCratesTests PRIVATE /W4 /permissive-)
+set_property(TARGET BF2142VRSupportCratesTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+if(BUILD_TESTING)
+ add_test(NAME BF2142VRSupportCratesTests COMMAND BF2142VRSupportCratesTests)
 endif()
