@@ -217,6 +217,7 @@ void UpdateAutomaticAds(const std::array<EyeCamera,2>&){}
 void RequestAutomaticAds(bool){}
 void ResetAutomaticAds(){}
 bool HandlesAutomaticAds(){return false;}
+bool AutomaticAdsButton(bool){return false;}
 }
 
 namespace bfvr::bf2142 {bool ReadNativeInventory(std::array<bool,10>*,int*,std::array<std::array<char,49>,10>*,std::uint64_t*){return false;}bool ReadNativeSightAlignmentOffset(stereo::Vec3*){return false;}}

@@ -15,6 +15,8 @@ void RequestAutomaticAds(bool gameplay);
 void ResetAutomaticAds();
 bool NativeWeaponAds(void* weapon);
 bool HandlesAutomaticAds();
+// Once per controller command; never emit input in menus, vehicles or stale tracking.
+bool AutomaticAdsButton(bool allowInput);
 }
 
 namespace bfvr::bf2142 {bool ReadNativeSightAlignmentOffset(stereo::Vec3* offset);}

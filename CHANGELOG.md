@@ -2,6 +2,16 @@
 
 ## Unreleased - local multiplayer development
 
+- Route physical ADS through ordinary native alternate-fire input in the
+  experimental network client. Dedicated-server zoom now persists instead of
+  being immediately corrected away. Bound each press, await native state,
+  respect reload/sprint cancellation and discard stale activation on tracking
+  loss. Preserve the accepted singleplayer zoom path and first-person hand math.
+- Restore private multiplayer lab equipment visibility by repairing its copied
+  UTF-16 INI and local asset paths; all 56 local models load again. This was a
+  lab setup defect, not missing replicated equipment or a public package change.
+- Add native squad voice / VR push-to-talk to the deferred roadmap.
+
 - Developer-only --join-local PORT launcher option for a loopback dedicated
   server. Normal single-client protection and release behavior remain intact.
 - Add an opt-in experimental dedicated-server controller-aim adapter and local
@@ -307,7 +317,7 @@ the v1.0.2 section exactly as written below.
   and the EU, PAC and unlocked sniper rifles. Right-grip native ADS is retained;
   align an eye behind the gun's measured rear aperture to see the magnified
   world and bore-aligned reticle. Assault optics start at 2x, sniper optics at
-  4x; native zoom steps/fine tuning adjust magnification within a 1xÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“16x limit.
+  4x; native zoom steps/fine tuning adjust magnification within a 1xÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ16x limit.
 - Keep the normal weapon mesh during supported tracked ADS instead of its
   oversized flat aiming LOD. A signature-checked, local-owner-only adapter
   changes the visual LOD argument; native zoom state, accuracy, recoil and
@@ -408,7 +418,7 @@ the v1.0.2 section exactly as written below.
 
 -Increased left hand grab radius from 12cm to 18cm.
 -Increased scope aim smoothing radius from 0.35 degrees to 1.5 degrees.
--Doubled controller-motion turret/cannon sensitivity for land vehicles, sea vehicles, and mounted weapons compared to the original implementation and raised its input allowance to BF1942ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s native maximum. There is now a sensitivity slider for it as well.
+-Doubled controller-motion turret/cannon sensitivity for land vehicles, sea vehicles, and mounted weapons compared to the original implementation and raised its input allowance to BF1942ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢s native maximum. There is now a sensitivity slider for it as well.
 -Reduced the time it takes to trigger a view recenter when holding the reload button from 2.5 seconds to 2.
 -Added a Show 'hands+arms, hands only, none' setting.
 -Added a death cam comfort vignette effect with independent toggle.

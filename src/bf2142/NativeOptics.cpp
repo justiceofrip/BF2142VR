@@ -1,6 +1,8 @@
 #include "NativeOptics.h"
 #include "NativeHands.h"
 #include "AutoAdsPolicy.h"
+#include "AutoAdsInput.h"
+#include "multiplayer/NativeNetwork.h"
 #include <MinHook.h>
 #include <cmath>
 #include <cstring>
@@ -13,7 +15,7 @@ SetZoomLod nativeLod=nullptr;
 using SetZoom=void(__thiscall*)(void*,int,bool);
 SetZoom setZoom=nullptr;
 bool autoEnabled=false,autoGameplay=false,owned=false;
-void* autoWeapon=nullptr;AutoAdsPolicy autoPolicy;
+void* autoWeapon=nullptr;AutoAdsPolicy autoPolicy;AutoAdsInput networkAds;
 ULONGLONG autoRequestTime=0;
 
 template<class T>T Read(const void* p,size_t offset=0){T v{};std::memcpy(&v,static_cast<const BYTE*>(p)+offset,sizeof(v));return v;}
@@ -113,6 +115,15 @@ void ResetAutomaticAds(){
     // Resolve the current local inventory again before releasing a zoom we own.
     // Never retain or call an old component after death/equip/map transitions.
     Weapon w;
+    if(NetworkClientActive()){
+        // Suspend presses immediately. Keep only a still-local owner so the
+        // normal input path can release its zoom on return from a menu or a
+        // tracking interruption. Never call the local-only setter in this mode.
+        if(autoWeapon && IsLocalTrackedWeapon(autoWeapon) && ReadWeapon(autoWeapon,&w))
+            networkAds.Suspend(w.step>0,GetTickCount64());
+        else {autoWeapon=nullptr;networkAds={};}
+        owned=false;autoPolicy={};autoGameplay=false;return;
+    }
     if(owned && setZoom && IsLocalTrackedWeapon(autoWeapon) && ReadWeapon(autoWeapon,&w) && w.step>0)setZoom(w.zoomBase,0,false);
     autoWeapon=nullptr;owned=false;autoPolicy={};autoGameplay=false;
 }
@@ -123,13 +134,15 @@ void RequestAutomaticAds(bool gameplay){
 void UpdateAutomaticAds(const std::array<EyeCamera,2>& eyes){
     TrackedWeaponFrame f;Weapon w;
     if(!autoEnabled || !enabled || !autoGameplay || GetTickCount64()-autoRequestTime>150 || !ReadTrackedWeaponFrame(&f) || !ReadWeapon(f.weapon,&w)){ResetAutomaticAds();return;}
-    if(autoWeapon!=f.weapon){ResetAutomaticAds();autoWeapon=f.weapon;autoGameplay=true;}
+    if(autoWeapon!=f.weapon){ResetAutomaticAds();networkAds={};autoWeapon=f.weapon;autoGameplay=true;}
     GunOptic candidate{w.definition,f.world,w.definition->magnification};
     const auto view=MakeOpticView(candidate,eyes);
     const float alignment=view?std::max(view->visibility[0],view->visibility[1]):0;
-    const bool cancelled=owned && w.step==0;
+    const bool network=NetworkClientActive();
+    const bool cancelled=network?networkAds.Observe(w.step>0,GetTickCount64()):owned && w.step==0;
     if(cancelled)owned=false;
     const bool desired=autoPolicy.Update(true,alignment,cancelled,GetTickCount64());
+    if(network){networkAds.Request(desired,w.step>0,GetTickCount64());return;}
     // Manual keyboard zoom and native fine tuning remain native. Only release
     // the zoom this adapter engaged; reload/sprint cancellation is respected.
     if(desired && !w.step){setZoom(w.zoomBase,1,false);Weapon after;if(ReadWeapon(f.weapon,&after)&&after.step>0)owned=true;}
@@ -138,6 +151,20 @@ void UpdateAutomaticAds(const std::array<EyeCamera,2>& eyes){
 }
 
 namespace bfvr::bf2142 {
+bool AutomaticAdsButton(bool allowInput){
+    if(!NetworkClientActive())return false;
+    Weapon w;
+    if(!autoWeapon || !IsLocalTrackedWeapon(autoWeapon) || !ReadWeapon(autoWeapon,&w)){
+        networkAds={};autoWeapon=nullptr;return false;
+    }
+    if(!allowInput)return false;
+    const auto now=GetTickCount64();
+    if(!autoGameplay){
+        networkAds.Observe(w.step>0,now);
+        networkAds.Request(false,w.step>0,now);
+    }else if(now<autoRequestTime || now-autoRequestTime>150)return false;
+    return networkAds.Pressed(now);
+}
 bool ReadNativeSightAlignmentOffset(stereo::Vec3* offset){
     TrackedWeaponFrame f;Weapon w;stereo::Vec3 grip;
     if(!offset||!enabled||!ReadTrackedWeaponFrame(&f,true)||!ReadWeapon(f.weapon,&w)||!ReadNativeRightGripOffset(&grip))return false;

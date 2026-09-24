@@ -184,3 +184,26 @@ establish live pose-driven arm rendering, not perfect stability or headset feel.
 No second actual VR player was involved. The fixture, native captures and images
 stay private and are not required by the mod. The exact v31f headset check, visual
 hit alignment, external transport and two-real-client checks remain pending.
+
+## Physical ADS and local equipment regression fixes (2026-09-24)
+
+The direct client zoom setter works in instant action but is corrected away by
+an authoritative dedicated server. The experimental network client now sends
+bounded native alternate-fire input for automatic ADS. The 180 ms alignment /
+300 ms lowering hysteresis is unchanged. Native acknowledgement is awaited;
+server/reload/sprint cancellation blocks re-entry until the player lowers the
+weapon. Queued entry is canceled on tracking loss. Menu input and another or
+stale weapon never consume an ADS press. The offline zoom path remains intact.
+
+The copied private lab INI had corrupted UTF-16 newlines and stale generated
+asset paths. Correctly decoding/re-encoding it restored all 56 local equipment
+models. Holster interaction and rendering are client-side features, independent
+of replicated remote arm poses. The preparation script now respects the BOM.
+
+Desktop tests in the actual dedicated match kept physical ADS enabled for the
+full 12-second sample, released on lowering, re-acquired, fired while scoped,
+and recovered from simulated tracking loss. A downward capture shows the chest
+knife and belt equipment. All 63 CTests and the x64 presenter build pass. These
+are desktop observations; headset acceptance and two real clients remain open.
+Voice chat / Quest microphone routing / VR push-to-talk are deferred; see the
+[roadmap](BF2142_ROADMAP.md).

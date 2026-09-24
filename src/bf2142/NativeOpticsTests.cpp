@@ -7,13 +7,13 @@ static ULONGLONG TestTime(){return testTime;}
 #include <array>
 #include <cstdio>
 using namespace bfvr::bf2142;
-namespace {int zoomChanges=0;bool immediateSeen=false;
+namespace {bool networkTest=false;int zoomChanges=0;bool immediateSeen=false;
 void __fastcall ZoomSpy(void* base,void*,int step,bool immediate){++zoomChanges;immediateSeen|=immediate;std::memcpy(static_cast<BYTE*>(base)+0x1c,&step,sizeof(step));}
 TrackedWeaponFrame tracked;bool tracking=true;int forwarded=0,lastLod=-9;void* lastSelf=nullptr;
 void __fastcall Original(void* self,void*,int lod){++forwarded;lastSelf=self;lastLod=lod;}
 template<class T>void Set(BYTE* p,size_t off,T value){std::memcpy(p+off,&value,sizeof(value));}
 }
-namespace bfvr::bf2142 {bool ReadTrackedWeaponFrame(TrackedWeaponFrame* out,bool){if(!tracking)return false;*out=tracked;return true;}bool IsLocalTrackedWeapon(void* w){return tracking && w==tracked.weapon;}}
+namespace bfvr::bf2142 {bool NetworkClientActive(){return networkTest;}bool ReadTrackedWeaponFrame(TrackedWeaponFrame* out,bool){if(!tracking)return false;*out=tracked;return true;}bool IsLocalTrackedWeapon(void* w){return tracking && w==tracked.weapon;}}
 int main(){
  game=static_cast<BYTE*>(VirtualAlloc(nullptr,0x660000,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));if(!game)return 1;
  std::array<BYTE,0x268> w{};std::array<BYTE,0x370> t{};std::array<BYTE,0x38> z{};std::array<BYTE,0x4c> zt{};
@@ -67,6 +67,47 @@ int main(){
  Set(z.data(),0x34,.1f);ok=ok && ReadNativeOptic(&optic) && optic.magnification==1.f;
  Set(z.data(),0x34,0.f);
  DisableNativeOptics();LodHook(z.data(),nullptr,1);ok=ok && lastLod==1 && !ReadNativeOptic(&optic);
+ // Dedicated mode uses the normal input stream; local setters cannot own
+ // authoritative zoom. Model delayed acknowledgement and server correction.
+ networkTest=true;enabled=true;Set(z.data(),0x1c,0);Set(z.data(),0x34,0.f);
+ ResetAutomaticAds();networkAds={};autoWeapon=nullptr;
+ // EU LMG alignment has a different measured sight center.
+ std::memset(t.data()+0x10,0,16);std::memcpy(t.data()+0x10,"eu_ar_rifle",12);Set(t.data(),0x20,11u);factors[1]=.484f;
+ for(auto& e:eyes)e.world.values[3]={0,.095f,-.281f,1};
+ const int prior=zoomChanges;
+ #define CHECK(x) do{if(!(x)){printf("Network ADS failed line %d: %s\n",__LINE__,#x);return 3;}}while(0)
+ const auto tick=[&](ULONGLONG stamp){testTime=stamp;RequestAutomaticAds(true);UpdateAutomaticAds(eyes);};
+ tick(3000);tick(3180);CHECK(AutomaticAdsButton(true)&&!AutomaticAdsButton(false)&&zoomChanges==prior);
+ tick(3220);CHECK(AutomaticAdsButton(true)&&!autoPolicy.blocked); // no premature cancellation awaiting native input
+ Set(z.data(),0x1c,1);tick(3260);CHECK(networkAds.owned&&AutomaticAdsButton(true));
+ tick(3300);CHECK(!AutomaticAdsButton(true));
+ for(unsigned i=1;i<=60;++i){tick(3300+i*50);CHECK(networkAds.owned&&!AutomaticAdsButton(true)&&Read<int>(z.data(),0x1c)==1);}
+ // Lowering emits one native toggle, rather than clearing the local field.
+ for(auto& e:eyes)e.world.values[3][0]=1;
+ tick(6350);tick(6550);tick(6650);CHECK(AutomaticAdsButton(true)&&Read<int>(z.data(),0x1c)==1);
+ Set(z.data(),0x1c,0);tick(6700);tick(6770);CHECK(!networkAds.owned&&!AutomaticAdsButton(true));
+ for(auto& e:eyes)e.world.values[3][0]=0;
+ tick(6800);tick(6980);CHECK(AutomaticAdsButton(true));Set(z.data(),0x1c,1);tick(7020);tick(7100);
+ Set(z.data(),0x1c,0);tick(7150);CHECK(autoPolicy.blocked&&!networkAds.owned&&!AutomaticAdsButton(true));
+ tick(7200);CHECK(!AutomaticAdsButton(true)); // genuine native cancellation is respected
+ for(auto& e:eyes)e.world.values[3][0]=1;tick(7250);
+ for(auto& e:eyes)e.world.values[3][0]=0;tick(7300);tick(7480);Set(z.data(),0x1c,1);tick(7520);tick(7600);
+ RequestAutomaticAds(false);CHECK(!AutomaticAdsButton(false)&&Read<int>(z.data(),0x1c)==1);
+ testTime=7700;CHECK(AutomaticAdsButton(true)); // release on safe gameplay return
+ Set(z.data(),0x1c,0);testTime=7820;CHECK(!AutomaticAdsButton(true)&&!networkAds.owned);
+ // Losing tracking before native input is consumed cannot replay an entry.
+ for(auto& e:eyes)e.world.values[3][0]=0;
+ tick(7850);tick(8030);CHECK(AutomaticAdsButton(true));RequestAutomaticAds(false);
+ CHECK(!AutomaticAdsButton(true)&&!networkAds.pending&&!networkAds.owned);
+ // A dead/stale/different local weapon must never receive the queued toggle.
+ networkAds={true};autoWeapon=w.data();tracking=false;CHECK(!AutomaticAdsButton(true)&&!autoWeapon);tracking=true;
+ // Native/manual zoom is never claimed or released by the automatic adapter.
+ networkAds={};Set(z.data(),0x1c,1);tick(8100);tick(8280);RequestAutomaticAds(false);CHECK(!AutomaticAdsButton(true)&&!networkAds.owned);
+ // Unacknowledged press expires once and blocks reacquisition until lowered.
+ Set(z.data(),0x1c,0);tick(8300);tick(8480);CHECK(AutomaticAdsButton(true));
+ for(auto stamp:{8600u,8800u,9000u,9250u})tick(stamp);
+ CHECK(autoPolicy.blocked&&!AutomaticAdsButton(true)&&zoomChanges==prior);
+ #undef CHECK
  printf("Native optic/auto-ADS adapter %s: x86 LOD forwarding=%d, local ownership, stale/fault/unknown fallback, fine zoom, native ADS transitions and cancellation.\n",ok?"PASS":"FAIL",forwarded);
  VirtualFree(game,0,MEM_RELEASE);return ok?0:2;
 }

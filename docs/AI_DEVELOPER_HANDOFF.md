@@ -5,6 +5,35 @@ agents taking over BFVR. It explains what the major pieces do, which behaviors
 must be preserved, and how to verify changes. It is intentionally more current
 and task-oriented than the chronological `devREADME.md`.
 
+## Multiplayer regression checkpoint: v32a
+
+The owner reported physical ADS dropping out after a fraction of a second and
+invisible local chest/belt equipment. A read-only desktop native-state capture
+reproduced automatic zoom 0 -> 1 -> 0 after about 125 ms; an ordinary mouse
+alternate-fire press remained zoomed. NetworkClientActive selects AutoAdsInput:
+use the existing DirectInput overlay to send a 120 ms native toggle and allow
+750 ms for native acknowledgement. Never call the local-only zoom setter in
+this mode. Keep the accepted offline adapter, optics/eye rendering, first-person
+hands and server firearm/IK code unchanged. Menus/mounts/lost focus suppress
+input; tracking loss cancels queued activation; only the still-local, validated
+weapon may receive an owned exit on safe gameplay return. Unknown weapons and
+manual zoom retain native behavior. This assumes the lab's stock RMB alt-fire
+binding, just like the existing controller input adapter.
+
+Private lab preparation had incorrectly rewritten UTF-16 bytes as text, corrupting
+newlines and leaving copied asset paths behind. Its INI and preparation script
+are repaired; runtime loads 56 equipment models. These are local render props;
+network equipment replication is unnecessary. Native multiplayer desktop capture
+shows chest knife and belt props. Do not put those game-art captures in source.
+
+Verification: full x86 build / 63 CTests (including delayed input acknowledgement,
+manual ownership, native cancellation, tracking loss, stale weapon and timeout
+coverage), x64 presenter build, 12-second native ADS sample, firing, lowering,
+reacquisition and simulated tracking dropout in a real dedicated match. Exact
+headset feel and two real VR clients remain pending. Active private lab shortcut
+selects v32a; normal v30/public alpha remains unchanged. Voice chat is explicitly
+deferred to the roadmap. The local server still has voice disabled.
+
 ## Local multiplayer development
 
 See LOCAL_MULTIPLAYER.md. Developer launcher adds --join-local PORT, targeting

@@ -254,6 +254,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
         (diagnostic||desktop)?width:b->requirements.uiWidth,(diagnostic||desktop)?height:b->requirements.uiHeight,command,&controlsMenu,&settings);
     if(controlsMenu.RecenterRequested()){standingHeight=settings.standingHeight;haveStandingHeight=true;Recenter();}
     SetCrosshairHidden(settings.hideCrosshair);
+    if(AutomaticAdsButton(accepted && gameplay && !showMenu && !mounted && !command.recenter && !body.key))command.buttons[1]=0x80;
     if(desktop)BlockDesktopHotkeys(command);
     if(accepted)PublishControllerCommand(command,true);else {ClearControllerCommand();ClearNativeHands();}
     return true;

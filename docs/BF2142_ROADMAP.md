@@ -1,9 +1,10 @@
 **BF2142 VR roadmap**
 
-Current implementation baseline: private v30. Proposed first public version:
-0.1.0-alpha.1. The player ZIP and installation instructions are prepared; installer and
-rollback checks pass. One packaged live/headset run remains before public
-release. Multiplayer compatibility still requires its own acceptance.
+Public baseline: 0.1.0-alpha.1 (v30), available as an early playtest. Additional
+multiplayer work lives on the development branch and is not in the public ZIP.
+The one-PC dedicated lab has exercised tracked firing and visible remote arm
+movement through an explicit bot mirror. Two actual VR clients and external
+networking still need their own acceptance.
 
 **First public alpha**
 
@@ -27,8 +28,18 @@ release. Multiplayer compatibility still requires its own acceptance.
 - Add a bounded, player-identified head/hand pose channel and third-person IK
   for viewing clients. Keep visual pose replication separate from authoritative
   gameplay. Define behavior for ordinary clients and missing/stale VR poses.
-- Other players currently see stock animations; local first-person arm IK is
-  already implemented, but remote IK/waving is not.
+- The public alpha shows stock remote animations. Experimental remote arm IK
+  exists in the private lab, with desktop bot-mirror verification. Confirm it
+  between two real VR clients before advertising multiplayer waving.
+
+**Voice chat - deferred**
+
+- Start with BF2142's native squad voice and add a VR push-to-talk binding.
+- Verify Quest/Steam Link microphone routing, receive audio and two-client
+  squad communication on the dedicated server. Native server voice is present
+  but disabled in the current private lab; no voice support is claimed tested.
+- Consider proximity/spatial voice separately after squad radio works.
+- Keep this out of the ADS/holster regression build at the owner's request.
 
 **Physical vehicle controls - requested**
 

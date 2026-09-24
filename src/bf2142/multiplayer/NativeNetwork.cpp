@@ -62,6 +62,7 @@ void InstallNetworkClient(LogFunction log){
  if(MH_EnableHook(target)!=MH_OK){MH_RemoveHook(target);transport.Close();return;}
  enabled=true;if(log)log("Experimental multiplayer poses enabled on loopback UDP %u; server extension required.",settings.port);
 }
+bool NetworkClientActive(){return enabled;}
 void TickNetworkClient(){
  if(!enabled)return;if(!ownerThread)ownerThread=GetCurrentThreadId();if(ownerThread!=GetCurrentThreadId())return;
  const auto now=GetTickCount64();if(now-lastPump<16)return;lastPump=now;
