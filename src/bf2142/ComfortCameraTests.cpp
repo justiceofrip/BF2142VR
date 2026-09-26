@@ -1,4 +1,5 @@
 #include "ComfortCamera.h"
+#include "MovementFrame.h"
 #include "StereoCamera.h"
 #include "TrackingMath.h"
 #include <cmath>
@@ -31,6 +32,23 @@ int main(){
         // Reapplying an absolute source must never integrate the previous eye.
         if(!Same(*bf2142::MakeComfortCamera(*stable,*heading),*baseline))return 4;
     }
+    // W/forward and sprint must stay on the rendered heading after thousands
+    // of shots, wrapped recoil, snap turns and a physical head/controller turn.
+    for(int step=0;step<720;++step){
+        const float input=float(step*30),recoil=float(step*1.7f),tracked=float((step%9)-4)*.3f;
+        const auto native=*bf2142::MakeComfortCamera(identity,input+recoil);
+        const auto animatedMove=bf2142::Multiply(Pitch(.65f),native);
+        const auto offset=bf2142::MovementYawOffset(recoil,tracked);
+        const auto mapped=offset?bf2142::MakeMovementCamera(animatedMove,*offset):std::optional<M>{};
+        const auto expected=bf2142::MakeComfortCamera(identity,input+tracked*57.295779513f);
+        if(!mapped||!expected||!Same(*mapped,*expected))return 21;
+        const auto viewBase=*bf2142::MakeComfortCamera(identity,input);
+        stereo::Pose trackedPose{};trackedPose.orientation={0,-std::sin(tracked/2),0,std::cos(tracked/2)};
+        const auto eye=bf2142::MakeEyeCamera({viewBase,.04f,300},{},trackedPose,{-1,1,1,-1});
+        if(!eye||!Same(*mapped,eye->world))return 22;
+    }
+    if(bf2142::MovementYawOffset(NAN,0)||bf2142::MovementYawOffset(0,INFINITY)||
+       bf2142::MakeMovementCamera(identity,181)||bf2142::MakeMovementCamera(Pitch(1.57079632679f),0))return 23;
     // Deliberate turning while firing is retained, including angle wraparound.
     auto heading=yaw.Heading(float(nativeYaw)+95,0);
     auto turned=heading?bf2142::MakeComfortCamera(identity,*heading):std::optional<M>{};

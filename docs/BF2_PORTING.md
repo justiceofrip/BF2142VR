@@ -1,5 +1,7 @@
 # Porting this code to Battlefield 2
 
+Start with the [IK transfer guide](ik/README.md) and [beta changes since alpha](BF2_POST_ALPHA_UPDATES.md) for current multiplayer work.
+
 BF2142 VR already supplies the VR runtime and interaction systems. A BF2 port should connect those systems to BF2's native renderer and gameplay objects. No BF2 runtime profile has been implemented or validated in this snapshot, so there is no supported BF2 launch command yet.
 
 ## Start here
@@ -47,4 +49,4 @@ The missing gun sides were missing first-person mesh surfaces, not only backface
 4. Add BF2 weapon repair profiles, optics and vehicle seats; batch headset checks around complete playable changes.
 5. Test multiplayer connection, authoritative aim/hit registration, respawn and vehicles separately from remote IK replication.
 
-Desktop simulation and deterministic tests help iteration without repeatedly reconnecting a headset. Final stereo comfort, physical alignment and real runtime behavior still need a headset. Current arm IK is local rendering only; remote waving needs a network protocol and compatible peers/server behavior, not just sharing the model solver.
+Desktop simulation and deterministic tests help iteration without repeatedly reconnecting a headset. Final stereo comfort, physical alignment and real runtime behavior still need a headset. The released alpha has local-only arm IK. Subsequent private multiplayer development includes a pose relay and remote IK; see [post-alpha updates](BF2_POST_ALPHA_UPDATES.md) before duplicating that work. Internet transport and two-VR-user acceptance remain pending.

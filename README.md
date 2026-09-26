@@ -1,58 +1,54 @@
-# Battlefield 2142 VR
+# Battlefield 2142 VR — 0.2.0-beta.1
 
-An early PC VR port of Battlefield 2142, based on [BFVR by JayBiggsGMG and the BFVR contributors](https://github.com/JayBiggsGMG/BFVR-Battlefield-1942-VR-Mod).
+A PC VR port based on [BFVR by JayBiggsGMG and the BFVR contributors](https://github.com/JayBiggsGMG/BFVR-Battlefield-1942-VR-Mod). Play bot matches or join compatible multiplayer servers alongside desktop players.
 
-**[Download BF2142 VR 0.1.0-alpha.1 - Early Playtest](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.1.0-alpha.1)**
+**[Beta release and downloads](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.1)**
 
-Based on the v30 runtime. The player installer has passed local setup and rollback checks. Final acceptance of this exact package in a headset remains pending; it is published as an early playtest. This repository is also a starting point for contributors interested in a Battlefield 2 port.
+| Download | Who needs it? |
+| --- | --- |
+| [BF2142-VR-0.2.0-beta.1.zip](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.1/BF2142-VR-0.2.0-beta.1.zip) | VR players: full runtime, reversible setup and community join shortcut. Includes the remote-player IK receiver. |
+| [BF2142-Flat-0.2.0-beta.1.zip](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.1/BF2142-Flat-0.2.0-beta.1.zip) | Monitor players: run the included EXE to join the community test server with tracked-player visuals. No SteamVR, headset or separate .NET installation. |
 
-## Play
+VR players do **not** install the flat addon too. Unmodified desktop clients can play on a compatible server, but need the addon to see VR gestures and use our proximity voice. The server also needs the VR server adapter and community bridge. This is a beta, with remaining animation and compatibility issues.
 
-You need your own **Battlefield 2142 v1.51** installation and a working PC VR/OpenXR runtime. The initial playtest target is Quest controllers through Steam Link/SteamVR, with stock singleplayer/bot matches. Reclamation Hub/OpenSpy setup is separate; Remaster and multiplayer compatibility are unverified.
+## Quick install
 
-1. [Download the player ZIP (17 MB)](https://github.com/justiceofrip/BF2142VR/releases/download/v0.1.0-alpha.1/BF2142-VR-0.1.0-alpha.1-playtest.zip) and extract it.
-2. Close BF2142, run `Setup.cmd`, select `BF2142.exe`, and wait for setup to finish.
-3. Connect your headset to SteamVR, then use the **Battlefield 2142 VR Alpha** shortcut or the installed `Play VR.cmd`.
-4. Load a singleplayer bot match. Right-stick click recenters.
+You need your own working **BF2142 v1.51** installation on Windows x64. Set up Reclamation/OpenSpy separately and confirm you can log in. VR has primarily been tested with Quest 3 controllers through Steam Link/SteamVR. Remaster and other weapon packs are not supported by this installer.
 
-A GitHub source download is for developers and contains no compiled player client. Full installation instructions are included in the player ZIP.
+1. Extract the VR ZIP. Close BF2142, run `Setup.cmd`, select `BF2142.exe`, and wait for setup.
+2. Connect your headset to SteamVR. Use **Battlefield 2142 VR Beta** / installed `Play VR.cmd` for singleplayer.
+3. For the community server, use the ZIP's `Join Community Server.cmd`, select **Play in VR**, and log in with your own game account. Leave the helper open while playing.
 
-- [Full installation instructions](scripts/bf2142/package/START%20HERE.txt)
-- [Controls](scripts/bf2142/package/CONTROLS.txt)
-- [Troubleshooting](scripts/bf2142/package/TROUBLESHOOTING.txt)
-- [Release readiness and known limitations](docs/BF2142_ALPHA_READINESS.md)
+**Updating from alpha:** run the old installation's `Uninstall.cmd`, then rename that game's `BF2142VR` folder to keep its backups. Install the beta from a fresh extraction. Do not overwrite the old installer folder. For a flat-addon update, close the game and use the new EXE instead of the older playtest EXE.
 
-## Implemented
+- [Full installation instructions](scripts/bf2142/package/START%20HERE.txt) / [controls](scripts/bf2142/package/CONTROLS.txt) / [troubleshooting](scripts/bf2142/package/TROUBLESHOOTING.txt)
+- [Flat addon and Reclamation Hub integration](docs/FLAT_ADDON.md)
+- [Beta checks and known limitations](docs/BF2142_BETA_READINESS.md)
 
-- Stereo rendering and 6DoF head movement, recentering and recoil-free head rendering.
-- Tracked weapons, local arm IK, two-hand support, body holsters and empty hands.
-- Controller-touch finger poses, physical crouch/prone, snap/smooth turning and head/controller-relative locomotion.
-- Physical ADS with supported optics, floating HUD, laser menus and a 3D walker lobby.
-- Locally generated repairs for missing first-person weapon surfaces.
-- Vehicle gun head aiming within stock articulation limits, seat controls and parachute comfort work.
-- A reversible installer and loading-memory fix for the supported game profile.
+## Features
 
-These are alpha implementations. Remote players do **not** receive tracked arm IK. Hand-to-hand knife transfer, manual reloads and physical steering wheels are not implemented.
+- Stereo VR and 6DoF head movement, recentering and recoil-free head rendering.
+- Tracked weapons/hands, local arm IK, two-hand support, body holsters and empty hands.
+- Controller-touch finger poses, physical crouch/prone, snap/smooth turning, head/controller-relative movement.
+- Physical ADS, floating HUD, laser menus, a 3D walker lobby and locally repaired weapon surfaces.
+- Vehicle gun head aiming within native limits, seat controls and traversal comfort improvements.
+- Multiplayer controller aiming; remote tracked head, arms, approximate finger curls and held/holstered weapon visibility.
+- Smoothed observer IK, bounded torso follow and approximate cosmetic hand/arm self-collision.
+- Fist-bump haptic implementation and separate equipment contact cues.
+- Left-hand grip-and-throw medical/ammo crates with native cooldowns.
+- Community join helper, signed/versioned downloads and encrypted pose/audio bridge.
+- Proximity audio and physical shoulder interaction for native squad radio.
 
-## Planned
+The latest observer arm/recoil and holster-haptic corrections have automated coverage but have not had another headset/observer session. The owner authorized this beta without that final test. Earlier builds were exercised in two-client IK and outside-network crossplay sessions. The owner confirmed proximity voice worked with the second `vrtester` client; separate-PC microphone routing and voice quality still need broader testing. Read the [known limits](docs/BF2142_BETA_READINESS.md).
 
-Multiplayer compatibility and hit-registration checks, community Titan sessions, networked player IK, physical vehicle controls, optional manual reloads, and further hand/weapon polish. Custom cockpit modeling is a longer-term possibility. See the [roadmap](docs/BF2142_ROADMAP.md).
+## For contributors and BF2 ports
 
-## Build and contribute
+**Start with the separate [IK transfer guide](docs/ik/README.md)**: source map, engine boundaries, failure cases and regression workflow. See [changes since alpha](docs/BF2_POST_ALPHA_UPDATES.md) and the broader [BF2 porting guide](docs/BF2_PORTING.md). Reusable math does not make BF2142 memory offsets valid in BF2.
 
-Start with [building BF2142 VR](docs/BUILD_BF2142.md). Windows C++ build dependencies are required; pinned third-party source and OpenXR runtime files are included.
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Build-BF2142.ps1 -Architecture x86
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Build-BF2142.ps1 -Architecture x64
-```
-
-For a BF2 port, read [BF2 porting guide](docs/BF2_PORTING.md). The presenter, tracking, input transport and interaction math provide substantial reusable groundwork. BF2's native renderer, object layouts and weapon/skeleton adapters still need their own verified profiles.
-
-[Contributor guidance](CONTRIBUTING.md) / [developer handoff](docs/AI_DEVELOPER_HANDOFF.md) / [historical port notes](docs/BF2142_PORT.md).
+[Build instructions](docs/BUILD_BF2142.md) / [hosting](docs/BF2142_COMMUNITY_HOSTING.md) / [roadmap](docs/BF2142_ROADMAP.md) / [developer handoff](docs/AI_DEVELOPER_HANDOFF.md).
 
 ## Credits and ownership
 
-Original BFVR work: JayBiggsGMG and BFVR contributors. BF2142 adaptation maintained by justiceofrip. See [upstream provenance](UPSTREAM.md), [MIT license](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md).
+Original BFVR work: JayBiggsGMG and BFVR contributors. BF2142 adaptation: justiceofrip. [Upstream provenance](UPSTREAM.md), [MIT license](LICENSE), [third-party notices](THIRD_PARTY_NOTICES.md).
 
-No Battlefield executable, game archives, decoded meshes/textures or account data are included. Setup derives repaired models and lobby equipment from each player's own installation. Those generated assets remain game content and must not be committed or redistributed as mod source. This is a community project, unaffiliated with EA or DICE.
+No Battlefield executable, maps, game archives, decoded meshes/textures or account data are included. Setup derives its repaired models and lobby from each player's own installation. Generated assets remain game content and must not be redistributed as mod source. Community project, unaffiliated with EA or DICE.

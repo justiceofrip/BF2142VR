@@ -20,6 +20,26 @@ std::optional<stereo::Matrix4> InverseRigid(const stereo::Matrix4& m) noexcept {
     for(int j=0;j<3;++j)for(int k=0;k<3;++k)out.values[3][j]-=m.values[3][k]*out.values[k][j];
     return out;
 }
+std::optional<stereo::Matrix4> InverseAnimatedTransform(const stereo::Matrix4& m) noexcept {
+ // Do not loosen pose validation. The native blended basis is near-rigid, but
+ // transpose is not its exact inverse; repeated retargeting magnifies the drift.
+ if(!InverseRigid(m))return {};
+ const auto& a=m.values;
+ const float det=a[0][0]*(a[1][1]*a[2][2]-a[1][2]*a[2][1])-a[0][1]*(a[1][0]*a[2][2]-a[1][2]*a[2][0])+a[0][2]*(a[1][0]*a[2][1]-a[1][1]*a[2][0]);
+ if(!std::isfinite(det)||std::abs(det)<.9f)return {};
+ stereo::Matrix4 out{};for(int i=0;i<4;++i)out.values[i][i]=1;auto& b=out.values;
+ b[0][0]=(a[1][1]*a[2][2]-a[1][2]*a[2][1])/det;
+ b[0][1]=(a[0][2]*a[2][1]-a[0][1]*a[2][2])/det;
+ b[0][2]=(a[0][1]*a[1][2]-a[0][2]*a[1][1])/det;
+ b[1][0]=(a[1][2]*a[2][0]-a[1][0]*a[2][2])/det;
+ b[1][1]=(a[0][0]*a[2][2]-a[0][2]*a[2][0])/det;
+ b[1][2]=(a[0][2]*a[1][0]-a[0][0]*a[1][2])/det;
+ b[2][0]=(a[1][0]*a[2][1]-a[1][1]*a[2][0])/det;
+ b[2][1]=(a[0][1]*a[2][0]-a[0][0]*a[2][1])/det;
+ b[2][2]=(a[0][0]*a[1][1]-a[0][1]*a[1][0])/det;
+ for(int j=0;j<3;++j)for(int k=0;k<3;++k)b[3][j]-=a[3][k]*b[k][j];
+ return out;
+}
 std::optional<stereo::Matrix4> TrackedWeaponCamera(const stereo::Matrix4& sourceCamera,
     const stereo::Matrix4& eyeCamera,const stereo::Pose& calibrationHead,
     const stereo::Pose& referenceGrip,const stereo::Pose& currentGrip,float scale) noexcept {

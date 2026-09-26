@@ -1,6 +1,7 @@
 #include "NativeComfort.h"
 #include "multiplayer/NativeNetwork.h"
 #include "ComfortCamera.h"
+#include "MovementFrame.h"
 #include "ComfortControls.h"
 #include "TrackingMath.h"
 #include <MinHook.h>
@@ -13,6 +14,10 @@ namespace {
 BYTE* game=nullptr;BYTE* render=nullptr;
 using RecoilGetter=float(__thiscall*)(void*);
 RecoilGetter nativeRecoil=nullptr;
+using MoveCameraGetter=const stereo::Matrix4*(__thiscall*)(void*);
+MoveCameraGetter nativeMoveCamera=nullptr;bool movementInstalled=false;
+struct MovementSample {std::uint64_t owner=0;ULONGLONG tick=0;float trackedYaw=0;} movement;
+thread_local stereo::Matrix4 movementCamera{};
 SRWLOCK lock=SRWLOCK_INIT;
 ComfortYaw yaw;NativeTurnPulse turnPulse;TraversalView traversalView;bool traversalProfile=false;
 bool physicalCamera=false;PhysicalCameraHeight physicalHeight;
@@ -77,6 +82,31 @@ float LocalLookInput(void* soldier,const void* caller,float result){
     }
     return result;
 }
+bool CopyMovementCamera(const stereo::Matrix4* source,stereo::Matrix4* out){
+ __try {if(!source)return false;*out=*source;return true;}__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+}
+const stereo::Matrix4* LocalMovementCamera(void* soldier,const void* caller,const stereo::Matrix4* native){
+ if(caller!=game+0x18b033)return native;
+ float offset=0;stereo::Matrix4 source{};
+ if(!ReadNativeMovementYaw(soldier,&offset)||!CopyMovementCamera(native,&source))return native;
+ const auto mapped=MakeMovementCamera(source,offset);if(!mapped)return native;
+ movementCamera=*mapped;return &movementCamera;
+}
+const stereo::Matrix4* __fastcall MovementCameraHook(void* soldier,void*){
+ const auto caller=_ReturnAddress();return LocalMovementCamera(soldier,caller,nativeMoveCamera(soldier));
+}
+bool InstallMovementCamera(){
+ // Native input reads projected forward/right from this returned matrix for
+ // BOTH ordinary walking and sprint. All other callers keep the original.
+ __try {
+  if(!Match(game+0x189000,{0x55,0x8b,0xec,0x81,0xec,0xf8,0,0,0,0x8b,0x81,8,2,0,0,0x8b,8,0x56,0x8b,0x71,0x10})||
+   !Match(game+0x18908b,{0x8b,0x10,0x8b,0xc8,0xff,0x52,0x78,0x5e,0x8b,0xe5,0x5d,0xc3})||
+   !Match(game+0x18b029,{0x8b,0xcb,0x89,0x45,0xfc,0xe8,0xcd,0xdf,0xff,0xff,0x8b,0xf8,0x8b,0x4f,0x20,0x8b,0x57,0x28}))return false;
+ }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+ auto entry=game+0x189000;
+ if(MH_CreateHook(entry,MovementCameraHook,reinterpret_cast<void**>(&nativeMoveCamera))!=MH_OK)return false;
+ if(MH_EnableHook(entry)!=MH_OK){MH_RemoveHook(entry);return false;}return true;
+}
 float __fastcall RecoilHook(void* soldier,void*){
     const auto caller=_ReturnAddress();
     return LocalLookInput(soldier,caller,nativeRecoil(soldier));
@@ -114,6 +144,16 @@ bool ReadNativeTraversal(TraversalSample* out){
   if(!InverseRigid(s.world))return false;*out=s;return true;
  }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
 }
+bool ConfigureNativeMovement(bool enabled,float trackedYawRadians){
+ Infantry owner{};const bool valid=enabled&&installed&&movementInstalled&&Focused()&&std::isfinite(trackedYawRadians)&&ReadInfantry(&owner);
+ AcquireSRWLockExclusive(&lock);movement=valid?MovementSample{TurnOwner(owner),GetTickCount64(),trackedYawRadians}:MovementSample{};ReleaseSRWLockExclusive(&lock);return valid;
+}
+bool ReadNativeMovementYaw(const void* soldier,float* offsetDegrees){
+ Infantry owner{};if(!offsetDegrees||!installed||!movementInstalled||!Focused()||!ReadInfantry(&owner)||owner.soldier!=soldier)return false;
+ AcquireSRWLockShared(&lock);const auto sample=movement;const auto recoil=yaw.owner==reinterpret_cast<std::uintptr_t>(owner.identity)?yaw.recoilDegrees:0;ReleaseSRWLockShared(&lock);
+ const auto now=GetTickCount64();if(sample.owner!=TurnOwner(owner)||!sample.tick||now<sample.tick||now-sample.tick>150)return false;
+ const auto offset=MovementYawOffset(recoil,sample.trackedYaw);if(!offset)return false;*offsetDegrees=*offset;return true;
+}
 bool NativeSnapTurnAvailable(){TraversalSample traversal;if(ReadNativeTraversal(&traversal)&&traversal.mode!=TraversalMode::Foot)return false;Infantry owner{};return installed && ReadInfantry(&owner);}
 bool RequestNativeSnapTurn(float degrees,std::int64_t sampleTime){
     Infantry owner{};if(!installed||!Focused()||!ReadInfantry(&owner))return false;
@@ -137,6 +177,7 @@ bool InstallNativeComfort(LogFunction logger){
         Read<void*>(game+0x567790,0x50)==game+0x19e1a0 && Read<void*>(game+0x56e518,0x50)==game+0x1d0280 &&
         Match(game+0x19ded1,{0xc7,0x06}) && Read<void*>(game,0x19ded3)==game+0x5673d8 &&
         Match(game+0x1d0092,{0xc7,0x06}) && Read<void*>(game,0x1d0094)==game+0x56e818;
+    movementInstalled=InstallMovementCamera();logger("VR movement basis: %s.",movementInstalled?"native walking/sprint heading connected":"unavailable; original input retained");
     installed=true;logger("Traversal comfort profile: %s.",traversalProfile?"ladder and stock parachute":"unavailable");
     logger("Infantry VR comfort connected: native snap-turn input, level heading, head recoil excluded, native recoil retained.");return true;
 }

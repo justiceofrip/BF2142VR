@@ -19,6 +19,13 @@ float NativeTurnPulse::Consume(std::uint64_t identity,bool focused,std::uint64_t
  const float turn=degrees;degrees=0;
  return identity==owner && identity && focused && now>=queuedAt && now-queuedAt<=150 ? turn:0.f;
 }
+void StandingHeightReference::Ensure(float current,float configured) noexcept {
+ if(!ready)Recenter(std::isfinite(configured)&&configured!=0?configured:current);
+}
+bool StandingHeightReference::Recenter(float current) noexcept {
+ if(!std::isfinite(current))return false;
+ height=current;ready=true;return true;
+}
 PhysicalPosture PhysicalStance::Update(bool active,float drop,int native,std::int64_t time) noexcept {
  if(!active||!std::isfinite(drop)||drop<-.8f||drop>2.5f||native<0||native>2){Reset();return {};}
  const bool gap=last==0||time<=last||time-last>250000000;last=time;

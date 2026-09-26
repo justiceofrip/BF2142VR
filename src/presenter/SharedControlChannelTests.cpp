@@ -112,6 +112,11 @@ int main()
         &producerBlock->localPlayerLifeState,
         static_cast<LONG>(bfvr::shared::LocalPlayerLifeState::Dead));
     InterlockedIncrement(&producerBlock->hapticNativeMenuHoverSequence);
+    InterlockedIncrement(&producerBlock->hapticRadioLeftSequence);
+    InterlockedIncrement(&producerBlock->hapticFistLeftSequence);
+    InterlockedIncrement(&producerBlock->hapticFistRightSequence);
+    InterlockedIncrement(&producerBlock->hapticEquipmentLeftSequence);
+    InterlockedIncrement(&producerBlock->hapticEquipmentRightSequence);
     InterlockedIncrement(&producerBlock->killSoundSequence);
     passed = Check(
         producer.SignalProducerUpdate() &&
@@ -131,7 +136,12 @@ int main()
                 0,
                 0) == 1 &&
             InterlockedCompareExchange(
-                &presenterBlock->killSoundSequence, 0, 0) == 1,
+                &presenterBlock->killSoundSequence, 0, 0) == 1 &&
+            InterlockedCompareExchange(&presenterBlock->hapticRadioLeftSequence, 0, 0) == 1 &&
+            InterlockedCompareExchange(&presenterBlock->hapticFistLeftSequence, 0, 0) == 1 &&
+            InterlockedCompareExchange(&presenterBlock->hapticFistRightSequence, 0, 0) == 1 &&
+            InterlockedCompareExchange(&presenterBlock->hapticEquipmentLeftSequence, 0, 0) == 1 &&
+            InterlockedCompareExchange(&presenterBlock->hapticEquipmentRightSequence, 0, 0) == 1,
         L"producer-to-presenter haptic and kill-sound event counters failed") && passed;
 
     bfvr::RegisterControllerHapticTransport(producerBlock);

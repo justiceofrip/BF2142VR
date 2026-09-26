@@ -24,6 +24,14 @@ int main(){
  Put<void*>(definition.data(),0,game+ServerProfile.weaponTemplateVt);memcpy(definition.data()+0x10,"eu_ar_scar11",12);Put<unsigned>(definition.data(),0x20,12);Put<unsigned>(definition.data(),0x24,15);
  CHECK(ReadRoster(manager,game,ServerProfile,&actors));CHECK(actors[7].weapon==weapon.data());CHECK(Owner(receiver.data(),actors[7]));
  Put<BYTE>(player.data(),0xd4,1);CHECK(ReadRoster(manager,game,ServerProfile,&actors)&&actors[7].ai);Put<BYTE>(player.data(),0xd4,0);Put<BYTE>(player.data(),0x3d1,1);CHECK(ReadRoster(manager,game,ServerProfile,&actors)&&!actors[7].ai);
+ // Team filtering reads only the signature-verified native player getter.
+ Put<int>(player.data(),0xd8,2);CHECK(VoiceTeam(actors[7])==0);
+ const BYTE teamGetter[]={0x8b,0x81,0xd8,0,0,0,0xc3};
+ const BYTE teamCaller[]={0x8b,0x16,0x8b,0xce,0xff,0x92,0xf8,0,0,0};
+ memcpy(game+0x13e930,teamGetter,sizeof(teamGetter));memcpy(game+0x106ebc,teamCaller,sizeof(teamCaller));
+ Put<void*>(game+ServerProfile.playerVt,0xf8,game+0x13e930);CHECK(VoiceTeam(actors[7])==2);
+ Put<int>(player.data(),0xd8,7);CHECK(VoiceTeam(actors[7])==0);Put<int>(player.data(),0xd8,1);CHECK(VoiceTeam(actors[7])==1);
+ game[0x13e932]^=1;CHECK(VoiceTeam(actors[7])==0);game[0x13e932]^=1;
  // Malformed native tree must fail closed, including cycles and duplicate IDs.
  Put<void*>(node.data(),0,node.data());CHECK(!ReadRoster(manager,game,ServerProfile,&actors));Put<void*>(node.data(),0,sentinel.data());CHECK(ReadRoster(manager,game,ServerProfile,&actors));
  settings.enabled=true;settings.secret[0]=17;CHECK(transport.Open(false,1));Transport client;CHECK(client.Open(false,1));
@@ -49,6 +57,21 @@ int main(){
  peers[7].pendingSnap=30;peers[7].snapTime=GetTickCount64()-500;CHECK(ServerLookInput(soldier.data(),game+0x12d49e,2)==2);
  peers[7].pendingSnap=30;peers[7].snapTime=GetTickCount64();Put<void*>(soldier.data(),0x28c,weapon.data());
  CHECK(ServerLookInput(soldier.data(),game+0x12d49e,2)==2);Put<void*>(soldier.data(),0x28c,nullptr);
+ // Real dedicated movement callback uses the same heading as the client.
+ // Flat players, AI, mounts, stale poses and unrelated callers stay native.
+ source=At(10,2,30);const auto originalMovement=source;
+ auto& movementPeer=peers[7];movementPeer.pose.packet.flags|=MovementValid;
+ movementPeer.pose.packet.movementYawDegrees=-37;movementPeer.pose.received=GetTickCount64();lastPump=GetTickCount64();
+ CHECK(ServerMovementCamera(soldier.data(),game+0x12d7d6,&source)!=&source);
+ CHECK(Near(movementCamera,*MakeMovementCamera(source,-37))&&Near(source,originalMovement));
+ CHECK(ServerMovementCamera(soldier.data(),game+0x12d7d7,&source)==&source);
+ actors[7].ai=true;CHECK(ServerMovementCamera(soldier.data(),game+0x12d7d6,&source)==&source);actors[7].ai=false;
+ movementPeer.pose.packet.flags&=~MovementValid;CHECK(ServerMovementCamera(soldier.data(),game+0x12d7d6,&source)==&source);
+ movementPeer.pose.packet.flags|=MovementValid;movementPeer.pose.received=GetTickCount64()-151;
+ CHECK(ServerMovementCamera(soldier.data(),game+0x12d7d6,&source)==&source);
+ movementPeer.pose.received=GetTickCount64();Put<void*>(soldier.data(),0x34,weapon.data());
+ CHECK(ServerMovementCamera(soldier.data(),game+0x12d7d6,&source)==&source);Put<void*>(soldier.data(),0x34,nullptr);
+ ownerThread++;CHECK(ServerMovementCamera(soldier.data(),game+0x12d7d6,&source)==&source);ownerThread--;
  // Native crate fire owns creation/cooldown; only pose/velocity is replaced.
  memset(definition.data()+0x10,0,16);memcpy(definition.data()+0x10,"unl_hub_medic",14);Put<unsigned>(definition.data(),0x20,13);
  Put<void*>(receiver.data(),0x10,game+0x3dbf90);CHECK(ReadRoster(manager,game,ServerProfile,&actors));
@@ -60,5 +83,28 @@ int main(){
  FireHook(receiver.data(),nullptr,crateLaunch,&parent,&velocity);CHECK(Near(gotLaunch,crateExpected)&&gotVelocity.x==2&&gotVelocity.y==1&&gotVelocity.z==4);
  CHECK(CrateLaunchHook(receiver.data()+0x10,nullptr)==&source);
  p.sequence++;CHECK(client.Send(p,transport.LocalPort()));lastPump=0;Pump();CHECK(CrateLaunchHook(receiver.data()+0x10,nullptr)==&source);
+ // An authenticated, unspawned flat observer receives another player's relay
+ // without acquiring a tracked-fire/movement pose of its own.
+ std::array<BYTE,0x400> observerPlayer{};std::array<BYTE,20> observerNode{};
+ Put<void*>(observerPlayer.data(),0,game+ServerProfile.playerVt);
+ Put<void*>(observerNode.data(),0,sentinel.data());Put<void*>(observerNode.data(),4,node.data());
+ Put<void*>(observerNode.data(),8,sentinel.data());Put<unsigned>(observerNode.data(),12,8);
+ Put<void*>(observerNode.data(),16,observerPlayer.data());Put<void*>(node.data(),8,observerNode.data());Put<unsigned>(pm.data(),0x5c,2);
+ Transport observer,intruder;CHECK(observer.Open(false,1)&&intruder.Open(false,1));
+ Packet subscribe;subscribe.kind=Subscribe;subscribe.player=8;subscribe.session=789;subscribe.sequence=1;subscribe.secret=settings.secret;
+ CHECK(observer.Send(subscribe,transport.LocalPort()));lastPump=0;Pump();
+ CHECK(peers[8].subscription.Read(GetTickCount64())&&!peers[8].pose.Read(GetTickCount64()));
+ CHECK(peers[8].port==observer.LocalPort()&&!peers[8].pendingSnap&&!peers[8].throwTime);
+ p.sequence++;CHECK(client.Send(p,transport.LocalPort()));lastPump=0;Pump();
+ Packet received;unsigned sender=0;CHECK(observer.Receive(&received,&sender,settings.secret));
+ CHECK(received.kind==Relay&&received.player==7&&sender==transport.LocalPort());
+ // An active slot's port/session cannot be stolen; a VR sender cannot turn
+ // itself into a subscription until its previous tracking lease expires.
+ subscribe.sequence++;CHECK(intruder.Send(subscribe,transport.LocalPort()));lastPump=0;Pump();CHECK(peers[8].port==observer.LocalPort());
+ subscribe.player=7;CHECK(client.Send(subscribe,transport.LocalPort()));lastPump=0;Pump();CHECK(!peers[7].subscription.received);
+ peers[8].subscription.received=GetTickCount64()-1001;
+ p.sequence++;CHECK(client.Send(p,transport.LocalPort()));lastPump=0;Pump();CHECK(!observer.Receive(&received,&sender,settings.secret));
+ // Missing native player invalidates the lease, even if a UDP port remains open.
+ Put<void*>(node.data(),8,sentinel.data());Put<unsigned>(pm.data(),0x5c,1);lastPump=0;Pump();CHECK(!peers[8].port);
  puts("Native roster validation, authenticated pose ingestion, authoritative launch/parent, unchanged velocity and owner/dropout fallback passed.");return 0;
 }

@@ -10,6 +10,7 @@ struct HandFrame {
     stereo::Matrix4 head{},leftGrip{},leftAim{},rightGrip{},rightAim{};
     std::optional<HandBindings> bindings;
     std::optional<stereo::Matrix4> leftItem; // independently held support crate
+    std::optional<stereo::Vec3> leftThumbContact; // shoulder-radio switch contact
     std::optional<stereo::Matrix4> torso; // level input frame in skeleton coordinates
     bool leftValid=false,rightValid=false,supportPressed=false,wasSupporting=false;
     bool supportReady=true;
@@ -24,6 +25,7 @@ struct HandResult { HandBones bones{}; bool supporting=false; };
 // arm proportions, wrist-to-item binding, recoil and all sixteen mesh parts.
 std::optional<HandResult> SolveTrackedHands(const HandBones& native,const HandFrame& frame) noexcept;
 bool PoseEmptyFingers(HandBones&,int wrist,const stereo::Matrix4& palm,const std::array<float,5>& curls) noexcept;
+bool PoseFingerContact(HandBones&,int base,stereo::Vec3 target) noexcept;
 bool PoseFreeFingers(HandBones&,int wrist,const std::array<float,5>& curls) noexcept;
 struct ArmSolution { stereo::Vec3 elbow{},wrist{}; };
 std::optional<ArmSolution> SolveArm(stereo::Vec3 shoulder,stereo::Vec3 wrist,

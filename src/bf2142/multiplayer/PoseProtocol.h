@@ -7,9 +7,9 @@ namespace bfvr::bf2142::net {
 using Matrix=stereo::Matrix4;
 using Secret=std::array<std::uint8_t,16>;
 constexpr std::uint32_t Magic=0x31524e42;
-constexpr std::uint16_t Version=2;
-enum :std::uint16_t {Pose=1,Relay=2,Mirror=3};
-enum :std::uint32_t {LeftValid=1,RightValid=2,WeaponHeld=4,LeftCrateHeld=8};
+constexpr std::uint16_t Version=4;
+enum :std::uint16_t {Pose=1,Relay=2,Mirror=3,Subscribe=4};
+enum :std::uint32_t {LeftValid=1,RightValid=2,WeaponHeld=4,LeftCrateHeld=8,MovementValid=16};
 // Fixed-width, little-endian experimental PC protocol; no process pointers.
 struct Packet {
  std::uint32_t magic=Magic;
@@ -25,9 +25,10 @@ struct Packet {
  std::uint32_t snapSerial=0,throwSerial=0;
  float snapDegrees=0;stereo::Vec3 throwVelocity{};
  Matrix throwLaunch{};
+ float movementYawDegrees=0; // Native input -> selected comfort heading, not a turn event.
 
 };
-static_assert(sizeof(Packet)==608);
+static_assert(sizeof(Packet)==616);
 static_assert(sizeof(Packet)<1200);
 stereo::Vec3 TransformVelocity(stereo::Vec3,const Matrix&) noexcept;
 struct EventWindow {

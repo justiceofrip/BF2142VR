@@ -29,7 +29,7 @@ session. Avoid treating missing tracking as a new standing-height reference.
 
 CRASH OR BAD RENDERING
 Save the exact error and what you were doing. Reports should include version
-0.1.0-alpha.1 (v30), headset/runtime, GPU, game mod, map and the failed action.
+0.2.0-beta.1, headset/runtime, GPU, game mod, map and the failed action.
 Client/presenter logs are under BF2142VR/runtime/x86/logs. Optional branding
 messages are under BF2142VR/logs. Check logs before sharing them for any personal
 paths or account information. Do not post credentials, original game archives,

@@ -6,7 +6,7 @@ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 
 def copy_pe(source,target):
     # Preserve all executable sections. Remove only the build machine's PDB
-    # filename from CodeView metadata; no PDB/debug-only payload is shipped.
+    # filename from CodeView metadata and Opus diagnostic roots below.
     raw=bytearray(source.read_bytes());p=struct.unpack_from('<I',raw,60)[0]
     optional=p+24;magic=struct.unpack_from('<H',raw,optional)[0];directory=optional+(112 if magic==0x20b else 96)
     rva,size=struct.unpack_from('<II',raw,directory+6*8);sections=struct.unpack_from('<H',raw,p+6)[0];section_table=optional+struct.unpack_from('<H',raw,p+20)[0]
@@ -22,6 +22,32 @@ def copy_pe(source,target):
                         original=bytes(raw[data+24:data+count]);label=source.with_suffix('.pdb').name.encode('ascii')+b'\0'
                         assert len(label)<=len(original)
                         raw[data+24:data+count]=label+b'\0'*(len(original)-len(label));edits.append((data+24,data+count))
+    # Opus hardening diagnostics embed __FILE__ even in release builds. Keep
+    # the diagnostic filename, dropping only this build's absolute root. Never
+    # edit executable sections or arbitrary paths in the binary.
+    repo=Path(__file__).resolve().parents[3]
+    prefixes=[str(repo).encode()+b'\\',repo.as_posix().encode()+b'/']
+    for i in range(sections):
+        at=section_table+i*40
+        name=bytes(raw[at:at+8]).rstrip(b'\0')
+        _,_,n,offset=struct.unpack_from('<4I',raw,at+8)
+        flags=struct.unpack_from('<I',raw,at+36)[0]
+        if name!=b'.rdata' or flags&0x20000000:continue
+        for prefix in prefixes:
+            cursor=offset
+            while True:
+                start=raw.find(prefix,cursor,offset+n)
+                if start<0:break
+                end=raw.find(b'\0',start,offset+n)
+                if end<0:break
+                cursor=end+1
+                relative=bytes(raw[start+len(prefix):end]).replace(b'\\',b'/')
+                if not relative.startswith(b'third_party/opus-1.6.1/'):continue
+                text=relative.decode('ascii')
+                file=repo/text
+                if file.suffix not in ('.c','.h') or not file.is_file() or not file.resolve().is_relative_to(repo/'third_party/opus-1.6.1'):continue
+                raw[start:end]=relative+b'\0'*(end-start-len(relative))
+                edits.append((start,end))
     old=source.read_bytes()
     assert all(any(a<=i<b for a,b in edits) for i,(a,b) in enumerate(zip(old,raw)) if a!=b)
     target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
@@ -40,7 +66,7 @@ def stage(checkpoint,tools,python_home,python_env,dest):
     for name in ['Setup.cmd','Play VR.cmd','Desktop Preview.cmd','Uninstall.cmd','START HERE.txt','CONTROLS.txt','TROUBLESHOOTING.txt','RELEASE NOTES.txt']:shutil.copy2(package/name,dest/name)
     shutil.copy2(repo/'LICENSE',dest/'LICENSE.txt')
     license_dir=dest/'licenses';license_dir.mkdir()
-    mapping=[(repo/'licenses/OpenXR-Loader-1.1.61.txt','OpenXR-Loader-1.1.61.txt'),(repo/'third_party/minhook-1.3.4/LICENSE.txt','MinHook-LICENSE.txt'),(python_home/'LICENSE.txt','Python-LICENSE.txt'),(python_env/'Lib/site-packages/pillow-12.3.0.dist-info/licenses/LICENSE','Pillow-LICENSE.txt'),(python_env/'Lib/site-packages/pyinstaller-6.22.3.dist-info/licenses/COPYING.txt','PyInstaller-COPYING.txt'),(repo/'licenses/OpenSSL-3.0.11.txt','OpenSSL-3.0.11.txt'),(repo/'licenses/libffi.txt','libffi.txt')]
+    mapping=[(repo/'third_party/opus-1.6.1/COPYING','Opus-1.6.1.txt'),(repo/'licenses/OpenXR-Loader-1.1.61.txt','OpenXR-Loader-1.1.61.txt'),(repo/'third_party/minhook-1.3.4/LICENSE.txt','MinHook-LICENSE.txt'),(python_home/'LICENSE.txt','Python-LICENSE.txt'),(python_env/'Lib/site-packages/pillow-12.3.0.dist-info/licenses/LICENSE','Pillow-LICENSE.txt'),(python_env/'Lib/site-packages/pyinstaller-6.22.3.dist-info/licenses/COPYING.txt','PyInstaller-COPYING.txt'),(repo/'licenses/OpenSSL-3.0.11.txt','OpenSSL-3.0.11.txt'),(repo/'licenses/libffi.txt','libffi.txt')]
     for src,name in mapping:shutil.copy2(src,license_dir/name)
     (dest/'THIRD PARTY NOTICES.txt').write_text('''BF2142 VR is based on BFVR by JayBiggsGMG and the BFVR contributors.
 https://github.com/JayBiggsGMG/BFVR-Battlefield-1942-VR-Mod
@@ -48,6 +74,7 @@ The mod and its setup source are under the included MIT license.
 
 OpenXR Loader 1.1.61 (Khronos Group): Apache 2.0; see licenses.
 MinHook 1.3.4 (Tsuda Kageyu and contributors): BSD; see licenses.
+Opus 1.6.1 (Xiph.Org Foundation and contributors): BSD; see licenses/Opus-1.6.1.txt.
 Python 3.12.0 (Python Software Foundation): PSF license; see licenses.
 Pillow 12.3.0 (Pillow/PIL contributors): MIT-CMU and bundled dependency
 notices, all reproduced in licenses/Pillow-LICENSE.txt.
@@ -70,20 +97,7 @@ subject to the original game's ownership and are not public mod source.
     source_dir=dest/'source-tools';source_dir.mkdir()
     for name in ['RepairWeaponMeshes.py','CompleteWeaponSurfaces.py','RemoveInteriorBackfaces.py','ExportBodyEquipment.py','ExportLobbyScene.py']:shutil.copy2(assets/name,source_dir/name)
     shutil.copy2(package/'SetupAssets.py',source_dir/'SetupAssets.py')
-    (dest/'PACKAGE CHECKS.txt').write_text('''BF2142 VR alpha candidate - package validation scope
-
-Runtime baseline: v30. Its Win32/x64 builds, 60 CTest checks and 13 GPU rendering
-fixtures passed before staging. The package retains its executable code; local
-PDB filenames are removed from debug metadata only. No developer PDBs are shipped.
-
-Package checks cover asset regeneration against the accepted weapon hash,
-installation in a separate folder, native launcher inspection, repeat setup,
-rollback and refusing to overwrite game files changed by another mod.
-A validation report and SHA-256 checksum accompany the final archive.
-
-Headset-visible comfort and behavior cannot be established by these automated
-checks. Other headsets and multiplayer are outside the verified alpha scope.
-''')
+    (dest/'PACKAGE CHECKS.txt').write_text('BF2142 VR 0.2.0-beta.1\n\nMatched x86 client/launcher and x64 presenter; shared IPC 26, pose v4.\n71 native CTests passed. PE code is retained; local PDB paths and Opus diagnostic source roots are scrubbed.\nSee the release CHECKS.txt for checks on the exact distributed archive.\n\nEarlier multiplayer IK builds were reviewed in recorded VR/flat sessions.\nLatest observer arm stabilization, segment clearance and equipment haptic\nchanges have automated coverage but await visual/haptic confirmation.\nNo final packaged headset test was performed; the owner authorized beta release.\nVoice worked with the second tester client; broader device tests remain.\n')
     # Reject this build's private input locations in either path spelling.
     private_roots=[repo.parent,checkpoint,tools,python_home,python_env,Path.home()]
     forbidden=sorted({str(p.resolve()).lower().replace('\\','/') for p in private_roots})
@@ -96,7 +110,7 @@ checks. Other headsets and multiplayer are outside the verified alpha scope.
             if text.encode() in lower or text.encode('utf-16le') in lower:raise ValueError('Private build path in '+rel)
         if path.suffix.lower() in ['.pdb','.dmp','.bik','.bundledmesh'] or path.name in ['Weapons_client.zip','BodyEquipment.bin','LobbyScene.bin','install.json']:raise ValueError('Private or developer artifact: '+rel)
         files[rel]=sha(path)
-    (dest/'payload.json').write_text(json.dumps({'version':'0.1.0-alpha.1','build':'v30','files':files},indent=2))
+    (dest/'payload.json').write_text(json.dumps({'version':'0.2.0-beta.1','build':'v35h-beta1','files':files},indent=2))
     print('Staged',len(files),'files;',sum(x.stat().st_size for x in dest.rglob('*') if x.is_file()),'bytes:',dest)
 
 if __name__=='__main__':

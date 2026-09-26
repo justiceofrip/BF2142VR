@@ -27,6 +27,14 @@ int main() {
     check(ParseOptions({L"--game-dir",L"G:\\Game",L"--desktop-vr"},options,error)&&options.desktopVr,"headset-free desktop mode");
     check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--desktop-vr",L"--presenter",L"p.exe"},options,error),"desktop cannot start OpenXR");
     check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--desktop-vr",L"--diagnostic-stereo"},options,error),"simulation and automated fixtures are separate");
+    check(ParseOptions({L"--game-dir",L"G:\\Game",L"--network-observer"},options,error)&&options.networkObserver,"flat receive-only observer");
+    for(const auto& incompatible:{L"--desktop-vr",L"--diagnostic-stereo"})
+        check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--network-observer",incompatible},options,error),"observer never simulates tracking");
+    check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--network-observer",L"--presenter",L"p.exe"},options,error),"observer never launches a headset presenter");
+    check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--observer-profile",L"G:\\Observer"},options,error),"isolation never bypasses normal launch guard");
+    check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--network-observer",L"--observer-profile",L"G:\\Observer"},options,error),"isolated observer requires an explicit destination");
+    check(ParseOptions({L"--game-dir",L"G:\\Game",L"--network-observer",L"--join-local",L"17567",L"--observer-profile",L"G:\\Observer"},options,error),"explicit isolated observer");
+    check(bfvr::bf2142::GameCommand(L"BF2142.exe",options).find(L"+multi 1")!=std::wstring::npos,"native multiple-instance flag only with profile isolation");
     for (const auto& port : {L"0",L"65536",L"9999999999999999999",L"-1",L"127.0.0.1",L"17567 +foo"})
         check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--join-local",port},options,error),"reject invalid local port");
     check(ParseOptions({L"--game-dir",L"G:\\Game",L"--join-local",L"17567",L"--desktop-vr"},options,error),"desktop local server client");
@@ -50,6 +58,28 @@ int main() {
         check(args && count == 2 && args[1] == path, "Windows argument round trip");
         if (args) LocalFree(args);
     }
+    check(ParseOptions({L"--game-dir",L"G:\\Game",L"--flat",L"--join-server",L"play.example.org",L"--port",L"17567"},options,error)&&options.networkObserver,"remote flat addon");
+    check(bfvr::bf2142::GameCommand(L"BF2142.exe",options).find(L"+joinServer play.example.org +port 17567")!=std::wstring::npos,"remote join arguments");
+    for(const auto& bad:{L"x +password y",L"x\n",L"x/../../",L"\"x",L"-option",L"..",L"http://x",L"x:17567"})
+        check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--join-server",bad,L"--port",L"17567"},options,error),"remote host rejects argument injection");
+    check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--join-server",L"example.org"},options,error),"remote join requires port");
+    check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--join-server",L"example.org",L"--port",L"17567",L"--join-local",L"17567"},options,error),"join modes cannot mix");
+    check(ParseOptions({L"--game-dir",L"G:\\Game",L"--flat",L"--join-server",L"play.example.org",L"--port",L"17567",L"--observer-profile",L"G:\\Observer With Spaces"},options,error),"isolated flat observer may join a remote server");
+    const auto cloudCommand=bfvr::bf2142::GameCommand(L"G:\\Game With Spaces\\BF2142.exe",options);
+    int cloudCount=0;auto cloudArgs=CommandLineToArgvW(cloudCommand.c_str(),&cloudCount);
+    check(cloudArgs && cloudCount==9 && std::wstring(cloudArgs[0])==L"G:\\Game With Spaces\\BF2142.exe" &&
+          std::wstring(cloudArgs[3])==L"+multi" && std::wstring(cloudArgs[4])==L"1" &&
+          std::wstring(cloudArgs[5])==L"+joinServer" && std::wstring(cloudArgs[6])==L"play.example.org" &&
+          std::wstring(cloudArgs[7])==L"+port" && std::wstring(cloudArgs[8])==L"17567","isolated remote native arguments round trip");
+    if(cloudArgs)LocalFree(cloudArgs);
+    for(const auto& incompatible:{L"--desktop-vr",L"--diagnostic-stereo"})
+        check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--flat",L"--join-server",L"play.example.org",L"--port",L"17567",L"--observer-profile",L"G:\\Observer",incompatible},options,error),"remote isolation cannot enable simulated tracking");
+    check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--flat",L"--join-server",L"play.example.org",L"--port",L"17567",L"--observer-profile",L"G:\\Observer",L"--presenter",L"p.exe"},options,error),"remote isolation cannot launch a presenter");
+    check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--join-server",L"play.example.org",L"--port",L"17567",L"--observer-profile",L"G:\\Observer"},options,error),"remote isolation requires flat mode");
+    check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--flat",L"--join-server",L"play.example.org",L"--observer-profile",L"G:\\Observer"},options,error),"remote isolation requires a complete destination");
+    check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--flat",L"--join-server",L"play.example.org",L"--port",L"17567",L"--observer-profile",L"G:\\Observer\nInjected"},options,error),"remote isolation rejects initialization protocol injection");
+    check(ParseOptions({L"--game-dir",L"G:\\Game",L"--flat",L"--join-server",L"play.example.org",L"--port",L"17567"},options,error) &&
+          bfvr::bf2142::GameCommand(L"BF2142.exe",options).find(L"+multi")==std::wstring::npos,"normal remote join retains the single-instance guard");
     if (!failed) puts("BF2142 launcher option and quoting checks passed.");
     return failed ? 1 : 0;
 }

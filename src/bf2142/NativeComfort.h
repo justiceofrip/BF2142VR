@@ -8,6 +8,9 @@ bool InstallNativeComfort(LogFunction logger);
 bool ReadNativeComfortCamera(const stereo::Matrix4& nativeWorld,stereo::Matrix4* stableWorld,
     const void* expectedSoldier=nullptr);
 bool ReadNativeStance(int* stance);
+// Returns true only when the movement-only native adapter owns this infantry.
+bool ConfigureNativeMovement(bool enabled,float trackedYawRadians);
+bool ReadNativeMovementYaw(const void* soldier,float* offsetDegrees);
 void ConfigurePhysicalCamera(bool enabled);
 bool NativeSnapTurnAvailable();
 bool RequestNativeSnapTurn(float degrees,std::int64_t sampleTime);

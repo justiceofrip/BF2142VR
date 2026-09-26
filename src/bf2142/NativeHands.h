@@ -1,6 +1,7 @@
 #pragma once
 #include "StereoSession.h"
 #include "StereoCamera.h"
+#include "ShoulderRadio.h"
 #include <dxgiformat.h>
 #include <vector>
 namespace bfvr::bf2142 {
@@ -8,7 +9,7 @@ struct TrackedWeaponFrame {void* weapon=nullptr;stereo::Matrix4 world{};std::arr
 bool ReadTrackedWeaponFrame(TrackedWeaponFrame* result,bool previousSample=false);
 bool InstallNativeHands(LogFunction logger);
 void PublishNativeHands(const shared::SharedControllerSample* sample,const stereo::Pose& reference,
-    const stereo::Pose& head,float worldScale,float heightOffset);
+    const stereo::Pose& head,float worldScale,float heightOffset,const RadioFrame& radio={});
 void ClearNativeHands();
 void DrawNativeOptic(std::vector<DWORD>& pixels,UINT width,UINT height,DXGI_FORMAT format,const EyeCamera& eye);
 }

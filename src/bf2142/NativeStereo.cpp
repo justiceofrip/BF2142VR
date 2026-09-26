@@ -6,6 +6,7 @@
 #include "NativeVehicle.h"
 #include "NativeHudPointer.h"
 #include "NativeCrosshair.h"
+#include "NativeWorldMarkers.h"
 #include <MinHook.h>
 #include <array>
 #include <cmath>
@@ -122,7 +123,16 @@ bool SaveView(void* view,Override* target,CameraInput* camera) {
     } __except(EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 void __fastcall CameraSetterHook(void* view,void*,const stereo::Matrix4* world) {
-    if(eyeActive)for(const auto& item:overrides)if(item.view==view) {setCamera(view,&item.eye.world);return;}
+    if(eyeActive)for(const auto& item:overrides)if(item.view==view) {
+        // NativeRender copies the CURRENT world eye into the weapon camera
+        // immediately before first-person draws. That matrix already includes
+        // HMD motion/IPD. The pre-render weapon view can still be at the loading
+        // origin (0,100,0); pinning it hides hands or strands them in the world.
+        // Scope replays and the legacy camera-only weapon mode keep their
+        // explicit overrides. The normal motion-hand rig uses the native copy.
+        const bool nativeWeaponEye=item.view==overrides[1].view && !IsScopeRender() && !handTracking;
+        setCamera(view,nativeWeaponEye?world:&item.eye.world);return;
+    }
     setCamera(view,world);
 }
 void __fastcall ProjectionHook(void* view,void*) {
@@ -211,6 +221,7 @@ bool BeginNativeScope(void* renderer,const stereo::Matrix4& world,const stereo::
     return true;
 }
 bool ReadNativeEyeCamera(EyeCamera* camera){if(!camera||!eyeActive)return false;*camera=overrides[0].eye;return true;}
+bool ReadNativeWeaponProjection(stereo::Matrix4* projection){if(!projection||!eyeActive||IsScopeRender())return false;*projection=overrides[1].eye.projection;return true;}
 void EndNativeEye() {
     if (!eyeActive) return;
     eyeActive=false;
@@ -248,6 +259,7 @@ bool InstallNativeStereo(LogFunction logger) {
         return false;
     }
     installed=true;
+    if(!InstallNativeWorldMarkers(image,logger))logger("Native 3D-map marker profile unavailable; original markers retained.");
     if(!InstallNativeHudPointer(logger))logger("Deployment HUD pointer hook unavailable: profile mismatch.");
     if(!InstallNativeComfort(logger))logger("Infantry VR comfort unavailable: native heading/recoil profile or hook mismatch.");
     if(!InstallNativeQueryGuard(image,logger))logger("Native renderer query guard unavailable: profile or hook mismatch.");

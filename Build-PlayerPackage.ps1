@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
 if (-not $X86Build) { $X86Build = Join-Path $repo 'build\bf2142-x86' }
 if (-not $X64Build) { $X64Build = Join-Path $repo 'build\bf2142-x64' }
-if (-not $Destination) { $Destination = Join-Path $repo 'build\player-candidate\BF2142 VR Alpha' }
+if (-not $Destination) { $Destination = Join-Path $repo 'build\player-candidate\BF2142 VR Beta' }
 if (Test-Path -LiteralPath $Destination) { throw 'Choose a new destination; candidates are never overwritten.' }
 $packageSource = Join-Path $repo 'scripts\bf2142\package'
 $assetsSource = Join-Path $repo 'scripts\bf2142'
@@ -25,7 +25,7 @@ if (-not $Python) {
 }
 $version = & $Python -c 'import platform; print(platform.python_version())'
 if ($LASTEXITCODE -ne 0 -or $version -ne '3.12.0') {
-    throw 'The alpha packaging license set is pinned to Python 3.12.0. Supply that interpreter; review component versions/licenses before changing it.'
+    throw 'The beta packaging license set is pinned to Python 3.12.0. Supply that interpreter; review component versions/licenses before changing it.'
 }
 function Invoke-Native {
     param([string]$Executable, [string[]]$Arguments)

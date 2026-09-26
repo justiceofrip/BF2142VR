@@ -1,4 +1,5 @@
 #include "BodyInventory.h"
+#include "EquipmentHaptics.h"
 #include "NativeHands.h"
 #include <cmath>
 #include <cstdio>
@@ -67,5 +68,30 @@ int main(){
     // Invalid head input never presents equipment at a fabricated anchor.
     head.orientation={0,0,0,0};sample.predictedDisplayTime+=16000000;
     if(body.Update(true,sample,head,inventory).anchorValid)return 20;
+    // Stowing/retrieving a selected rifle must not send its fire-mode toggle.
+    head={{0,1.7f,0},{0,0,0,1}};
+    for(int selected:{3,2}){
+        body.Reset();const auto slot=BodySlots()[0];hand.gripPose.positionX=slot.offset.x;
+        hand.gripPose.positionY=1.7f+slot.offset.y;hand.gripPose.positionZ=slot.offset.z;
+        hand.squeezeValue=0;sample.predictedDisplayTime+=16000000;
+        body.Update(true,sample,head,inventory,selected);
+        hand.squeezeValue=1;sample.predictedDisplayTime+=16000000;
+        auto grabbed=body.Update(true,sample,head,inventory,selected);
+        if(grabbed.selected!=0 || (selected==3?grabbed.key!=0:grabbed.key==0))return 21;
+        sample.predictedDisplayTime+=16000000;
+        if(body.Update(true,sample,head,inventory,3).key)return 22;
+        sample.predictedDisplayTime+=16000000;
+        if(body.Update(true,sample,head,inventory,3).key)return 23;
+    }
+    EquipmentHaptics cue;long long now=1000000000;
+    if(!cue.Update(true,0,false,now)||cue.Update(true,0,false,now))return 24;
+    for(int i=0;i<24;++i){now+=16000000;if(cue.Update(true,0,false,now))return 25;}
+    now+=16000000;if(!cue.Update(true,0,false,now))return 26;
+    now+=16000000;if(!cue.Update(true,0,true,now))return 27;
+    now+=16000000;if(cue.Update(true,-1,false,now)||cue.Update(false,0,false,now))return 28;
+    now+=16000000;if(!cue.Update(true,1,false,now))return 29;
+    now+=16000000;if(cue.Update(true,0,false,now))return 30; // boundary jitter rate cap
+    now+=500000000;if(!cue.Update(true,0,false,now))return 31; // refocus/recovery cue
+    if(!cue.Update(true,0,false,1))return 32; // runtime time reset
     puts("Body slots: seven mapped locations, availability, edge grabs, bounded key duration and menu/focus/tracking release passed.");
 }

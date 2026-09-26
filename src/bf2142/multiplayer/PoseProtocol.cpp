@@ -19,9 +19,20 @@ float Distance(const Matrix& a,const Matrix& b) noexcept {
 }
 bool Validate(const Packet& p,const Secret& secret) noexcept {
  if(p.magic!=Magic||p.version!=Version||p.bytes!=sizeof(Packet)||p.player>255||!p.session||
-    p.kind<Pose||p.kind>Mirror||(p.flags&~15u))return false;
+    p.kind<Pose||p.kind>Subscribe||(p.flags&~31u))return false;
+ if(!std::isfinite(p.movementYawDegrees)||std::abs(p.movementYawDegrees)>180||(!(p.flags&MovementValid)&&p.movementYawDegrees!=0))return false;
  unsigned difference=0;for(std::size_t i=0;i<secret.size();++i)difference|=secret[i]^p.secret[i];
  if(difference)return false;
+ if(p.kind==Subscribe){
+  // A receive-only lease cannot smuggle aim, movement, grip or action state.
+  if(p.flags||p.snapSerial||p.throwSerial||p.snapDegrees!=0||p.movementYawDegrees!=0||
+     p.throwVelocity.x!=0||p.throwVelocity.y!=0||p.throwVelocity.z!=0)return false;
+  for(const auto* m:{&p.body,&p.camera,&p.head,&p.left,&p.right,&p.weapon,&p.throwLaunch})
+   for(const auto& row:m->values)for(float v:row)if(v!=0)return false;
+  for(float v:p.curls)if(v!=0)return false;
+  for(char c:p.weaponName)if(c)return false;
+  return true;
+ }
  for(const auto* m:{&p.body,&p.camera,&p.head,&p.left,&p.right,&p.weapon})if(!InverseRigid(*m))return false;
  for(int i=0;i<3;++i)if(std::abs(p.body.values[3][i])>100000)return false;
  Matrix origin{};

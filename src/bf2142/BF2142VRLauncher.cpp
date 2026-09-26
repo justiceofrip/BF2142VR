@@ -66,7 +66,7 @@ bool CallRemoteString(HANDLE process, LPTHREAD_START_ROUTINE function,
     if (finished) VirtualFreeEx(process, argument, 0, MEM_RELEASE);
     return success;
 }
-bool InitializeClient(Process& child, const fs::path& client, const fs::path& log, const std::wstring& presenter) {
+bool InitializeClient(Process& child, const fs::path& client, const fs::path& log, const std::wstring& presenter,const std::wstring& observerProfile) {
     DWORD remoteBase = 0;
     if (!CallRemoteString(child.info.hProcess, RemoteLoadLibrary(),
         client.wstring(), remoteBase)) {
@@ -82,7 +82,7 @@ bool InitializeClient(Process& child, const fs::path& client, const fs::path& lo
     FreeLibrary(local);
     const auto remote = reinterpret_cast<LPTHREAD_START_ROUTINE>(static_cast<std::uintptr_t>(remoteBase) + rva);
     DWORD result = 0;
-    return CallRemoteString(child.info.hProcess, remote, log.wstring() + (presenter.empty() ? L"" : L"\n" + presenter), result);
+    return CallRemoteString(child.info.hProcess, remote, log.wstring() + (presenter.empty() ? L"" : L"\n" + presenter) + (observerProfile.empty()?L"":L"\n"+observerProfile), result);
 }
 bool AlreadyRunning(const fs::path& executable) {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -109,10 +109,12 @@ int Run(int argc, wchar_t** argv) {
     }
     if (options.help) {
         wprintf(L"BF2142VR development launcher\n"
-            L"Usage: BF2142VRLauncher --game-dir PATH [--mod FOLDER] [--windowed] [--join-local PORT] [--inspect] [--presenter PATH]\n"
+            L"Usage: BF2142VRLauncher --game-dir PATH [--mod FOLDER] [--windowed] [--join-local PORT | --join-server HOST --port PORT] [--flat] [--inspect] [--presenter PATH]\n"
             L"Use --presenter with the x64 BFVRPresenter.exe to enable experimental head-tracked stereo.\n"
             L"--diagnostic-stereo uses synthetic head poses and saves local eye/UI images; no headset input is generated.\n"
             L"--desktop-vr runs stereo, native VR hands and menus with keyboard simulated controllers, without OpenXR.\n"
+            L"--network-observer receives multiplayer arms in the native flat view; requires private network configuration.\n"
+            L"--observer-profile PATH isolates Documents for a second flat client; requires an explicit join destination.\n"
             L"--inspect validates paths and x86 images without starting the game.\n");
         return 0;
     }
@@ -137,7 +139,7 @@ int Run(int argc, wchar_t** argv) {
     }
     wprintf(L"Game: %ls\nMod: %ls\nClient: %ls\n", executable.c_str(), options.mod.c_str(), client.c_str());
     if (options.inspect) { wprintf(L"Inspection passed; no game was launched.\n"); return 0; }
-    if (AlreadyRunning(executable)) {
+    if (AlreadyRunning(executable) && options.observerProfile.empty()) {
         fwprintf(stderr, L"BF2142 is already running. Exit it normally before using this launcher.\n"); return 2;
     }
     fs::create_directories(folder / L"logs");
@@ -156,12 +158,12 @@ int Run(int argc, wchar_t** argv) {
         fwprintf(stderr, L"BF2142 could not start (Windows error %lu).\n", GetLastError()); return 1;
     }
     wprintf(L"Renderer log: %ls\n", logPath.c_str());
-    if (!InitializeClient(child, client, logPath, options.desktopVr?L"@desktop":options.diagnosticStereo?L"@diagnostic":options.presenter)) {
+    if (!InitializeClient(child, client, logPath, options.networkObserver?L"@observer":options.desktopVr?L"@desktop":options.diagnosticStereo?L"@diagnostic":options.presenter,options.observerProfile)) {
         fwprintf(stderr, L"Renderer initialization failed. The new suspended process will be closed.\n"); return 1;
     }
     if (ResumeThread(child.info.hThread) == static_cast<DWORD>(-1)) return 1;
     child.resumed = true;
-    wprintf(L"BF2142 started. %ls\n", options.desktopVr ? L"Desktop VR simulation; no headset or presenter required." : options.diagnosticStereo
+    wprintf(L"BF2142 started. %ls\n", options.networkObserver ? L"Flat network observer; no tracking, presenter or local VR controls." : options.desktopVr ? L"Desktop VR simulation; no headset or presenter required." : options.diagnosticStereo
         ? L"Diagnostic stereo with synthetic tracking; no headset required."
         : options.presenter.empty() ? L"Desktop renderer mode."
         : L"Experimental stereo, 6DoF head tracking and controller controls enabled.");

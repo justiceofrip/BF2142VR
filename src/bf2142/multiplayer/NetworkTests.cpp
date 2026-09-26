@@ -1,3 +1,4 @@
+#include "NativeJoinProof.h"
 #include "PoseProtocol.h"
 #include "RemoteArmMath.h"
 #include "LoopbackTransport.h"
@@ -45,11 +46,130 @@ int TestRig(const BodyBones& b,const BodyBones* reference=nullptr){
  auto broken=b;broken[20].values[0][0]=std::numeric_limits<float>::quiet_NaN();CHECK(!SolveRemoteArms(broken,p,*l,*r));
  return 0;
 }
+int TestHead(const BodyBones& b){
+ const auto originalHead=InverseAnimatedBone(b[47]);CHECK(originalHead);
+ for(int axis=0;axis<3;++axis){
+  auto tracked=Yaw(.7f);
+  if(axis==1){tracked=At();tracked.values[1]={0,.8f,.6f,0};tracked.values[2]={0,-.6f,.8f,0};}
+  if(axis==2){tracked=At();tracked.values[0]={.8f,.6f,0,0};tracked.values[1]={-.6f,.8f,0,0};}
+  tracked.values[3]={2,-2,1,1}; // HMD translation cannot detach the remote head.
+  const auto solved=SolveRemoteHead(b,tracked);CHECK(solved);
+  auto expected=tracked;expected.values[3]=b[47].values[3];CHECK(Near((*solved)[47],expected,.0001f));
+  CHECK(Distance((*solved)[47],b[47])<.00001f);
+  const auto inverse=InverseAnimatedBone((*solved)[47]);CHECK(inverse);
+  for(int i=0;i<80;++i){
+   if(i<47||i>=64)CHECK(Near((*solved)[i],b[i]));
+   else CHECK(Near(Multiply((*solved)[i],*inverse),Multiply(b[i],*originalHead),.0001f));
+  }
+  const auto again=SolveRemoteHead(*solved,tracked);CHECK(again);for(int i=0;i<80;++i)CHECK(Near((*again)[i],(*solved)[i],.0001f));
+ }
+ auto bad=At();bad.values[0][0]=std::numeric_limits<float>::quiet_NaN();CHECK(!SolveRemoteHead(b,bad));
+ auto damaged=b;damaged[52]=bad;CHECK(!SolveRemoteHead(damaged,At()));
+ // Invalid arm geometry cannot cancel an otherwise valid head rotation.
+ damaged=b;damaged[20]=bad;CHECK(SolveRemoteHead(damaged,Yaw(.4f)));
+ return 0;
+}
+int TestRemoteFingers(){
+ BodyBones rig=Rig();
+ for(int wrist:{20,35})for(int group=0;group<3;++group)for(int joint=0;joint<3;++joint){
+  auto m=rig[wrist];m.values[3][0]+=(group-1)*.025f;m.values[3][2]+=.055f+joint*.025f;rig[wrist+1+group*3+joint]=m;
+ }
+ for(bool left:{true,false}){
+  const int wrist=left?20:35;auto palm=At();const float sign=left?1.f:-1.f;
+  palm.values[0]={0,-sign,0,0};palm.values[1]={0,0,-sign,0};palm.values[2]={1,0,0,0};
+  std::array<float,5> open{},closed;closed.fill(1);
+  auto a=rig,b=rig;CHECK(PoseRemoteFingers(a,left,palm,open,false));CHECK(PoseRemoteFingers(b,left,palm,closed,false));
+  // Fist movement is inward; roots, wrist, other hand, arms and item remain fixed.
+  CHECK(b[wrist+3].values[3][1]<a[wrist+3].values[3][1]-.01f);
+  CHECK(b[wrist+6].values[3][1]<a[wrist+6].values[3][1]-.01f);
+  for(int i=0;i<80;++i)if(i<=wrist||i>=wrist+10)CHECK(Near(b[i],rig[i]));
+  for(int base:{wrist+1,wrist+4,wrist+7})for(int j=0;j<2;++j)CHECK(std::abs(Distance(b[base+j],b[base+j+1])-Distance(rig[base+j],rig[base+j+1]))<.0001f);
+  // Different controller input affects only its matching chain.
+  auto indexOnly=open;indexOnly[1]=1;auto index=rig;CHECK(PoseRemoteFingers(index,left,palm,indexOnly,false));
+  for(int i=wrist+1;i<wrist+10;++i)CHECK(Near(index[i],(i>=wrist+4&&i<=wrist+6)?b[i]:a[i]));
+  auto held=rig;CHECK(PoseRemoteFingers(held,left,palm,open,true));for(int i=wrist+1;i<=wrist+3;++i)CHECK(Near(held[i],rig[i]));
+  auto invalid=closed;invalid[2]=std::numeric_limits<float>::quiet_NaN();auto unchanged=rig;CHECK(!PoseRemoteFingers(unchanged,left,palm,invalid,false));for(int i=0;i<80;++i)CHECK(Near(unchanged[i],rig[i]));
+  auto collapsed=rig;collapsed[wrist+2]=collapsed[wrist+1];auto before=collapsed;CHECK(!PoseRemoteFingers(collapsed,left,palm,closed,false));for(int i=0;i<80;++i)CHECK(Near(collapsed[i],before[i]));
+  // Soldier yaw and position cannot reverse the curl direction.
+  auto transform=Yaw(.8f);transform.values[3]={4,2,-3,1};auto rotated=rig;for(auto& m:rotated)m=Multiply(m,transform);
+  CHECK(PoseRemoteFingers(rotated,left,Multiply(palm,transform),closed,false));for(int i=0;i<80;++i)CHECK(Near(rotated[i],Multiply(b[i],transform),.0001f));
+ }
+ auto l=CaptureBodyPalm(rig,true),r=CaptureBodyPalm(rig,false);CHECK(l&&r);auto p=Sample();p.flags=LeftValid|RightValid;p.left=Multiply(*InverseAnimatedBone(l->wristFromPalm),rig[20]);p.right=Multiply(*InverseAnimatedBone(r->wristFromPalm),rig[35]);
+ auto open=SolveRemoteArms(rig,p,*l,*r);p.curls.fill(1);auto closed=SolveRemoteArms(rig,p,*l,*r);CHECK(open&&closed);CHECK(Distance((*open)[26],(*closed)[26])>.01f);CHECK(Near((*open)[20],(*closed)[20]));CHECK(Near((*open)[35],(*closed)[35]));
+ return 0;
+}
+int TestTrackedItems(){
+ const auto rig=Rig();const auto l=CaptureBodyPalm(rig,true),r=CaptureBodyPalm(rig,false);CHECK(l&&r);
+ auto p=Sample();p.left=Multiply(*InverseAnimatedBone(l->wristFromPalm),rig[20]);p.right=Multiply(*InverseAnimatedBone(r->wristFromPalm),rig[35]);
+ p.weapon=Multiply(Yaw(.9f),At(-.1f,1.3f,.35f));
+ for(const char* name:{"knife","knife_unlock","eu_ar_rifle","as_ar_rifle","unl_hub_medic","unl_hub_ammo"}){
+  p.weaponName={};strcpy_s(p.weaponName.data(),p.weaponName.size(),name);const bool crate=std::strstr(name,"hub_")!=nullptr;
+  p.flags=LeftValid|RightValid|(crate?LeftCrateHeld:WeaponHeld);
+  auto result=SolveRemoteArms(rig,p,*l,*r);CHECK(result);CHECK(Near((*result)[64],p.weapon));
+  for(int i=64;i<72;++i)CHECK(Near(Multiply((*result)[i],*InverseAnimatedBone(p.weapon)),Multiply(rig[i],*InverseAnimatedBone(rig[64]))));
+  for(int i=0;i<80;++i)if(i<15||(i>=45&&i<64)||i>=72)CHECK(Near((*result)[i],rig[i]));
+  // Native knife slash / rifle ADS can change the item's wrist attachment.
+  // The same transmitted pose must still place mesh1 at exactly the same root.
+  auto animated=rig;auto delta=Multiply(Yaw(-.7f),At(.06f,-.04f,.1f));
+  for(int i=64;i<72;++i)animated[i]=Multiply(animated[i],delta);
+  auto changed=SolveRemoteArms(animated,p,*l,*r);CHECK(changed);for(int i=64;i<72;++i)CHECK(Near((*changed)[i],(*result)[i]));
+  // A crate follows the left item pose even when the right palm is moving.
+  if(crate){auto moved=p;moved.right.values[3][0]+=.2f;changed=SolveRemoteArms(rig,moved,*l,*r);CHECK(changed);for(int i=64;i<72;++i)CHECK(Near((*changed)[i],(*result)[i]));}
+ }
+ // Preserve the accepted pistol binding, unknown mods, and unlike bot weapons.
+ for(const char* name:{"eu_handgun","as_handgun","custom_weapon"}){
+  p.weaponName={};strcpy_s(p.weaponName.data(),p.weaponName.size(),name);p.flags=RightValid|WeaponHeld;p.right.values[3][0]+=.01f;
+  auto result=SolveRemoteArms(rig,p,*l,*r);CHECK(result);
+  CHECK(Near(Multiply((*result)[64],*InverseAnimatedBone((*result)[35])),Multiply(rig[64],*InverseAnimatedBone(rig[35]))));
+ }
+ p.weaponName={};strcpy_s(p.weaponName.data(),p.weaponName.size(),"knife");p.kind=Mirror;
+ auto mirror=SolveRemoteArms(rig,p,*l,*r);CHECK(mirror);CHECK(!Near((*mirror)[64],p.weapon));
+ p.kind=Relay;p.weapon={};auto invalid=SolveRemoteArms(rig,p,*l,*r);CHECK(invalid);CHECK(Near((*invalid)[64],(*mirror)[64]));
+ // Reproduce the outgoing knife-palm failure without a game: individually
+ // accepted animated matrices fail packet validation after transpose inversion.
+ auto binding=At(.03f,-.04f,.02f);binding.values[0][0]=.997f;binding.values[0][1]=.001f;
+ const auto grip=Multiply(Yaw(.6f),At(.2f,1.2f,.3f)),wrist=Multiply(binding,grip);CHECK(InverseRigid(binding)&&InverseRigid(wrist));
+ p=Sample();p.weaponName={};strcpy_s(p.weaponName.data(),p.weaponName.size(),"knife");p.right=Multiply(*InverseRigid(binding),wrist);CHECK(!Validate(p,p.secret));
+ p.right=Multiply(*InverseAnimatedTransform(binding),wrist);CHECK(Validate(p,p.secret)&&Near(p.right,grip,.00001f));
+ binding.values[0][0]=.8f;CHECK(!InverseAnimatedTransform(binding));
+ return 0;
+}
+int TestStableObserverArms(){
+ auto reference=Rig();reference[11]=At(0,1,0);reference[12]=At(0,1.15f,0);reference[13]=At(0,1.3f,0);
+ reference[14]=At(-.08f,1.35f,0);reference[30]=At(.08f,1.35f,0);
+ auto l=CaptureBodyPalm(reference,true),r=CaptureBodyPalm(reference,false);CHECK(l&&r);
+ auto p=Sample();p.kind=Relay;p.weaponName={};strcpy_s(p.weaponName.data(),p.weaponName.size(),"eu_handgun");
+ RemoteArmContinuity c1,c2;
+ const auto baseline=SolveRemoteArms(reference,p,*l,*r,&reference,&c1,.016f);CHECK(baseline);
+ auto recoil=reference;
+ for(int side=0;side<2;++side){
+  const int collar=side?30:14,wrist=side?35:20;
+  const auto kick=Multiply(Yaw(side?.5f:-.4f),At(.035f,.045f,-.06f));
+  for(int i=collar;i<wrist+10;++i)recoil[i]=Multiply(recoil[i],kick);
+  if(side)for(int i=64;i<72;++i)recoil[i]=Multiply(recoil[i],kick);
+ }
+ const auto shooting=SolveRemoteArms(recoil,p,*l,*r,&reference,&c2,.016f);CHECK(shooting);
+ for(int i=14;i<45;++i)CHECK(Near((*shooting)[i],(*baseline)[i]));
+ for(int i=64;i<72;++i)CHECK(Near((*shooting)[i],(*baseline)[i]));
+ // Stabilization cannot move the legs/head or cancel real controller movement.
+ for(int i=0;i<14;++i)CHECK(Near((*shooting)[i],recoil[i]));
+ for(int i=45;i<64;++i)CHECK(Near((*shooting)[i],recoil[i]));
+ p.right.values[3][0]+=.06f;const auto moved=SolveRemoteArms(recoil,p,*l,*r,&reference,&c2,.016f);CHECK(moved);
+ CHECK(Distance((*moved)[35],(*shooting)[35])>.05f);
+ return 0;
+}
 int main(int argc,char** argv){
- if(argc==2||argc==3){BodyBones b,reference;std::ifstream f(argv[1],std::ios::binary);f.read(reinterpret_cast<char*>(b.data()),sizeof(b));CHECK(f.gcount()==sizeof(b));if(argc==3){std::ifstream ref(argv[2],std::ios::binary);ref.read(reinterpret_cast<char*>(reference.data()),sizeof(reference));CHECK(ref.gcount()==sizeof(reference));}CHECK(!TestRig(b,argc==3?&reference:nullptr));puts("Private captured 80-bone rig passed.");return 0;}
+ CHECK(!TestRemoteFingers());CHECK(!TestTrackedItems());CHECK(!TestStableObserverArms());
+ if(argc==2||argc==3){BodyBones b,reference;std::ifstream f(argv[1],std::ios::binary);f.read(reinterpret_cast<char*>(b.data()),sizeof(b));CHECK(f.gcount()==sizeof(b));if(argc==3){std::ifstream ref(argv[2],std::ios::binary);ref.read(reinterpret_cast<char*>(reference.data()),sizeof(reference));CHECK(ref.gcount()==sizeof(reference));}CHECK(!TestRig(b,argc==3?&reference:nullptr));CHECK(!TestHead(b));puts("Private captured 80-bone arms and head rig passed.");return 0;}
  Packet p=Sample(),out;CHECK(Validate(p,p.secret));CHECK(Decode(&p,sizeof(p),p.secret,&out));CHECK(!Decode(&p,sizeof(p)-1,p.secret,&out));CHECK(!Decode(&p,sizeof(p)+1,p.secret,&out));
  auto bad=p;bad.secret[2]^=1;CHECK(!Validate(bad,p.secret));bad=p;bad.player=256;CHECK(!Validate(bad,p.secret));bad=p;bad.kind=4;CHECK(!Validate(bad,p.secret));bad=p;bad.flags=8;CHECK(!Validate(bad,p.secret));bad=p;bad.session=0;CHECK(!Validate(bad,p.secret));
  bad=p;bad.version++;CHECK(!Validate(bad,p.secret));bad=p;bad.head.values[3][0]=5;CHECK(!Validate(bad,p.secret));bad=p;bad.curls[0]=1.1f;CHECK(!Validate(bad,p.secret));bad=p;bad.right.values[0][0]=std::numeric_limits<float>::quiet_NaN();CHECK(!Validate(bad,p.secret));bad=p;bad.weaponName.back()='x';CHECK(!Validate(bad,p.secret));
+ auto moving=p;moving.flags|=MovementValid;moving.movementYawDegrees=-143.5f;
+ CHECK(Validate(moving,moving.secret)&&Decode(&moving,sizeof(moving),moving.secret,&out)&&out.movementYawDegrees==-143.5f);
+ bad=moving;bad.movementYawDegrees=180.01f;CHECK(!Validate(bad,p.secret));
+ bad=moving;bad.movementYawDegrees=std::numeric_limits<float>::quiet_NaN();CHECK(!Validate(bad,p.secret));
+ bad=moving;bad.flags&=~MovementValid;CHECK(!Validate(bad,p.secret));
+ bad=moving;bad.version=2;CHECK(!Validate(bad,p.secret));
  auto event=p;event.snapSerial=1;event.snapDegrees=30;CHECK(Validate(event,event.secret));
  event.snapDegrees=91;CHECK(!Validate(event,event.secret));event.snapDegrees=0;CHECK(!Validate(event,event.secret));
  event=p;event.throwSerial=1;event.throwLaunch=At(0,1,.2f);event.throwVelocity={1,2,3};CHECK(!Validate(event,event.secret));
@@ -71,9 +191,29 @@ int main(int argc,char** argv){
  auto blendedRig=Rig();for(int i=14;i<45;++i)blendedRig[i]=Multiply(blendedRig[i],blend);
  for(int i=64;i<72;++i)blendedRig[i]=Multiply(blendedRig[i],blend);
  CHECK(!TestRig(blendedRig));
+ CHECK(!TestHead(Rig()));CHECK(!TestHead(blendedRig));
  CHECK(!TestRig(Rig()));auto reference=Rig(),lod=reference;for(int w:{20,35})for(int i=w+1;i<w+10;++i)lod[i]=lod[w];CHECK(!CaptureBodyPalm(lod,true));CHECK(!TestRig(lod,&reference));for(int i=18;i<30;++i)lod[i]=lod[17];CHECK(!TestRig(lod,&reference));
+ // A subscription is a distinct receive lease, never a valid tracking/action packet.
+ Packet sub;sub.kind=Subscribe;sub.player=8;sub.session=42;sub.sequence=1;sub.secret=p.secret;
+ CHECK(Validate(sub,p.secret)&&Decode(&sub,sizeof(sub),p.secret,&out)&&out.kind==Subscribe);
+ bad=sub;bad.flags=WeaponHeld;CHECK(!Validate(bad,p.secret));
+ bad=sub;bad.right=At();CHECK(!Validate(bad,p.secret));
+ bad=sub;bad.throwSerial=1;CHECK(!Validate(bad,p.secret));
+ bad=sub;bad.snapDegrees=30;CHECK(!Validate(bad,p.secret));
+ bad=sub;bad.weaponName[0]='a';CHECK(!Validate(bad,p.secret));
+ bad=sub;bad.curls[1]=.5f;CHECK(!Validate(bad,p.secret));
+ bad=sub;bad.throwVelocity.x=std::numeric_limits<float>::quiet_NaN();CHECK(!Validate(bad,p.secret));
+ bad=sub;bad.version=3;CHECK(!Validate(bad,p.secret));
  // Actual nonblocking UDP round trip: invalid tokens are dropped, source port is retained.
  Transport a,b;CHECK(a.Open(false,1)&&b.Open(false,1));CHECK(a.LocalPort()&&b.LocalPort());p=Sample();bad=p;bad.secret[1]^=1;CHECK(a.Send(bad,b.LocalPort()));CHECK(a.Send(p,b.LocalPort()));
  unsigned port=0;bool got=false;for(int i=0;i<100&&!got;++i){got=b.Receive(&out,&port,p.secret);if(!got)Sleep(1);}CHECK(got&&port==a.LocalPort()&&out.player==7);out.kind=Relay;CHECK(b.Send(out,port));got=false;for(int i=0;i<100&&!got;++i){got=a.Receive(&out,&port,p.secret);if(!got)Sleep(1);}CHECK(got&&port==b.LocalPort()&&out.kind==Relay);CHECK(!a.Receive(&out,&port,p.secret));
+ JoinChallenge challenge;challenge.player=7;challenge.session=42;challenge.secret=p.secret;challenge.nonce[0]=1;
+ JoinChallenge decoded;CHECK(DecodeJoinChallenge(&challenge,sizeof(challenge),p.secret,decoded));
+ CHECK(!DecodeJoinChallenge(&challenge,sizeof(challenge)-1,p.secret,decoded));
+ auto wrongKey=p.secret;wrongKey[0]^=1;CHECK(!DecodeJoinChallenge(&challenge,sizeof(challenge),wrongKey,decoded));
+ auto emptyNonce=challenge;emptyNonce.nonce={};CHECK(!DecodeJoinChallenge(&emptyNonce,sizeof(emptyNonce),p.secret,decoded));
+ JoinProofPolicy proof;CHECK(!proof.Accept(challenge,8,42,1000));CHECK(!proof.Accept(challenge,7,43,1000));
+ CHECK(proof.Accept(challenge,7,42,1000));CHECK(!proof.Accept(challenge,7,42,1200));CHECK(proof.Accept(challenge,7,42,1800));
+ CHECK(!SendNativeJoinProof(nullptr,nullptr,challenge.nonce));
  puts("Pose validation, replay/dropout guards, body-space fire, independent remote arms and loopback round trip passed.");return 0;
 }

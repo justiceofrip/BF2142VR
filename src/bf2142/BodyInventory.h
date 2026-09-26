@@ -9,12 +9,12 @@ struct BodyInventoryResult {int hovered=-1,selected=-1;unsigned key=0;stereo::Po
 class BodyInventory {
 public:
     BodyInventoryResult Update(bool enabled,const shared::SharedControllerSample&,const stereo::Pose& head,
-        const std::array<bool,10>& inventory) noexcept;
+        const std::array<bool,10>& inventory,int equippedItem=0) noexcept;
     void Reset() noexcept {*this={};}
 private:
     bool initialized=false,gripHeld=false,gripTracked=false;
     float bodyYaw=0;
     LONGLONG lastTime=0,keyUntil=0;
-    unsigned pendingKey=0;
+    unsigned pendingKey=0,pendingItem=0;
 };
 }

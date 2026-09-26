@@ -31,3 +31,9 @@ LobbyScene.bin
 Weapons_client.zip
 .env
 .env.*
+
+# Community join/host helper build products.
+/src/community/bin/
+/src/community/obj/
+/src/community-tests/bin/
+/src/community-tests/obj/

@@ -294,6 +294,7 @@ public:
 
     [[nodiscard]] bool IsInitialized() const noexcept;
     [[nodiscard]] bool IsSessionRunning() const noexcept;
+    [[nodiscard]] bool IsSessionVisible() const noexcept;
     [[nodiscard]] OpenXRPresentationTextureRequirements GetTextureRequirements() const noexcept;
 
     // Borrowed pointers; they remain valid only until Shutdown/destruction.

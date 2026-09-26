@@ -1,6 +1,9 @@
 #include "StereoSession.h"
 #include "LegacyShaderMemory.h"
 #include "NativeVehicle.h"
+#include "NativeQueryGuard.h"
+#include "ObserverProfile.h"
+#include "multiplayer/NativeNetwork.h"
 #include <string>
 #include <windows.h>
 #include <d3d9.h>
@@ -16,6 +19,7 @@ HANDLE logFile = INVALID_HANDLE_VALUE;
 SRWLOCK logLock = SRWLOCK_INIT;
 SRWLOCK hookLock = SRWLOCK_INIT;
 std::atomic<bool> started = false;
+bool networkObserver = false;
 std::atomic<bool> alternateImplementationLogged = false;
 std::atomic<unsigned long> presentations = 0;
 std::atomic<unsigned long> swapPresentations = 0;
@@ -151,6 +155,7 @@ HRESULT STDMETHODCALLTYPE PresentHook(IDirect3DDevice9* device, const RECT* sour
     const RECT* destination, HWND window, const RGNDATA* dirty) {
     PresentationScope scope;
     if (scope.outer && bfvr::bf2142::SuppressStereoPresent(device)) return S_OK;
+    if (scope.outer && networkObserver) bfvr::bf2142::TickNetworkClient();
     if (scope.outer) bfvr::bf2142::StereoPresent(device);
     const HRESULT result = originalPresent(device, source, destination, window, dirty);
     CountBoundary(presentations, "Present", result);
@@ -167,6 +172,7 @@ HRESULT STDMETHODCALLTYPE SwapPresentHook(IDirect3DSwapChain9* chain, const RECT
                 const bool isPrimary=primary==chain;
                 primary->Release();
                 if (isPrimary && bfvr::bf2142::SuppressStereoPresent(device)) { device->Release(); return S_OK; }
+                if (isPrimary && networkObserver) bfvr::bf2142::TickNetworkClient();
                 if (isPrimary) bfvr::bf2142::StereoPresent(device);
             }
             device->Release();
@@ -227,7 +233,13 @@ HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
         parameters ? parameters->BackBufferHeight : 0, parameters ? parameters->Windowed : 0, behavior);
     if (SUCCEEDED(result) && output && *output) {
         ConnectShaderFailureLog();
-        bfvr::bf2142::InstallNativeVehicle(Log);
+        if (networkObserver) {
+            auto renderer=reinterpret_cast<BYTE*>(GetModuleHandleW(L"RendDX9_ori.dll"));
+            if(!renderer)renderer=reinterpret_cast<BYTE*>(GetModuleHandleW(L"RendDX9.dll"));
+            if(!bfvr::bf2142::InstallNativeQueryGuard(renderer,Log))Log("Observer renderer query guard unavailable: profile mismatch.");
+            bfvr::bf2142::InstallNetworkObserver(Log);
+        }
+        else bfvr::bf2142::InstallNativeVehicle(Log);
         bfvr::bf2142::StereoDeviceCreated(*output);
         void** table = *reinterpret_cast<void***>(*output);
         const bool present = Hook(table[17], reinterpret_cast<void*>(&PresentHook),
@@ -262,7 +274,9 @@ extern "C" DWORD WINAPI BF2142VRInitialize(void* parameter) {
     const std::wstring configuration=static_cast<const wchar_t*>(parameter);
     const auto separator=configuration.find(L'\n');
     const std::wstring logPath=configuration.substr(0,separator);
-    const std::wstring presenter=separator==std::wstring::npos?L"":configuration.substr(separator+1);
+    const auto profileSeparator=separator==std::wstring::npos?std::wstring::npos:configuration.find(L'\n',separator+1);
+    const std::wstring presenter=separator==std::wstring::npos?L"":configuration.substr(separator+1,profileSeparator==std::wstring::npos?std::wstring::npos:profileSeparator-separator-1);
+    const std::wstring observerProfile=profileSeparator==std::wstring::npos?L"":configuration.substr(profileSeparator+1);
     logFile = CreateFileW(logPath.c_str(), GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (logFile == INVALID_HANDLE_VALUE) return 0;
@@ -279,10 +293,16 @@ extern "C" DWORD WINAPI BF2142VRInitialize(void* parameter) {
     if (!entry) { Log("Direct3DCreate9 is unavailable."); return 0; }
     const MH_STATUS status = MH_Initialize();
     if (status != MH_OK) { Log("MinHook init failed: %s", MH_StatusToString(status)); return 0; }
+    if(!observerProfile.empty()){
+        if(presenter!=L"@observer"||!bfvr::bf2142::InstallObserverProfile(observerProfile)){Log("Observer profile isolation failed; new child will not start.");return 0;}
+        Log("Observer Documents isolated; exclusive per-profile lease held.");
+    }
     if (!Hook(reinterpret_cast<void*>(entry), reinterpret_cast<void*>(&Create9Hook),
         reinterpret_cast<void**>(&originalCreate9), create9Target)) return 0;
     Log("Direct3DCreate9 connection installed.");
-    if (!presenter.empty() && !bfvr::bf2142::StartStereo(presenter,logPath,Log)) {
+    networkObserver=presenter==L"@observer";
+    if (networkObserver) Log("Flat network observer requested: receive-only poses, native camera/input; no OpenXR.");
+    if (!presenter.empty() && !networkObserver && !bfvr::bf2142::StartStereo(presenter,logPath,Log)) {
         Log("Headset session could not start: %lu",GetLastError()); return 0;
     }
     return 1;

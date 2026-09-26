@@ -21,7 +21,7 @@ stereo::Pose Pose(const shared::SharedPresentationPose& p){return {{p.positionX,
 }
 const std::array<BodySlot,7>& BodySlots() noexcept{return slots;}
 BodyInventoryResult BodyInventory::Update(bool enabled,const shared::SharedControllerSample& sample,const stereo::Pose& head,
-    const std::array<bool,10>& inventory) noexcept {
+    const std::array<bool,10>& inventory,int equippedItem) noexcept {
     BodyInventoryResult result;
     constexpr DWORD tracked=shared::kControllerHandFlagGripActive|shared::kControllerHandFlagGripPositionValid|
         shared::kControllerHandFlagGripOrientationValid|shared::kControllerHandFlagGripPositionTracked|shared::kControllerHandFlagGripOrientationTracked;
@@ -71,9 +71,16 @@ BodyInventoryResult BodyInventory::Update(bool enabled,const shared::SharedContr
         if(std::isfinite(distance)&&distance<best){best=distance;result.hovered=int(i);}
     }
     if(pressed && !gripHeld && result.hovered>=0){
-        result.selected=result.hovered;pendingKey=scanCodes[slots[result.hovered].item];keyUntil=now+120000000;
+        result.selected=result.hovered;
+        // Selecting the already equipped slot cycles its native fire mode.
+        // A holstered VR gun is still equipped in BF2142: grab it without a key.
+        pendingItem=slots[result.hovered].item;
+        pendingKey=pendingItem==unsigned(equippedItem)?0:scanCodes[pendingItem];
+        keyUntil=now+120000000;
     }
     gripHeld=pressed;
+    // End the selection pulse as soon as the game acknowledges the new item.
+    if(pendingItem==unsigned(equippedItem))pendingKey=0;
     if(now<keyUntil)result.key=pendingKey;else pendingKey=0;
     return result;
 }

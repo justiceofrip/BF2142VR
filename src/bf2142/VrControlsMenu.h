@@ -16,7 +16,7 @@ public:
  void Reset(){open=false;hover=-1;dirty=true;}
  bool RecenterRequested(){bool r=recenter;recenter=false;return r;}
 private:
- bool vehicle=false;
+ bool vehicle=false,voicePage=false;
  bool open=false,keyHeld=false,dirty=true,recenter=false,saveFailed=false,backHeld=false;
  int hover=-1;UINT cachedWidth=0,cachedHeight=0;DXGI_FORMAT cachedFormat=DXGI_FORMAT_UNKNOWN;
  std::vector<DWORD> art;

@@ -9,7 +9,7 @@ import ExportLobbyScene as lobby
 from PIL import Image
 
 APP='BF2142VR'
-VERSION='0.1.0-alpha.1'
+VERSION='0.2.0-beta.1'
 STOCK='1a9903113df3fa5b24282ce8d2adbf54ddb58160155b28dea09f26fe85b782f9'
 COMPLETE='e5d605ed915adac29c57840835d900bbc68a3c3ea4a2c7f7077000f6db8c144d'
 WEAPONS='mods/bf2142/Objects/Weapons_client.zip'
@@ -83,7 +83,7 @@ def validate_game(game):
     for name in ['Weapons_client.zip','Vehicles_client.zip','Vehicles_server.zip','Common_client.zip']:
         if not (objects/name).is_file():raise ValueError('Missing stock game archive: '+name)
     original=sha(objects/'Weapons_client.zip')
-    if original not in (STOCK,COMPLETE):raise ValueError('This alpha needs the stock BF2142 weapon archive. Use a clean v1.51 installation; Remaster and other weapon packs are not supported yet.')
+    if original not in (STOCK,COMPLETE):raise ValueError('This beta needs the stock BF2142 weapon archive. Use a clean v1.51 installation; Remaster and other weapon packs are not supported yet.')
     patched=bytearray(data);flags=struct.unpack_from('<H',data,p+22)[0];struct.pack_into('<H',patched,p+22,flags|0x20)
     return original,data,bytes(patched)
 
@@ -189,7 +189,7 @@ def install(game,payload):
             if m.get('status')=='installed' and m.get('version')==VERSION:
                 rows=mutations(final,m)
                 if all(current==row['installed'] for row,_,_,current in rows):
-                    print('This alpha is already installed:',final);return final
+                    print('This beta is already installed:',final);return final
         raise ValueError('BF2142VR already exists. Run its Uninstall.cmd first, then move that folder aside before installing again.')
     stage=game/('.BF2142VR-setup-'+uuid.uuid4().hex);stage.mkdir();committed=False
     try:
@@ -202,7 +202,7 @@ def install(game,payload):
         if exe!=patched:
             (stage/'backups/BF2142.exe').write_bytes(exe);(stage/'generated/BF2142.exe').write_bytes(patched)
             changes.append({'target':'BF2142.exe','backup':'backups/BF2142.exe','original':hashlib.sha256(exe).hexdigest(),'installed':hashlib.sha256(patched).hexdigest()})
-        m={'app':APP,'version':VERSION,'build':'v30','game':str(game),'status':'prepared','changes':changes}
+        m={'app':APP,'version':VERSION,'build':'v35h-beta1','game':str(game),'status':'prepared','changes':changes}
         write_json(stage/'install.json',m);running(game)
         for row in changes:
             if sha(child(game,row['target']))!=row['original']:raise ValueError('Game files changed during setup')

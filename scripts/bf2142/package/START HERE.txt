@@ -1,67 +1,45 @@
-BATTLEFIELD 2142 VR - 0.1.0-alpha.1
-Early PC VR alpha, based on development build v30.
+BATTLEFIELD 2142 VR 0.2.0-beta.1
 
-WHAT YOU NEED
-- 64-bit Windows 10/11 and your own working Battlefield 2142 v1.51 installation.
-- A PC VR headset and a configured OpenXR runtime.
-- Tested development setup: Quest 3, Steam Link and SteamVR.
-- Use the stock bf2142 mod for this alpha. Remaster/HD packs are not verified.
-- No Python, FFmpeg, Visual Studio or developer tools are needed.
+Requires your own working stock BF2142 v1.51 on Windows x64.
+Set up Reclamation/OpenSpy separately and confirm you can log in.
+VR already includes the remote IK receiver. Do not also install the flat addon.
+Remaster/other weapon packs are not supported by this installer.
 
-BEFORE SETUP
-1. Get base Battlefield 2142 working first. For login/server redirects, follow
-   the Reclamation Hub instructions at https://www.battlefield2142.co/help/ .
-   The Hub/OpenSpy patch is a separate prerequisite; this ZIP does not install
-   it or contain the game, maps, account credentials or proprietary game art.
-2. Close Battlefield 2142.
-3. Right-click this ZIP and choose Extract All. Open the extracted folder.
-   Do not run setup from inside the ZIP. You can extract into Downloads.
+INSTALL / UPDATE
+1. Close BF2142. Updating alpha? Run its installed Uninstall.cmd first.
+   Rename that game's BF2142VR folder to preserve backups/settings.
+   Do not overwrite the old installer folder with this ZIP.
+2. Extract the entire beta ZIP into a new folder.
+3. Run Setup.cmd, select BF2142.exe, and wait for local weapon/body/lobby setup.
+   Original files are backed up for rollback. No game content is downloaded.
+4. Connect through Steam Link/SteamVR. Use Battlefield 2142 VR Beta on the
+   desktop or installed Play VR.cmd for singleplayer/bot matches.
 
-INSTALL
-4. Double-click Setup.cmd and select BF2142.exe in your installed game folder.
-5. Wait for setup to finish; generating weapon repairs and the walker hangar
-   can take a few minutes. These assets are built from your own game files.
-6. Setup installs a BF2142VR folder inside the game and creates a desktop
-   shortcut named Battlefield 2142 VR Alpha.
-   If your game is in a protected folder and setup reports access denied,
-   right-click Setup.cmd and choose Run as administrator. Nothing downloads
-   during setup and no global PowerShell setting is changed.
+COMMUNITY MULTIPLAYER
+Use Join Community Server.cmd from this extracted ZIP. Choose Play in VR and
+log in with your own Reclamation/OpenSpy account. Leave the helper running.
+It verifies/downloads the community payload and joins the temporary test server.
+If direct join stalls after login: IP 18.190.153.177, port 17567.
+The server may be offline. Ordinary game/Hub shortcuts do not activate this mod.
+Other community hosts need the VR server adapter and bridge too.
 
-PLAY
-7. Connect your headset and start SteamVR. For Quest wireless, connect through
-   Steam Link before launching. Set SteamVR as the OpenXR runtime in SteamVR
-   Settings > OpenXR if another runtime is currently selected.
-8. Use Battlefield 2142 VR Alpha on the desktop, or open the game's BF2142VR
-   folder and double-click Play VR.cmd. Launching from the ordinary game/Hub
-   shortcut starts the ordinary game rather than this VR launcher.
-9. Log in using your existing game account and start a bot match. Right-stick
-   click recenters. B opens the game menu; VR CONTROLS opens the VR settings.
-   Read CONTROLS.txt for body slots, aiming, vehicles and menu controls.
+CONTROLS
+Right-stick click recenters. B opens the game menu; VR CONTROLS opens settings.
+Read CONTROLS.txt for body slots, aiming, vehicles and menus.
+Voice worked with the second vrtester client; wider device testing remains.
 
-Desktop Preview.cmd is an optional simulator for checking setup without a
-headset. It intentionally does not start VR. Its keyboard guide is in CONTROLS.
+ROLLBACK
+Close the game and run installed Uninstall.cmd. It restores only recorded VR
+changes and retains settings/verified backups. If another mod changed a file,
+uninstall stops to protect it. Move the uninstalled folder aside before using
+the earlier installer. Keep your old ZIP for rollback.
+Community caches live separately under LOCALAPPDATA/BF2142VR/Community.
+Older signed server revisions are rejected; authorized rollback requires a
+new signed descriptor selecting an earlier payload.
 
-UNINSTALL / GO BACK TO FLAT
-Close the game and run Uninstall.cmd in the installed BF2142VR folder.
-It restores the original weapon archive and original executable header if
-setup enabled large-address support. Your settings and verified backups remain
-inside BF2142VR. After uninstall finishes, that folder may be deleted manually.
-The Hub/OpenSpy patch, accounts, maps and your ordinary player profile are left
-alone. If another mod changed a file after setup, uninstall stops before
-replacing it and preserves the backup for manual recovery.
+Desktop Preview.cmd is optional synthetic tracking, not VR.
+Latest arm/haptic fixes have automated coverage, not final headset acceptance.
+See RELEASE NOTES.txt and the release CHECKS.txt.
 
-TO REINSTALL THIS ALPHA
-Uninstall first, move the old BF2142VR folder aside, then run Setup.cmd from a
-fresh extraction. Keep your old BF2142VR.ini if you want to retain preferences.
-
-CURRENT LIMITS
-Multiplayer hit registration, remote IK/waving, Remaster and other headset paths
-are not verified. Some grenade-guide and hand details still need refinement.
-Fixed aircraft guns aim with the aircraft; Nekomata main-gun yaw uses steering.
-Vehicle head aim and parachute hands are the latest additions and need feedback.
-Expect early-alpha bugs. See RELEASE NOTES.txt and TROUBLESHOOTING.txt.
-
-CREDITS
-Built on BFVR / Battlefield 1942 VR by JayBiggsGMG and contributors:
-https://github.com/JayBiggsGMG/BFVR-Battlefield-1942-VR-Mod
-MIT license and third-party notices are included. This is an independent mod.
+Source/credits: https://github.com/justiceofrip/BF2142VR
+Based on BFVR by JayBiggsGMG and contributors. Licenses included.

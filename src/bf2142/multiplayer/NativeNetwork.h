@@ -3,7 +3,10 @@
 #include "PoseProtocol.h"
 namespace bfvr::bf2142 {
 void InstallNetworkClient(LogFunction);
+void InstallNetworkObserver(LogFunction);
 void TickNetworkClient();
+// Cross-thread cosmetic event drain; inactive/menu/focus loss discards contacts.
+unsigned TakeNetworkFistBumps(bool active);
 bool NetworkClientActive();
 void PublishNetworkPose(void* soldier,void* weapon,const net::Matrix& body,const net::Matrix& camera,
  const net::Matrix& head,const net::Matrix& leftPalm,const net::Matrix& rightPalm,const net::Matrix& weaponLocal,bool leftValid,bool held,

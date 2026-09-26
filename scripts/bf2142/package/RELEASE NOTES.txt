@@ -1,22 +1,24 @@
-BATTLEFIELD 2142 VR 0.1.0-alpha.1 - v30 PLAYTEST PACKAGE
+BATTLEFIELD 2142 VR 0.2.0-beta.1
 
-An early PC VR alpha candidate. Multiplayer support and remote IK are pending.
+Multiplayer beta: tracked head/arms/fingers/items, coherent observer smoothing,
+body follow, cosmetic self-collision and fist-bump haptic implementation.
+VR includes the same remote-player receiver shipped in the separate flat addon.
 
-Includes the accepted v29 loading-memory fix and v30 vehicle/parachute work:
-head aiming for movable vehicle guns, controller seat selection and tracked
-hands while gliding. Stock turret/aircraft limits remain; see CONTROLS.txt.
-Preserves tracked weapons/hands, two-hand support, physical ADS, body holsters,
-empty hands, controller-touch finger poses, physical stance, snap/smooth turning,
-head/controller locomotion, laser menus, floating HUD and the walker hangar.
+Latest fixes: stronger equipment pulses and left-hand crate cues, observer-only
+native arm-recoil isolation and improved arm-segment clearance. Automated tests
+pass; those changes have not had another visual/haptic session. Existing torso
+calibration remains; some body/shoulder jank is still present.
 
-Setup generates the repaired weapons, body equipment and lobby locally. Game
-files are not included. It installs the VR runtime under your game/BF2142VR,
-backs up the original weapon archive and enables large-address support only if
-needed, with a recorded backup for uninstall. The Hub/OpenSpy patch is separate.
+Includes community controller aiming, MP ADS/movement/snap fixes, left-hand
+crate throws, Titan/silo marker suppression, signed downloads and encrypted
+pose/audio transport. Proximity voice worked with the second vrtester client;
+separate-PC microphone routing/quality still needs broader testing.
 
-This package's installer/load checks are recorded in PACKAGE CHECKS.txt.
-Compilation and automated checks do not establish compatibility with every
-headset, GPU or game modification. New interactions remain open for feedback.
+Preserves stereo/6DoF, tracked hands/weapons, physical ADS/stance, two-hand grips,
+body holsters, laser UI, floating HUD, walker lobby and vehicle/traversal work.
+No manual reloads, physical steering wheels, knife hand-to-hand transfer or new
+cockpits in this main beta. Separate SP experiments remain parked.
+Stock v1.51 required; Remaster and full collision-aware roomscale unverified.
 
-No manual reloads, physical steering wheels, hand-to-hand knife transfer,
-networked waving or new cockpit geometry are included yet.
+Both native builds/71 CTests and 279 community checks pass. See release CHECKS.
+Source/IK guide: https://github.com/justiceofrip/BF2142VR/tree/main/docs/ik

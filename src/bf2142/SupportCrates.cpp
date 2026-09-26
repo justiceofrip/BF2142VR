@@ -26,13 +26,13 @@ SupportFrame SupportCrates::Update(const SupportObservation& s){
     // Native ammo readiness, not an invented cooldown timer, drives holster visibility.
     if(s.leftCrates)for(int i=1;i<10;++i)if(SupportCrateWeapon(Name(s.names,i)))out.unavailable[i]=!s.ammo[i].valid||(s.ammo[i].deployable>=0?s.ammo[i].deployable==0:s.ammo[i].rounds<1);
     if(!s.leftCrates){crate=0;phase=0;return out;}
-    if(!crate && !out.busy && rising){
+    if(!crate){
         float nearest=1;
         for(const auto& slot:BodySlots())if(SupportCrateWeapon(Name(s.names,slot.item))&&!out.unavailable[slot.item]){
             const float d=Distance(hand->position,slot.offset)/slot.radius;
-            if(d<nearest){nearest=d;crate=slot.item;}
+            if(d<nearest){nearest=d;out.hovered=int(slot.item);}
         }
-        if(crate){restore=s.equipped;phase=1;deadline=s.time+1800000000;}
+        if(rising&&out.hovered>0){crate=out.hovered;restore=s.equipped;phase=1;deadline=s.time+1800000000;}
     }
     if(crate){
         out.busy=out.consumeLeft=true;out.crateItem=crate;

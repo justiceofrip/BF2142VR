@@ -27,6 +27,9 @@ bool BeginNativeEye(void* renderer, const stereo::Pose& reference,
 bool BeginNativeScope(void* renderer,const stereo::Matrix4& world,const stereo::FovTangents& fov);
 struct EyeCamera;
 bool ReadNativeEyeCamera(EyeCamera* camera);
+bool ReadNativeWeaponProjection(stereo::Matrix4* projection);
+bool ReadStereoMarkerFrame(EyeCamera* head,EyeCamera* eye);
+bool HideStereoWorldMarkers();
 void EndNativeEye();
 }
 

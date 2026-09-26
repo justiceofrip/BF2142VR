@@ -1,3 +1,5 @@
+> Historical alpha notes. Use the [current beta README](../README.md) and [flat/Hub message](FLAT_ADDON.md).
+
 # BF2142 VR sharing
 
 **[Player download and installation instructions](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.1.0-alpha.1)**

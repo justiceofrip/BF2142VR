@@ -64,7 +64,8 @@ ControllerCommand MapControllers(ControllerPolicyState& state,const shared::Shar
         if(next && !state.nextWeaponHeld)out.wheel=-120;
         if(previous && !state.previousWeaponHeld)out.wheel=120;
         state.nextWeaponHeld=next;state.previousWeaponHeld=previous;
-        out.keys[DIK_LSHIFT]=pressed(l,shared::kControllerHandButtonThumbstick)?0x80:0;
+        const bool stickClick=pressed(l,shared::kControllerHandButtonThumbstick);
+        out.keys[DIK_LSHIFT]=stickClick?0x80:0;
         out.keys[DIK_LCONTROL]=(!motionHands || modifier) && (l.flags&shared::kControllerHandFlagSqueezeActive) && std::isfinite(l.squeezeValue) && l.squeezeValue>.65f?0x80:0;
         out.buttons[1]= (r.flags&shared::kControllerHandFlagSqueezeActive) && std::isfinite(r.squeezeValue) && r.squeezeValue>.65f?0x80:0;
     } else {

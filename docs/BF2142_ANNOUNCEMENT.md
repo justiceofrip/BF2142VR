@@ -1,3 +1,5 @@
+> Historical alpha notes. Use the [current beta README](../README.md) and [flat/Hub message](FLAT_ADDON.md).
+
 **Battlefield 2142 VR - early PCVR alpha**
 
 6DoF VR, motion-controlled weapons, physical ADS, body holsters, tracked hands and snap turning. Tested in singleplayer with Quest 3 + SteamVR.

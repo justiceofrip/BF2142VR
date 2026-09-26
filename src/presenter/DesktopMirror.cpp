@@ -258,13 +258,31 @@ void DesktopMirror::PumpMessages()
     }
 }
 
+void DesktopMirror::SetRuntimeVisible(bool visible)
+{
+    visibility_.SetRuntimeVisible(visible);
+    UpdateVisibility();
+}
+
+void DesktopMirror::UpdateVisibility()
+{
+    if (window_ == nullptr || !IsWindow(window_)) return;
+    const bool shown = (GetWindowLongPtrW(window_, GWL_STYLE) & WS_VISIBLE) != 0;
+    if (shown == visibility_.Visible()) return;
+    ShowWindow(window_, visibility_.Visible() ? SW_SHOWNOACTIVATE : SW_HIDE);
+    if (!visibility_.Visible() && parentWindow_ != nullptr)
+        InvalidateRect(parentWindow_, nullptr, FALSE);
+}
+
 void DesktopMirror::Render(
     const OpenXRPresentationTextures& textures,
     const OpenXRPresentationView* rightEyeView,
     OpenXRUiPresentationMode uiPresentationMode,
     const OpenXRPresentationPose* scopeRollInView,
-    const OpenXRQuickMenuMirrorState* quickMenu)
+    const OpenXRQuickMenuMirrorState* quickMenu,
+    bool freshSource)
 {
+    if (!visibility_.RuntimeVisible()) return;
     if (!initialized_ || permanentlyDisabled_ || textures.rightWorld == nullptr ||
         textures.ref2Ui == nullptr)
     {
@@ -479,10 +497,16 @@ void DesktopMirror::Render(
     {
         Disable(L"Desktop mirror stopped after its nonblocking present failed; the headset presentation remains active.");
     }
+    else if (SUCCEEDED(result))
+    {
+        if (freshSource) visibility_.AcceptFrame();
+        UpdateVisibility();
+    }
 }
 
 void DesktopMirror::Shutdown()
 {
+    visibility_ = {};
     ReleaseQuickMenuViews();
     ReleaseSourceViews();
     ReleaseSwapchain();
@@ -622,7 +646,7 @@ bool DesktopMirror::EnsureWindow()
         // The parent belongs to the game process. Disable this display-only
         // child as well as returning HTTRANSPARENT so it can never become an
         // input target across the process boundary.
-        WS_CHILD | WS_VISIBLE | WS_DISABLED,
+        WS_CHILD | WS_DISABLED,
         0, 0, 1, 1,
         parentWindow_,
         nullptr,
@@ -1041,7 +1065,7 @@ void DesktopMirror::UpdateWindowBounds()
     SetWindowPos(
         window_, HWND_TOP, 0, 0,
         std::max<LONG>(rectangle.right, 1), std::max<LONG>(rectangle.bottom, 1),
-        SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        SWP_NOACTIVATE);
 }
 
 void DesktopMirror::ReleaseSourceViews()

@@ -1,9 +1,59 @@
 # Local multiplayer development
 
+Current public beta: [IK guide](ik/README.md), [flat addon](FLAT_ADDON.md) and [community hosting](BF2142_COMMUNITY_HOSTING.md). Native transports below stay loopback-only; the authenticated community bridge provides internet transport. Older private-candidate notes are historical. Shared presenter IPC is now 26.
+
 A single Windows PC can run the dedicated BF2142 v1.51 server plus one desktop
 VR simulator client. The dedicated server supplies authoritative bots and game
 state, so a second person is not needed for initial connection and firing work.
 This does not establish internet compatibility, remote VR poses or Titan play.
+
+## Receive-only observer and remote empty hands (v33f, private)
+
+The launcher now supports --network-observer: native flat rendering/input, no
+OpenXR session, synthetic controllers or local VR controls. The matching
+protocol-v4 server accepts a separate authenticated Subscribe lease and relays
+other players' poses to it, including while the observer is unspawned. Leases
+expire after one second, have sequence/session/port checks, and never provide
+tracked fire, movement, snap or throw authority. This is still loopback-only.
+
+For two clients on one PC, add --observer-profile "ABSOLUTE ISOLATED DOCUMENTS"
+and --join-local 17567 to the observer. Before native main resumes, this child's
+SHGetFolderPathW Documents lookup is redirected and an exclusive profile lock is
+held for its lifetime. Primary Documents/profile paths are rejected. Only this
+explicit observer mode allows the additional instance (+multi 1); ordinary
+launches keep their existing duplicate-process guard. Use a separate account.
+Launch the normal primary game first, then the isolated observer. Close the
+observer before restarting a normal primary launch.
+
+The first flat observer hit RendDX9_ori+0x127c during loading. That path lacked
+the existing native query guard used by stereo. Observer startup now installs
+that same signature-checked guard independently; the rerun loaded successfully
+and logged the missing-query fallback without crashing at that point.
+
+Fresh remote empty-hand poses now suppress only the held weapon's own bundled
+mesh submission and shadow callbacks. The verified geometry owner is +0x290;
+weapon +0x44 points back to it. Renderer vtable +0x1d5400 slots +0x18/+0x20 and
+function signatures guard the draw hooks (+0xc5030/+0xc67e0). The decision checks
+current inventory, native player/weak/soldier ownership, mount/death state, pose
+age, held flags and weapon name. Explicit AI mirror diagnostics permit a different
+bot weapon; normal relays require matching human weapon identity. No shared mesh,
+material, skeleton, inventory or gameplay flags are modified. Missing tracking,
+weapon switches and stale/unknown owners retain native drawing on the next call.
+This candidate still needs visual acceptance with actual VR input.
+
+68 Win32 CTests pass, including separate UDP observer relay, no observer action
+publication, native mesh/shadow call forwarding and owner/dropout transitions,
+and real process-local Documents redirection/exclusive locking. x64 builds.
+The live lab ran two BF2142 processes simultaneously with distinct accounts;
+both connected to the dedicated server. The second profile opened with empty
+login fields and stored files under its isolated Documents root. Its query and
+remote-weapon draw profiles installed successfully. Two connected flat clients
+are not proof of headset-to-observer IK/empty-hand appearance or internet play.
+
+The previous bot video proves transmitted arm motion, but visual IK quality is
+inconclusive: the bot retained its gun/combat AI, and the temporary position
+fixture placed it on a railing. Do not repeat that fixture as a visual acceptance
+test. Remote fingers/head retargeting, haptic fist bumps and voice remain pending.
 
 ## Current developer launcher
 
@@ -207,3 +257,49 @@ knife and belt equipment. All 63 CTests and the x64 presenter build pass. These
 are desktop observations; headset acceptance and two real clients remain open.
 Voice chat / Quest microphone routing / VR push-to-talk are deferred; see the
 [roadmap](BF2142_ROADMAP.md).
+
+## Private movement heading correction (v33b, protocol v3)
+
+The client and server use the same movement-only camera-basis adjustment for
+walking and sprint. Native input, speed and camera/body storage stay unchanged.
+MovementValid and movementYawDegrees are appended to the private pose packet;
+version 3 is 616 bytes and rejects version 2 or malformed offsets. The server
+checks human ownership, foot state, current weapon, thread and 150 ms freshness.
+Unmodified flat clients and bots have no accepted VR movement packet and retain
+ordinary movement. Roll back both DLLs when returning to a version 2 checkpoint.
+This has no effect on the released singleplayer alpha or public server policy.
+
+## Physical squad radio candidate (v33i, private)
+
+The private server initially had sv.voipEnabled 0. Its backed-up config now enables
+built-in VoIP (sv.voipServerRemote 0), quality 3, using stock ports 55123-55125.
+Changing the live setting alone did not open the service ports; restart the lab
+server before the audio check. Both native client profiles already enable VoIP
+and push-to-talk. No microphone device or open-mic preference was changed.
+
+In VR, reach to the upper-left shoulder with your left hand and squeeze the grip.
+The hand seats on the radio, curls around the casing and presses its talk switch;
+a left-controller haptic click accompanies native V being held. Release to stop.
+The right-hand gun remains usable. A held support crate blocks radio pickup;
+tracking/focus/menu loss or recenter cancels talk. No stick-click voice chord.
+Flat players retain stock V. Both clients must join the same squad for this test.
+Native voice settings retain volume/mute authority. Native commander/leader B
+is untouched; there is no added commander gesture yet.
+
+Shared x86/presenter IPC is v24; replace both together. Pose transport remains v4.
+69 CTests, x64 build, D3D9 depth/state stereo fixture and captured hand solves pass.
+Headset interaction/appearance and actual microphone delivery are not accepted.
+Voice-activated proximity with no held binding is requested but not implemented.
+
+## v33g: standing recenter and tracked remote head (private)
+
+The next private checkpoint adds explicit standing-height recenter and remote
+HMD yaw/pitch/roll. Head rotation keeps the native neck attachment and is independent
+of arm reach. Protocol v4 and the receive-only flat observer remain unchanged.
+Automatic focus/spawn recenters do not silently redefine standing height.
+
+For the combined visual check, stand normally and click the right stick once,
+then crouch and stand. On the observer, check a slow nod, left/right look and head
+tilt, followed by an empty-hand wave and weapon redraw. Voice work follows this
+candidate; launcher-managed addon downloads are deferred. Unmodified flat clients
+do not contain the tracked avatar receiver. Internet transport is still pending.

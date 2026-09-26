@@ -13,6 +13,16 @@ public:
 private:
  std::uint64_t owner=0,queuedAt=0;std::int64_t lastSample=0;float degrees=0;
 };
+// LOCAL-space height is a session reference, separate from saved preferences.
+// Explicit recenter defines the current posture as upright, even at y == 0.
+class StandingHeightReference {
+public:
+ void Ensure(float current,float configured) noexcept;
+ bool Recenter(float current) noexcept;
+ float Drop(float current) const noexcept {return ready?height-current:0.f;}
+ void Reset() noexcept {*this={};}
+private: bool ready=false;float height=0;
+};
 struct PhysicalPosture {int stance=0;bool crouch=false,proneKey=false;};
 class PhysicalStance {
 public:

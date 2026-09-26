@@ -169,6 +169,19 @@ int main(){
     bf2142::OverlayDeviceEvents(overlay,true,sizeof(filtered[0]),filtered,count,4,false,masked,2,100);
     if(filtered[0].dwData || overlay.physicalKeys[DIK_F9])return 61;
     masked={};raw[DIK_F9]=0x80;bf2142::OverlayDeviceState(overlay,true,256,raw.data(),masked,3);if(!raw[DIK_F9])return 62;
+    // The old voice chord is gone. Only the physical shoulder interaction
+    // may emit squad PTT; controller sprint remains independent.
+    shared::SharedControllerSample radio{};radio.flags=shared::kControllerSampleFlagSessionFocused;radio.predictedDisplayTime=7000000000LL;
+    radio.hands[0].flags=shared::kControllerHandFlagTriggerActive|shared::kControllerHandFlagThumbstickActive;
+    radio.hands[0].buttons=shared::kControllerHandButtonThumbstick;
+    bf2142::ControllerPolicyState radioState;
+    auto radioCommand=bf2142::MapControllers(radioState,radio,true,0,600,true);if(!radioCommand.keys[DIK_LSHIFT]||radioCommand.keys[DIK_V])return 102;
+    radio.hands[0].triggerValue=1;radioCommand=bf2142::MapControllers(radioState,radio,true,0,600,true);
+    if(radioCommand.keys[DIK_V]||!radioCommand.keys[DIK_LSHIFT]||radioCommand.keys[DIK_R]||radioCommand.keys[DIK_E]||radioCommand.buttons[0])return 103;
+    radioCommand=bf2142::MapControllers(radioState,radio,false,0,600,true);if(radioCommand.keys[DIK_V])return 104;
+    radio.flags=0;radioCommand=bf2142::MapControllers(radioState,radio,true,0,600,true);if(radioCommand.keys[DIK_V])return 105;
+    radio.flags=shared::kControllerSampleFlagSessionFocused;radio.hands[0].flags&=~shared::kControllerHandFlagThumbstickActive;
+    radioCommand=bf2142::MapControllers(radioState,radio,true,0,600,true);if(radioCommand.keys[DIK_V])return 106;
     // Holstered weapons suppress physical fire in both state and buffered
     // input, emitting a release even when no new physical mouse event arrives.
     bf2142::InputOverlayState blockedMouse;bf2142::ControllerCommand blockFire;blockFire.blockedPhysicalButtons[0]=1;
@@ -199,12 +212,39 @@ int main(){
     for(int i=0;i<8;++i)st=posture.Update(true,0,2,tick+=100000000);
     if(st.stance!=0||st.crouch)return 82;
     if(posture.Update(false,1,2,tick).proneKey)return 83;
+    // Reproduce returning to a different LOCAL origin: camera recenter alone
+    // used to leave the original upright Y, continuously requesting crouch.
+    bf2142::StandingHeightReference height;posture.Reset();tick=1000000000;
+    height.Ensure(1.7f,0);
+    posture.Update(true,height.Drop(1.2f),0,tick);
+    st=posture.Update(true,height.Drop(1.2f),0,tick+=200000000);if(!st.crouch)return 94;
+    if(!height.Recenter(1.2f))return 95;posture.Reset();
+    height.Ensure(1.2f,1.7f); // A persisted preference must not undo explicit recenter.
+    st=posture.Update(true,height.Drop(1.2f),1,tick+=10000000);if(st.crouch||st.proneKey||!Close(height.Drop(1.2f),0))return 96;
+    posture.Update(true,height.Drop(.8f),0,tick+=10000000);
+    st=posture.Update(true,height.Drop(.8f),0,tick+=200000000);if(!st.crouch)return 97;
+    if(!height.Recenter(0))return 98;posture.Reset();height.Ensure(0,1.7f);
+    if(!Close(height.Drop(0),0)||height.Recenter(std::numeric_limits<float>::quiet_NaN())||!Close(height.Drop(-.4f),.4f))return 99;
+    // Recenter while natively prone must request a native stand-up toggle,
+    // rather than forcing animation state or leaving a held crouch key.
+    posture.Update(true,height.Drop(0),2,tick+=10000000);
+    st=posture.Update(true,height.Drop(0),2,tick+=210000000);if(!st.proneKey||st.crouch)return 100;
+    height.Reset();height.Ensure(1.2f,1.7f);if(!Close(height.Drop(1.2f),.5f))return 101;
     if(bf2142::VrMenuHit(.8f,.04f,false)!=0||bf2142::VrMenuHit(.2f,.3f,false)!=-1||bf2142::VrMenuHit(.2f,.26f,true)!=1||bf2142::VrMenuHit(.87f,.15f,true)!=10)return 84;
     bf2142::VrControlsMenu options;bf2142::VrSettings values;options.Hotkey(true);options.Hotkey(false);
     values.configPath=(std::filesystem::temp_directory_path()/L"BF2142VR-controls-test.ini").wstring();
     if(!options.Interact(.2f,.26f,true,false,values,1.7f)||!values.snapTurning)return 85;
     if(GetPrivateProfileIntW(L"VR",L"SnapTurning",0,values.configPath.c_str())!=1)return 86;
     if(!options.Interact(.2f,.514f,true,false,values,1.7f)||!options.RecenterRequested())return 87;
+    if(GetPrivateProfileIntW(L"VR",L"HideWorldMarkers",0,values.configPath.c_str())!=1)return 92;
+    values.hideWorldMarkers=false;
+    if(!bf2142::SaveVrPreferences(values)||GetPrivateProfileIntW(L"VR",L"HideWorldMarkers",1,values.configPath.c_str())!=0)return 93;
+    // Voice settings are independent from locomotion and native radio.
+    if(!options.Interact(.75f,.15f,true,false,values,1.7f))return 107;
+    if(!options.Interact(.2f,.32f,true,false,values,1.7f)||!values.proximityMuted)return 108;
+    if(GetPrivateProfileIntW(L"VR",L"ProximityMicMuted",0,values.configPath.c_str())!=1)return 109;
+    if(!values.snapTurning||!values.proximityVoice)return 110;
+    options.Interact(.75f,.15f,true,false,values,1.7f);
     DeleteFileW(values.configPath.c_str());
     std::vector<DWORD> art(640*400);options.Draw(art,640,400,DXGI_FORMAT_B8G8R8A8_UNORM,values);
     if(!art[200*640+100]||art[0])return 88;

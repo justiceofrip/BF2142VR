@@ -42,7 +42,7 @@ std::array<std::array<float,5>,2> filteredCurls{};LONGLONG fingerTime=0;
 wchar_t tracePath[32768]{};unsigned traceFrames=0,traceRecords=0;
 bool installed=false,reported=false,fireReported=false;volatile LONG supporting=0;
 SRWLOCK sampleLock=SRWLOCK_INIT;
-struct Sample { shared::SharedControllerSample input{};stereo::Pose reference{},head{};float scale=1,height=0;ULONGLONG tick=0;bool enabled=false; } current;
+struct Sample { RadioFrame radio{};shared::SharedControllerSample input{};stereo::Pose reference{},head{};float scale=1,height=0;ULONGLONG tick=0;bool enabled=false; } current;
 template<class T>T Read(const void* p,size_t offset){T v{};std::memcpy(&v,static_cast<const BYTE*>(p)+offset,sizeof(v));return v;}
 stereo::Pose Pose(const shared::SharedPresentationPose& p){return {{p.positionX,p.positionY,p.positionZ},{p.orientationX,p.orientationY,p.orientationZ,p.orientationW}};}
 constexpr DWORD gripFlags=shared::kControllerHandFlagGripActive|shared::kControllerHandFlagGripPositionValid|shared::kControllerHandFlagGripOrientationValid|
@@ -185,6 +185,16 @@ void Apply(void* soldier){
     }
     f.supportPressed=(left.flags&shared::kControllerHandFlagSqueezeActive)&&std::isfinite(left.squeezeValue)&&left.squeezeValue>.65f;
     f.wasSupporting=InterlockedCompareExchange(&supporting,0,0)!=0;
+    const bool radio=s.radio.held && s.radio.time==s.input.predictedDisplayTime && f.leftValid && fingersValid && palms.left && palms.right;
+    if(radio){
+        const auto grip=Compose(trackingCamera,s,s.radio.grip);
+        stereo::Pose button=s.radio.grip;button.position=s.radio.button;
+        const auto contact=Compose(trackingCamera,s,button);
+        if(grip&&contact){
+            f.leftGrip=*grip;f.leftAim=*grip;f.supportPressed=false;f.wasSupporting=false;
+            const auto& p=contact->values[3];f.leftThumbContact=stereo::Vec3{p[0],p[1],p[2]};
+        }
+    }
     if(handPoseTime && (s.input.predictedDisplayTime<handPoseTime || s.input.predictedDisplayTime-handPoseTime>100000000)){
         f.wasSupporting=false;pistolAim.Reset();
     }
@@ -201,6 +211,7 @@ void Apply(void* soldier){
             if(dt!=0)for(size_t i=0;i<goal.size();++i)filteredCurls[h][i]+=(goal[i]-filteredCurls[h][i])*blend;}
         fingerTime=s.input.predictedDisplayTime;f.leftCurls=filteredCurls[0];f.rightCurls=filteredCurls[1];
     }
+    if(radio){f.fingerPoses=true;f.leftCurls={.65f,.70f,.74f,.78f,.82f};}
     NativeSupport ex;AcquireSRWLockShared(&sampleLock);ex=supportState;ReleaseSRWLockShared(&sampleLock);
     const bool exFresh=GetTickCount64()-ex.tick<150;
     if(exFresh&&ex.busy)f.supportPressed=false;
@@ -227,10 +238,13 @@ void Apply(void* soldier){
             AcquireSRWLockExclusive(&sampleLock);firePose={soldier,target.weapon,Multiply(solved->bones[54],body),Multiply(native[0],body),Multiply(trackingCamera,body),s.input.predictedDisplayTime,s.tick};ReleaseSRWLockExclusive(&sampleLock);
             // Publish anatomical palm frames separately from the accepted 1P rig.
             if(palms.left&&palms.right){
-                const auto l=InverseRigid(palms.left->bones[0]),r=InverseRigid(palms.right->bones[0]);
+                // Cancel the captured animated wrist exactly. A transpose squares
+                // its small native scale error and can reject an otherwise valid
+                // knife/controller pose at the network rigid-frame validator.
+                const auto l=InverseAnimatedTransform(palms.left->bones[0]),r=InverseAnimatedTransform(palms.right->bones[0]);
                 if(l&&r)PublishNetworkPose(soldier,target.weapon,body,native[0],*head,
                     Multiply(*l,solved->bones[7]),Multiply(*r,solved->bones[33]),solved->bones[54],
-                    f.leftValid,f.weaponHeld,filteredCurls,f.leftItem.has_value());
+                    f.leftValid,f.weaponHeld,{f.leftCurls,f.rightCurls},f.leftItem.has_value());
             }
         }
         InterlockedExchange(&gripTransition,0);
@@ -360,8 +374,8 @@ bool InstallNativeHands(LogFunction logger){
     logger("Support crate launch profile: %s",crateAdapterReady?"available":"unavailable; off-hand crates disabled");
     InstallNetworkClient(logger);installed=true;logger("Native hands connected: local first-person animation, pre-velocity launch pose and firearm adapters; tracking and owner guards enabled.");return true;
 }
-void PublishNativeHands(const shared::SharedControllerSample* sample,const stereo::Pose& reference,const stereo::Pose& head,float scale,float height){
-    Sample s{};s.reference=reference;s.head=head;s.scale=scale;s.height=height;s.tick=GetTickCount64();
+void PublishNativeHands(const shared::SharedControllerSample* sample,const stereo::Pose& reference,const stereo::Pose& head,float scale,float height,const RadioFrame& radio){
+    Sample s{};s.radio=radio;s.reference=reference;s.head=head;s.scale=scale;s.height=height;s.tick=GetTickCount64();
     if(sample && (sample->flags&shared::kControllerSampleFlagSessionFocused) && Tracked(sample->hands[1])){s.input=*sample;s.enabled=true;}
     AcquireSRWLockExclusive(&sampleLock);current=s;ReleaseSRWLockExclusive(&sampleLock);if(!s.enabled)InterlockedExchange(&supporting,0);
 }

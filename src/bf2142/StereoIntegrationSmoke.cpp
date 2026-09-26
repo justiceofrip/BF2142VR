@@ -47,6 +47,15 @@ bool __fastcall Scene(void*,void*,double delta,float) {
     ++renders;if(delta!=0){++advances;valid=valid&&delta==expectedNativeTime;}
     valid=SUCCEEDED(device->BeginScene()) && valid;
     valid=SUCCEEDED(device->Clear(0,nullptr,D3DCLEAR_TARGET,0xff102030,1,0)) && valid;
+    bf2142::EyeCamera markerHead{},markerEye{};
+    static stereo::Matrix4 firstMarkerHead{};
+    if(bf2142::IsScopeRender())valid=!bf2142::ReadStereoMarkerFrame(&markerHead,&markerEye)&&valid;
+    else {
+        valid=bf2142::ReadStereoMarkerFrame(&markerHead,&markerEye)&&valid;
+        if(!bf2142::IsSecondStereoEye())firstMarkerHead=markerHead.world;
+        else for(unsigned i=0;i<4;++i)for(unsigned j=0;j<4;++j)
+            valid=(std::abs(firstMarkerHead.values[i][j]-markerHead.world.values[i][j])<.001f)&&valid;
+    }
     const auto inverse=bf2142::InverseRigid(currentEye.world);
     D3DMATRIX world{};for(int i=0;i<4;++i)world.m[i][i]=1;
     device->SetTransform(D3DTS_WORLD,&world);
@@ -92,6 +101,7 @@ bool ReadNativeStance(int*){return false;}
 bool NativeSnapTurnAvailable(){return false;}
 bool RequestNativeSnapTurn(float,std::int64_t){return false;}
 void ClearNativeSnapTurn(){}
+bool ConfigureNativeMovement(bool,float){return false;}
 bool ReadNativeTraversal(TraversalSample*){return false;}
 bool ReadNativeVehicle(VehicleSample*){return false;}
 void UpdateNativeVehicle(const VehicleSample*,const shared::SharedControllerSample*,const stereo::Pose&,const stereo::Pose&,float,float,ControllerCommand&){}
@@ -111,8 +121,10 @@ bool BeginNativeScope(void*,const stereo::Matrix4& world,const stereo::FovTangen
     const auto camera=MakeEyeCamera({world,.04f,100}, {}, {},fov);if(!camera)return false;currentEye=*camera;return true;
 }
 bool InstallNativeHands(LogFunction){return true;}
-void PublishNativeHands(const shared::SharedControllerSample*,const stereo::Pose&,const stereo::Pose&,float,float){}
+void PublishNativeHands(const shared::SharedControllerSample*,const stereo::Pose&,const stereo::Pose&,float,float,const RadioFrame&){}
 void ClearNativeHands(){}
+unsigned TakeNetworkFistBumps(bool){return 0;}
+bool ReadNativeWeaponProjection(stereo::Matrix4* p){*p=currentEye.projection;return true;}
 void DrawNativeOptic(std::vector<DWORD>&,UINT,UINT,DXGI_FORMAT,const EyeCamera&){}
 bool InstallNativeStereo(LogFunction){return true;}
 bool NativeViewsAvailable(void*){return true;}

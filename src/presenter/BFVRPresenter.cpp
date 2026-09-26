@@ -626,6 +626,9 @@ int RunPresenter(
     LONG consumedShotBothSequence = 0;
     LONG consumedDeathSequence = 0;
     LONG consumedNativeMenuHoverSequence = 0;
+    LONG consumedEquipmentLeftSequence = 0, consumedEquipmentRightSequence = 0;
+    LONG consumedRadioLeftSequence = 0;
+    LONG consumedFistLeftSequence = 0, consumedFistRightSequence = 0;
     LONG consumedKillSoundSequence = InterlockedCompareExchange(
         &block->killSoundSequence, 0, 0);
     bool nativeMenuHoverActive = false;
@@ -1110,6 +1113,19 @@ int RunPresenter(
                 consumedNativeMenuHoverSequence,
                 bfvr::OpenXRHapticEvent::Hover,
                 bfvr::kOpenXRHapticHandRight);
+            consumeHapticCounter(
+                &block->hapticRadioLeftSequence,
+                consumedRadioLeftSequence,
+                bfvr::OpenXRHapticEvent::Hover,
+                bfvr::kOpenXRHapticHandLeft);
+            consumeHapticCounter(&block->hapticFistLeftSequence, consumedFistLeftSequence,
+                bfvr::OpenXRHapticEvent::FistBump, bfvr::kOpenXRHapticHandLeft);
+            consumeHapticCounter(&block->hapticFistRightSequence, consumedFistRightSequence,
+                bfvr::OpenXRHapticEvent::FistBump, bfvr::kOpenXRHapticHandRight);
+            consumeHapticCounter(&block->hapticEquipmentLeftSequence, consumedEquipmentLeftSequence,
+                bfvr::OpenXRHapticEvent::Equipment, bfvr::kOpenXRHapticHandLeft);
+            consumeHapticCounter(&block->hapticEquipmentRightSequence, consumedEquipmentRightSequence,
+                bfvr::OpenXRHapticEvent::Equipment, bfvr::kOpenXRHapticHandRight);
             if (frame.mapToggleRequested)
             {
                 DWORD errorCode = ERROR_SUCCESS;
@@ -1185,7 +1201,8 @@ int RunPresenter(
             rightEye,
             acceptedUiPresentationMode,
             currentUiWorldAnchor(),
-            quickMenuVisible ? &quickMenu : nullptr);
+            quickMenuVisible ? &quickMenu : nullptr,
+            desktopMirrorSourceDirty);
         if (performanceDiagnosticsEnabled)
         {
             totalDesktopMirrorQpcTicks +=
@@ -1351,6 +1368,9 @@ int RunPresenter(
             break;
         }
 
+        // Poll this even without a new render request: a sleeping headset can
+        // otherwise leave a stale mirror covering the live desktop login.
+        desktopMirror.SetRuntimeVisible(presentation.IsSessionVisible());
         if (runtimeTimedProducer)
         {
             if (pendingSourceSequence != 0)

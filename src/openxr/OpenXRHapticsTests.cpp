@@ -64,7 +64,18 @@ int main()
         false,
         bfvr::OpenXRHapticEvent::Hover,
         bfvr::kOpenXRHapticHandRight) && g_callCount == 0;
-    const bool passed = rightMapped && bothMapped && disabled &&
+    const auto bump = bfvr::OpenXRHapticPulseFor(bfvr::OpenXRHapticEvent::FistBump);
+    g_callCount = 0;
+    const bool bumpMapped = bfvr::ApplyOpenXRHapticOutput(CaptureHaptic, (XrSession)1, (XrAction)2,
+        userPaths, true, bfvr::OpenXRHapticEvent::FistBump, bfvr::kOpenXRHapticHandLeft) &&
+        g_callCount == 1 && g_paths[0] == userPaths[0] && bump.amplitude == .35F && bump.durationNanoseconds == 35'000'000;
+    const auto equipment = bfvr::OpenXRHapticPulseFor(bfvr::OpenXRHapticEvent::Equipment);
+    g_callCount = 0;
+    const bool equipmentMapped = bfvr::ApplyOpenXRHapticOutput(CaptureHaptic, (XrSession)1, (XrAction)2,
+        userPaths, true, bfvr::OpenXRHapticEvent::Equipment, bfvr::kOpenXRHapticHandRight) &&
+        g_callCount == 1 && g_paths[0] == userPaths[1] && equipment.amplitude > hover.amplitude &&
+        equipment.durationNanoseconds > hover.durationNanoseconds;
+    const bool passed = equipmentMapped && bumpMapped && rightMapped && bothMapped && disabled &&
         hover.amplitude > 0.0F &&
         hover.amplitude < shot.amplitude &&
         shot.amplitude < death.amplitude &&

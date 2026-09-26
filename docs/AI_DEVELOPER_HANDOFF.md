@@ -1,9 +1,663 @@
 # BFVR AI and Developer Handoff
 
+## Current BF2142 beta invariants (0.2.0-beta.1)
+
+Current status supersedes older private notes: see `docs/ik/README.md`, `docs/BF2_POST_ALPHA_UPDATES.md`, `docs/FLAT_ADDON.md` and `docs/BF2142_BETA_READINESS.md`. Owner authorized release without another headset test; latest visual/haptic fixes are not claimed accepted. Proximity voice with vrtester is user-confirmed.
+
+Shared client/presenter IPC **26**, pose v4/616 bytes, voice v1. Match x86/x64 packages. Independent per-hand equipment counters preserve menu/fist feedback, with guarded reminder pulses and left crate hover.
+
+Relay arm solves can rebase validated detailed collar/arm chains into the live chest while retaining wrist-local finger/item offsets. This isolates observer arms from native recoil. Local first-person arms and existing v35g torso neutral calibration stay unchanged. Collision samples arm segments and rotates on the elbow circle; cosmetic only. Never feed filtered presentation into aim/hitboxes.
+
+Release staging scrubs CodeView paths and verified Opus source roots in non-executable .rdata; executable sections stay byte-identical. No game/generated assets or private fixtures are published. Beta upgrades require uninstalling and preserving/moving the earlier installer folder.
+
+
+## Private v35g neutral bone-frame correction (2026-09-25)
+
+Owner's 22-22-20 recording still shows the belly issue with v35f; do not describe
+v35f's waist correction as visually accepted. Reviewed 48 one-second samples
+from 18 through 65 seconds of the 75.383-second file. Empty hands and rifle
+both show the posture. Live observer had no cached tracked rig during the read;
+no live neutral-pose validation is claimed.
+
+Owned 3p_setup.ske plus third-person skinned-mesh inverse binds establish the
+cause: the neutral bone frames have nonzero pitch. Stored SKE quaternions are
+INVERSE rotations (confirmed using the BF2 Blender importer and mesh products).
+The US neutral skeleton times mesh inverse binds is near identity; PAC meshes
+have a small positional variation but share these orientation calibrations.
+The first geometry in each mesh is first-person; use geometry 1 for 3P checks.
+Native metadata at skeleton+8 is still NOT bind rotations.
+
+SolveRemoteTorso now keeps neutral pitch calibration at joints 11,12,13,45
+separate from anatomical heading/lean/look. Remove the waist bind rotation
+before interpolating into the upper spine, then add each destination's bind
+rotation after interpolation. A neutral model is not a set of identity bone
+axes. Existing joint-pivot propagation, write/restore range 11..74, pelvis/legs
+0..10 and hip gear 75..79 remain unchanged. Exact identity/topology/write guards,
+accepted torso yaw, head orientation, palm/item targets, filtering, collision,
+haptics and local gameplay are unchanged. Shared v25; network v4 / 616 bytes.
+
+New independent rounded-bind regression catches the old false-upright result;
+optional private authored-bind input checks actual neutrality. Both builds and
+71/71 CTests pass; all seven prior captured rigs replay successfully. Offline
+skinning of the owned US mesh: old neutral correction deviates up to 4.8935 cm,
+new neutral solve stays within 0.001 mm of the authored result. This is numerical
+and offline geometry evidence, not visual acceptance in a running headset.
+Captures, decoded bones/meshes and review scripts stay private.
+
+Saved v35g-remote-neutral / v35g-cloud-observer; existing main shortcut selects
+the candidate, observer auto-matches and Previous Build restores v35f. Older
+accepted v35e/v35d remain available. Existing sessions/OBS left running. No
+public release, friend package, server binary deployment or service changes.
+
+Separate owner request to restore bots: current map was Highway Tampa gpm_sl 64
+with 0 bots, because the requested all-map rotation includes non-AI modes.
+Changed through authenticated map control to Suez gpm_coop 16; verified 62 bots
+and both accounts. No process or instance restart. All-map rotation retained.
+
+File-format reference (no code imported into production):
+https://github.com/marekzajac97/bf2-blender/blob/main/io_scene_bf2/core/bf2/bf2_skeleton.py
+https://github.com/marekzajac97/bf2-blender/blob/main/io_scene_bf2/core/bf2/bf2_mesh/bf2_skinnedmesh.py
+
+
+## Private v35f lowest-spine correction (2026-09-25)
+
+Owner confirms v35e side-to-side following works. Screenshot plus recording
+BF2142-VR-2026-09-25-21-59-32.mp4 shows a protruding/arched midsection, possibly
+more obvious on the recon/sniper kit. Requested review begins around 90 s.
+Reviewed 51 frame samples at 0.5 s intervals from 90 through 115 s of the
+142.316 s file. The silhouette is present with empty hands and with the rifle;
+no class-specific mesh diagnosis or continuous playback is claimed.
+
+Previous SolveRemoteTorso began at spine3/bone 12, leaving spine2/bone 11
+native. An aiming arch at 11 can therefore remain under a corrected chest.
+v35f rotates 11 at its unchanged hip attachment toward a standing waist frame,
+retaining that joint's native yaw and half the bounded physical chest lean.
+Standing weight is smoothstep(root up.y, .92, .98), so strongly tilted native
+hips retain the old lower-spine/crouch behavior. Spine3 blends from corrected
+out[11], never the native aiming bend. TorsoHeading, head rotation, arm targets,
+weapon alignment, existing smoothing, collision and haptics are unchanged.
+
+IMPORTANT: native restore/write masks now cover 11..74, not 12..74. The pelvis
+and legs 0..10 and hip gear 75..79 remain native. Exact previous-write matching,
+skeleton/actor identity and full verified topology guards are unchanged.
+Tests reproduce +/- standing lower-back arch and assert posture recovery,
+parent-local attachment preservation, unchanged pelvis/legs, crouch fallback,
+continuous blend and bone-11 write/restore through skipped native animation.
+All 71 CTests, both builds, five prior and two newly read private rigs pass.
+
+Live reads of the still-running observer were read-only. The local rig had
+zeroed matrices and the previous player rig was prone/ragdoll; neither was
+used as proof of the reported standing appearance. Two other populated rigs
+were used only as additional anonymous geometry replays. Native bone metadata
+at +8 is NOT a rest-pose quaternion; do not treat it as such. Game assets and
+captures stay private. No class-specific texture or model changes.
+
+Saved candidates: v35f-remote-waist and v35f-cloud-observer. Next launch selects
+v35f and the observer auto-matches. Previous Build selects v35e; v35d remains
+available with -Build v35d. Current games/OBS and cloud services were untouched.
+Protocol stays network v4 / 616 bytes and shared v25. Visual confirmation of
+the waist correction remains pending; no release or friend package upload.
+
+
+## Private v35e chest-facing refinement (2026-09-25)
+
+The owner accepts v35d's improved IK/body appearance. New recording:
+BF2142-VR-2026-09-25-21-40-48.mp4; start at 35 seconds as requested. Review
+sampled 94 frames at one-second intervals, 35 through 128 seconds (128.416 s
+file), not continuous playback. Chest retains a bladed stance as the arms
+reach across it, visible particularly at 57-62 s; no return of the earlier
+chest/head bunching was observed in those samples. Preserve this baseline.
+
+TorsoHeading now retains less native combat-stance yaw, follows the filtered
+HMD heading at 75%, and admits at most about 12 degrees of additional turn
+from both palms reaching ahead at torso/head height. Smooth geometric weights
+exclude one-handed waves, lowered/overhead hands and behind-body holster grabs.
+Palm orientation and item type do not infer torso facing. Total chest/hip yaw
+is bounded at 0.78 rad. Near-vertical HMD forward loses confidence rather than
+flipping the chest 180 degrees. No new state or packet fields: existing 40 ms
+presentation filtering applies to the inputs; v35d connected spine propagation
+and native hips/legs are unchanged. Local gameplay/aim/IK/haptics unchanged.
+
+New tests cover stance bias, modest symmetric reach, palm-rotation independence,
+single-hand/back/overhead exclusions, absent tracking, turn limit and vertical
+look. Full x86/x64 builds, 71 CTests and all five private rig replays pass.
+v35e-remote-facing / v35e-cloud-observer are private candidates. Main shortcut
+selects v35e, observer auto-matches; Previous Build selects accepted v35d.
+No cloud service, public release, friend package, account or OBS changes.
+Visual acceptance of the new facing adjustment remains pending.
+
+Owner also asked whether equip haptics disappeared after fist-bump work. Source
+still sends the original right-hand holster-entry hover pulse (12%, 15 ms),
+with unchanged routing and enabled configs in v35b/c/d. Separate fist counters
+do not remove it. Runtime cause unconfirmed; owner suspects battery and elected
+to continue IK testing. Do not claim that haptic report fixed or confirmed.
+
+
+## Private v35d torso correction (2026-09-25)
+
+The owner accepts v35c smoothing but reports chest/shoulder distortion. The
+new dual-view video was sampled at one-second intervals from 20 through 35
+seconds, explicitly identified by the owner as clean tracking. Raised hands
+are smooth; the chest armor rises toward the head with stock aiming posture.
+Do not undo the accepted pose filter, wrist/item alignment or elbow continuity.
+
+SolveRemoteTorso previously changed only chest yaw and independently moved
+lower/upper spine weights about one hip pivot. That retained weapon-driven
+pitch and failed to preserve parent-local joint attachment offsets. v35d
+builds a heading/limited-lean chest frame, eases spine3 from native spine2,
+and bends the neck modestly toward the HMD. Each adjusted joint rotates at its
+own attachment and carries its complete subtree. Neck counter-animation no
+longer folds the head into the armor. Hips/legs, prone fallback, collision,
+tracked head orientation and native restore-before-finalize remain unchanged.
+
+New regressions assert attachment offsets, upright chest limits, unchanged
+hips in crouch, and identical chest/shoulder/head placement with and without
+synthetic weapon-pitch/counter-neck animation. The same checks pass on all
+five private captured game rigs. Full x86/x64 builds and all 71 CTests pass.
+This is math/build evidence; the revised body still needs visual acceptance.
+
+Private checkpoints: v35d-remote-body and v35d-cloud-observer. Next main launch
+selects v35d; observer auto-selects the matching build from the primary DLL.
+The Previous Build shortcut selects v35c; explicit v35b remains available.
+Current games and the accepted OBS dual-window setup were left running.
+Network remains v4 / 616 bytes, local shared memory v25, cloud unchanged.
+Nothing published and no friend package replaced.
+
+## Private v35c observer refinement (2026-09-25)
+
+Owner supplied a 141.952-second dual-view recording and accepted the v35b head,
+knife and weapon visibility improvements. Review sampled 68 frames at two-second
+intervals, excluding 70-75 seconds (explicit Steam Link dropout). Remaining
+complaint was stiff/unnatural body motion. Owner also requested collision
+constraints and haptic fist bumps. The candidate is not visually accepted yet.
+
+RemotePresentation filters presentation poses with a 40 ms time constant and
+quaternion interpolation, leaving raw FreshPose/server gameplay untouched.
+Reset on identity/session, discontinuity, invalid input, weapon/held/validity
+changes and a new snap serial. Item pose is reconstructed relative to the
+filtered holding palm. Do not independently smooth an item away from its hand.
+RemoteArmContinuity limits elbow intent changes; RemoteCollision uses bounded
+anatomical torso capsules and empty-hand separation, retaining analytic arm
+lengths. These are cosmetic self-collision constraints, not world collision or
+physical hitbox changes; deliberately contacting weapon grips are exempt.
+
+Torso following requires the full verified on-foot rig. Hips/legs 0..11 and
+hip attachments 75..79 remain native. 3p_setup confirms gear parents 72->13,
+73/74->12; native torso gear follows those bones, never the weapon. Prone rigs
+retain native torso animation. The restoration cache now tracks every changed
+bone, including torso/head/gear, and restores only exact previous mod writes
+before the native finalize callback. Preserve this invariant during LOD work.
+
+FistBump uses fresh authenticated Relay poses in authoritative body coordinates.
+Both hands must be closed and empty; supporting a weapon is excluded. Separate,
+approach and contact produce one local hand pulse, with hysteresis, cooldown,
+stale/session/discontinuity guards and a 100 ms pending-event expiry. Gameplay
+focus/menu/controller gates discard haptics when inactive. Flat observers and
+bot mirrors cannot generate tracked fist bumps. Both VR players need the new
+client/presenter for reciprocal feedback. No new server event or packet field.
+
+Network packet remains v4 / 616 bytes, bridge compatibility v35-community.
+Local client/presenter shared memory is now version 25 with separate left/right
+fist counters; deploy the matching x86 DLL and x64 presenter together.
+
+Private checkpoints: local/multiplayer-lab/checkpoints/v35c-remote-ik and
+v35c-cloud-observer. Main Play-Cloud defaults to v35c. The observer launcher
+selects a matching v35b/v35c runtime from the running primary DLL hash. The
+Previous Build desktop shortcut now selects v35b; its observer auto-follows.
+Saved account/profile and OBS role titles are preserved. No game was started
+for this candidate; native --inspect passed through the PS5 x86 trampoline.
+The v35b binaries and existing friend package are retained. Cloud unchanged.
+
+Validation: complete x86/x64 builds; 71/71 native CTests; all five private native
+rig replays for old and new solvers; actual native observer inspection. No new
+managed protocol behavior. Headset/observer acceptance and two-VR-player haptic
+feel are still required before publication or promising complete clipping fixes.
+
+
+## Same-PC cloud flat observer setup (2026-09-25)
+
+The owner requested reuse of the existing vrtester account for a flat observer
+while the primary client runs in VR. Native --observer-profile now accepts an
+explicit validated --join-server HOST --port PORT as well as --join-local; it
+still requires flat mode, redirects Documents before native main, and holds
+the exclusive observer profile lock. Primary duplicate guards are unchanged.
+Managed Join.CreateLaunchInfo builds and tests the actual process arguments;
+remote observers have separate settings/bridge ports and receive-only voice.
+URI links still cannot supply profile paths.
+
+Private checkpoint: local/multiplayer-lab/checkpoints/v35b-cloud-observer. It
+retains the exact v35b client DLL and changes only the native launcher. The
+owner/friend v35b runtimes and rollback are unchanged. Private cloud observer
+runner and Play-Cloud-Observer.ps1 reuse profiles/ObserverDocuments and
+config/ObserverVR.ini; the desktop shortcut is BF2142 - Flat Observer.
+Start the primary VR client first; close the observer before restarting VR.
+No headset/game restart was performed during setup; the user's open game
+was left running. Actual two-client cloud admission/visual IK remains pending.
+
+x86/x64 builds, all 70 CTests, 279 managed checks and the staged native
+--inspect pass. Inspection does not launch a game or contact the server.
+Private OBSERVER-QUICKSTART.md documents account/focus/recording steps.
+
+## Cloud game server resumed at owner request (2026-09-25)
+
+The existing server task was restarted. Verified native game and addon bridge
+listeners, authenticated RCON with 64 slots/voting enabled, and 62 bots. The
+server is ready at its existing address; no AWS configuration was changed.
+Private current status: local/cloud/bf2142-vr-test/SERVER-STATE.md.
+Owner asked about a flat observer while in VR: an outside player with the v35b
+addon can test it. A second same-PC instance requires the isolated observer
+setup/account; the standard cloud launcher is not a dual-instance launcher.
+
+## Cloud game server paused at owner request (2026-09-25)
+
+After the launcher update the owner agreed to pause the idle game server.
+No humans were connected. Native exit acknowledged; the owned background task
+was stopped, and zero game/addon processes or sockets were verified. The AWS
+instance remains running; spending/deletion safeguards are unchanged. Before
+the next multiplayer test, start the existing BF2142VR Test Server cloud task
+and check readiness. Local client launch does not resume the cloud service.
+Private status: local/cloud/bf2142-vr-test/SERVER-PAUSED.md.
+
+## Private v35b remote weapon correction candidate (2026-09-25)
+
+Owner clarified the pistol looks okay, the knife stays in native animation,
+and the assault rifle is very buggy. These are explicit reports. The earlier
+headset-off movement around 2:30 is intentional and excluded.
+
+The outgoing anatomical palm now cancels the captured animated wrist with an
+exact inverse within the existing near-rigid acceptance bound. A regression
+reproduces the prior transpose multiplying a valid small native scale error
+until the canonical knife palm fails packet validation. Shared
+InverseAnimatedTransform contains the former InverseAnimatedBone math; the
+receiver wrapper retains its existing behavior. Local rendered hand solving,
+head/torso IK and server gameplay are unchanged.
+
+Receiver knife/knife_unlock, eu_ar_rifle/as_ar_rifle and support-crate mesh1
+roots now use the already-transmitted item pose. Mesh2..8 retain their native
+relative animation; mesh9..16 are body equipment and must NOT be moved with
+the item. Pistol/unknown-mod and unlike-bot mirror bindings stay unchanged.
+Native selected-weapon identity must match real relays before applying a pose.
+A per-actor cache restores only exact previous mod arm/item writes before the
+native animation callback, so skipped/partial native LOD updates cannot reuse
+stretched IK as authored limb lengths. Cache is allocated once per tracked
+actor; unrelated native changes, head, torso and gear are not restored.
+
+Saved at local/multiplayer-lab/checkpoints/v35b-remote-weapons/runtime.
+Full x86 and x64 presenter builds pass, all 70 CTests pass, and all five private
+native rig replays pass. Owner then authorized launcher activation: cloud
+Play-Cloud.ps1 now defaults to v35b, with explicit -Build v35 rollback. Desktop
+BF2142 VR / Multiplayer Test and the SteamVR Launch-VR-Dev.cmd entry point use
+the cloud launcher; a Previous Build shortcut retains v35. The cloud service
+is unchanged. Private dist/BF2142-Flat-Playtest-v35b.zip contains the signed
+revision-3 flat update. Its exact EXE passes the v35-to-v35b offline upgrade,
+all 13 file hashes and zero-download check. Both sender and receiver need the
+new DLL for the complete fix; visual acceptance is still pending.
+
+This candidate includes the saved v35a finger work. It is a private candidate,
+not a visual acceptance claim or a new public/friend release. Confirm knife
+tracking, raised rifle attachment/arms, left crate and retained pistol behavior
+with actual sender/observer views before calling those reported bugs resolved.
+
+## Private v35a receiver and voice investigation (2026-09-25)
+
+The owner's external flat tester confirmed remote IK visually in a Streamable
+clip (e0xcjz). Empty hands retained weapon-grip fingers. Packet v4 already carries
+10 curl values; the remote solver ignored them. PoseRemoteFingers now applies
+those values after each successful arm solve. 3p_setup.ske has ring/index/thumb
+chains at 21/24/27 (left) and 36/39/42 (right), with 3 bones each; it cannot expose
+five independent third-person fingers. Native finger parent topology is checked.
+New tests cover curl direction, individual hand/chain changes, lengths, held
+contact, invalid data and transformed frames. All 70 native CTests and x86/x64
+builds pass; detailed and collapsed private 80-bone captures also pass. Stage as
+v35a-remote-fingers for later acceptance. Do not replace a running user's DLL.
+
+Cloud voice did send real microphone packets in both directions: the owner's
+VR session counters reached 6525 sent, 1111 received and 1154 played, with WinMM
+input/output errors zero. Both clients had encrypted addon admission concurrently.
+This is transport/decode/playback submission, not confirmed audible speech.
+The owner heard no prox audio. Windows default input/output resolve to Steam
+Streaming Microphone/Speakers. Muting false, voice enabled, volume 1, threshold
+-40 dB. Foreground/tracking gating paused capture while the owner used desktop.
+The new flat session received 71 voice frames but sent none during observation;
+Windows defaults still target Steam devices. Asked which desktop mic/output to
+use; do not assume Kanto speakers vs HyperX headphone jack. Do not change global
+Windows defaults or send synthetic audio to the cloud without a focused test.
+
+A later expanded review of the entire external clip timeline (one-second
+samples plus close-ups) confirms the support crate floats near the waist while
+the left hand moves (0:28-0:36), and empty-hand fingers stay fixed (1:35 onward).
+IMPORTANT OWNER CORRECTION: around 2:30 the headset was removed and deliberately
+moved around. Exclude that head/neck strain from the bug list; do not clamp or
+change head/torso IK based on this intentional movement. The owner subsequently confirmed knife fallback and buggy rifle IK; pistol
+looks okay. Exact angular corrections still need sender-view comparison. The v35a finger patch does not fix crate attachment. Private
+timestamped findings are in working/ik-full-review. The popup at 2:47 is ordinary
+"Menu loading", not a voice setup popup.
+
+The desktop briefly became unusable. By the stop attempt the game and presenter
+had already exited; launcher reported game exit 0. Owner confirmed recovery.
+Do not claim a crash diagnosis or that the stop command killed a process. Owner
+then requested flat play and rejoined the same cloud through Play-Cloud.ps1 flat.
+Review browser is isolated/muted and should be closed when clip review finishes.
+Private diagnostic tools: Read-AudioDevices.py, Observe-Lab-VoiceDetail.py.
+
+## Private v35: live cloud connection reached (2026-09-25)
+
+Read BF2142_COMMUNITY_HOSTING.md. Real native ClientCommand challenges now pass
+both the local lab and the owned cloud Windows dedicated host. A real flat
+client joined Suez Titan over the public internet; TLS pinning, native ownership
+proof and encrypted addon admission succeeded. This is not yet a two-person
+internet IK/voice acceptance or a Quest microphone test. The public release is
+still alpha.1; v34 remains the selected rollback. Native x86/x64 builds and 70
+CTests passed earlier; the current managed suite passes 258 checks.
+
+The cloud originally crashed at dedicated RVA 0x38609: the legacy backend init
+failed and its subsequent getter returned null. sv.internet 0 stayed alive;
+applying the documented OpenSpy dedicated patch's five domain replacements to
+a backed-up private executable made sv.internet 1 work. Never ship that game
+executable. Preserve native signature checks after third-party patches. The
+cloud runs as a limited local user, with only SeBatchLogonRight added for its
+startup task. RCON, native pose/audio, and proof sockets remain localhost-only.
+
+HostSetup now forwards launcher diagnostics, reports nonzero native exits, and
+waits for the RCON exit acknowledgement. Closing the RCON socket immediately
+after writing exit could lose the command. These latest managed source fixes
+pass tests but are NOT yet deployed to the running cloud NativeAOT helper.
+Manage-Maps.ps1 provides List/Change/Next through localhost RCON and validates
+that a selected map belongs to the live rotation (co-op, Conquest, assault,
+assault lines or Titan). Runtime next-map/current
+indices confirmed a change to Minsk. Cloud starts on Suez after a normal restart.
+
+Owner chose the quicker Conquest/co-op bot test. The cloud has 64 slots and
+62 actual bots verified in Suez gpm_coop 16. All 20 installed maps are in the
+saved/live rotation and map voting is enabled. Only Suez, Belgrade, Cerbere,
+Berlin and Verdun stock co-op layouts have bots; Wake and other modes are
+human-only. Layout 16 is separate from the 64 player-slot setting. Both the
+owner and an outside friend have joined the native game; their two-addon
+IK/voice verification is still pending. A map change back to Suez was requested
+after the rotation advanced to Gibraltar. Do not resize the 2 GB instance.
+
+Private cloud state, connection fixtures, credentials, crash dump and remote
+scripts are outside this repository under the local cloud workspace. A private
+fixed-host development runner uses the existing v35 runtime for the successful
+cloud join; it is not the signed public downloader. The private flat join EXE now bundles one signed flat ZIP using BFJOIN02;
+OfflineBundle verifies its descriptor, exact archive and every file before use.
+It avoids HTTPS package hosting for this first friend's test; offline updates
+are manual. The normal BFJOIN01 online updater remains available. Flat package
+verification does not require a headset. Exact bundled files/install are checked,
+while the outside friend's first addon launch and IK/audio are pending. Full VR
+packaging, setup payload.json and HTTPS/public distribution remain pending.
+The one-month AWS deletion schedules, cost emails and five-minute traffic guard
+are configured; SNS traffic-email subscription confirmation remains unconfirmed.
+No cloud resize or additional paid instance was performed.
+
+
+## Owner priority: internet play and automatic flat-client setup
+
+The owner need not stay in the headset or keep the local match open while we
+implement networking/hosting. Batch the remaining Quest mic/native squad-radio
+check later. Download-on-join is an explicit hosting requirement: build toward
+one-time helper/launcher setup and automatic versioned addon download + join,
+with a lightweight flat IK/proximity package and no SteamVR requirement.
+A completely unmodified client cannot presently fetch/load our injected DLL
+from a server join; do not claim that bootstrap is solved. Reclamation Hub
+integration is a possible route, not an agreed integration. See the new internet
+hosting and automatic flat-player setup sections of BF2142_ROADMAP.md.
+
+## Private proximity voice candidate (v34)
+
+Read BF2142_VOICE.md and BF2_POST_ALPHA_UPDATES.md. Preserve the selected v33i
+rollback. This adds a separate Opus/WinMM loopback voice relay on 17569, admitted
+only after the existing pose/subscription session matches the live native owner.
+The native team getter is player vtable +0xf8 -> server RVA 0x13e930, verified
+against `mov eax,[ecx+0xd8]; ret` and the native Python `pmgr_p_get("team")`
+callsite at 0x106ebc. Unknown team denies teammates-only voice. No native writes
+or changes to pose protocol v4/presenter IPC v24 were introduced for audio.
+Host `[Voice]` defaults: everyone nearby, 20 m; disabled unless explicitly enabled
+in BF2142VR_NETWORK. Input capture requires live state/focus and (in VR) fresh
+focused controls. Radio pauses proximity. Settings UI names its mute as proximity
+only; native V/B remain available. Observer script uses independent preferences
+and receive-only mode to avoid two microphones on the same PC. WinMM/Opus live
+on a separate worker and no raw microphone recording is made. The codec source
+and licenses are vendored, but no new game assets are included.
+70 CTests, x86/x64 builds, real WinMM output and stereo GPU smoke passed.
+Two real native clients passed the proximity path on Suez: synthetic 440 Hz
+through VB Cable -> primary WinMM capture -> Opus -> live native server relay
+-> observer decode -> WinMM output; 62 sent/received, 63 played including PLC,
+zero device errors. No microphone recording was saved. Quest microphone/radio
+and audible headset quality remain pending. The primary INI has been restored
+to communications-default input/output for its next launch; the still-running
+desktop process retains the temporary cable input until restart. Observer uses
+receive-only mode and its separate speaker output preferences.
+Public hosting remains separate work: both custom transports are loopback-only;
+external authentication/encryption and deployment require their own design/test.
+Roomscale walking is explicitly deferred at the owner's request.
+
+
+## Physical shoulder radio candidate (v33i, private)
+
+The owner requested an actual weapon-like hand grip/press on an upper-left
+shoulder radio. ShoulderRadio now requires a new left squeeze inside an 11.5 cm
+contact region, then holds until release, tracking/focus/menu/owner loss, recenter
+or pulling 27 cm away. The thumb depresses a 4 mm switch in about 60 ms before
+native V is held. An entry with squeeze already held cannot activate voice.
+The old v33h left-trigger/stick chord is removed; ordinary sprint is unchanged.
+The body anchor remains available when holster visuals are disabled, but its
+weapon selection outputs are explicitly suppressed in that case.
+
+The radio is procedural geometry, drawn once per eye before native HUD isolation,
+with the native close-weapon projection and depth testing. Do not replace it with
+an overlaid body-prop bitmap: fingers must occlude the casing. D3D state is restored;
+no proprietary meshes or textures are added. The left palm has a dedicated fixed
+contact pose, disables support/pistol bracing, and has independent finger curls.
+A bounded thumb-only FABRIK solve reaches the moving switch while preserving bone
+lengths; an unreachable contact retains the normal grip. NativeHands publishes
+radio and controller data together with the same generation/freshness gate.
+The right weapon/hand are not retargeted. Existing held crates have priority.
+Remote palms already relay the shoulder pose; remote radio meshes/fingers do not.
+
+A new left haptic counter requires shared presenter IPC version 24. Always deploy
+matching x86 client and x64 presenter. Multiplayer pose wire protocol stays v4.
+69 Win32 tests, x64 build, actual D3D9 stereo/depth/state smoke (MSAA on/off), and
+16 captured native first-person hand frames verify mechanics. Captured thumb
+contact error is below 0.5 mm without changing the right-hand/weapon output.
+Actual shoulder ergonomics, native in-game depth appearance and audio delivery
+still need the combined headset/observer check. This is a private candidate.
+
+The private lab server had sv.voipEnabled 0; backed-up config now enables native
+VoIP. Both profiles already had VoIP and push-to-talk on. Runtime setting readback
+became 1 but service ports did not appear: a server restart/audio test is pending.
+No microphone device or open-mic preference was changed. Native stock V supplies
+squad talk; stock B/commander routing is not remapped. Requested voice-activated
+proximity with mute controls needs a separate audio path and is not implemented.
+The next milestone is actual native squad audio between the two clients, followed
+by no-button proximity and commander/leader radio design. Addon auto-download is
+still future work. Do not claim working voice from the radio's visuals/input.
+
+
+## Explicit standing recenter and remote head rotation (v33g, private)
+
+The user returned from OBS, recentered the camera, and remained natively crouched.
+StereoSession previously retained an independent standing Y. Right-stick click,
+Home, presenter explicit recenter and Calibrate Standing Height now also capture
+current LOCAL Y and reset PhysicalStance's debounce/toggle state. Zero is a valid
+session calibration; saved preferences cannot overwrite an explicit session reset.
+Automatic focus/spawn camera recenters do not redefine standing height. Native
+prone exits through the existing bounded toggle/retry policy, not memory writes.
+
+Protocol v4 already relays the head in soldier-local coordinates. ApplyRemoteNetworkPose
+now solves its orientation independently from arm reach/binding. The supported
+3p_setup rig has head 47, with face descendants 48-63; verify every id/parent
+before those writes. Keep bone 47's native position and transform the entire
+face subtree by its old-to-tracked rotation. The checked native setup has a
+neutral +X right/+Y up/+Z forward head basis. Preserve neck, torso, legs, item
+attachments and arm output. Local rigs, stale poses, mounts, dead actors and
+unknown face topology retain native head animation. No tracked positional neck
+or torso solve, facial gestures or networked finger retargeting is claimed.
+
+68 Win32 CTests, x64 build, five captured native rigs (with a detailed palm
+reference for collapsed LODs), and the basic real D3D9 stereo/pause fixture pass.
+Tests cover LOCAL-origin recenter from crouch/prone, zero-height calibration,
+head yaw/pitch/roll, invariant face offsets and neck attachment, and independent
+head/arm fallback through the actual remote animation callback. The user's
+previous v33f recording shows actual human-to-human arm motion and empty hands,
+then weapon redraw, but also the reported crouch fault. Head rotation in v33g
+remains a new, unaccepted headset-visible candidate. The saved v33f is rollback.
+
+Voice is now requested: voice-activated proximity plus a physical squad radio.
+The stock dedicated installation includes its VoIP component and server manual;
+first verify native squad delivery, then add proximity. Addon delivery is later.
+
+
+## Receive-only observer and remote empty hands (v33f, private)
+
+The launcher now supports --network-observer: native flat rendering/input, no
+OpenXR session, synthetic controllers or local VR controls. The matching
+protocol-v4 server accepts a separate authenticated Subscribe lease and relays
+other players' poses to it, including while the observer is unspawned. Leases
+expire after one second, have sequence/session/port checks, and never provide
+tracked fire, movement, snap or throw authority. This is still loopback-only.
+
+For two clients on one PC, add --observer-profile "ABSOLUTE ISOLATED DOCUMENTS"
+and an explicit --join-local PORT or --join-server HOST --port PORT to the
+flat observer. Before native main resumes, this child's
+SHGetFolderPathW Documents lookup is redirected and an exclusive profile lock is
+held for its lifetime. Primary Documents/profile paths are rejected. Only this
+explicit observer mode allows the additional instance (+multi 1); ordinary
+launches keep their existing duplicate-process guard. Use a separate account.
+Launch the normal primary game first, then the isolated observer. Close the
+observer before restarting a normal primary launch.
+
+The first flat observer hit RendDX9_ori+0x127c during loading. That path lacked
+the existing native query guard used by stereo. Observer startup now installs
+that same signature-checked guard independently; the rerun loaded successfully
+and logged the missing-query fallback without crashing at that point.
+
+Fresh remote empty-hand poses now suppress only the held weapon's own bundled
+mesh submission and shadow callbacks. The verified geometry owner is +0x290;
+weapon +0x44 points back to it. Renderer vtable +0x1d5400 slots +0x18/+0x20 and
+function signatures guard the draw hooks (+0xc5030/+0xc67e0). The decision checks
+current inventory, native player/weak/soldier ownership, mount/death state, pose
+age, held flags and weapon name. Explicit AI mirror diagnostics permit a different
+bot weapon; normal relays require matching human weapon identity. No shared mesh,
+material, skeleton, inventory or gameplay flags are modified. Missing tracking,
+weapon switches and stale/unknown owners retain native drawing on the next call.
+This candidate still needs visual acceptance with actual VR input.
+
+68 Win32 CTests pass, including separate UDP observer relay, no observer action
+publication, native mesh/shadow call forwarding and owner/dropout transitions,
+and real process-local Documents redirection/exclusive locking. x64 builds.
+The live lab ran two BF2142 processes simultaneously with distinct accounts;
+both connected to the dedicated server. The second profile opened with empty
+login fields and stored files under its isolated Documents root. Its query and
+remote-weapon draw profiles installed successfully. Two connected flat clients
+are not proof of headset-to-observer IK/empty-hand appearance or internet play.
+
+The previous bot video proves transmitted arm motion, but visual IK quality is
+inconclusive: the bot retained its gun/combat AI, and the temporary position
+fixture placed it on a railing. Do not repeat that fixture as a visual acceptance
+test. Remote fingers/head retargeting, haptic fist bumps and voice remain pending.
+
+
 This is the primary continuation guide for human developers and AI coding
 agents taking over BFVR. It explains what the major pieces do, which behaviors
 must be preserved, and how to verify changes. It is intentionally more current
 and task-oriented than the chronological `devREADME.md`.
+
+## Desktop mirror and sleeping headsets
+
+The owner could not see/click Login with the headset off. The presenter had
+consumed one frame and remained in SYNCHRONIZED, covering the live native UI
+with its initial partially drawn login. Hiding only BFVRDesktopMirrorCanvas
+exposed the actual game, which was already loading the Titan server. Saved
+credentials were intact; this was a stale desktop preview, not an auth failure.
+
+Poll IsSessionVisible even when no new source request arrives. Hide the child
+canvas outside VISIBLE/FOCUSED; waking waits for a newly accepted source frame
+before showing it. Create/resize never force a stale canvas visible. Retain
+normal last-frame recording during visible source gaps; do not restore flat
+gameplay rendering at the XR fence. The owner remains on v33c while this
+presenter-only follow-up is staged; no live restart is needed for development.
+
+## Objective marker preference: v33d
+
+The owner identified the floating Titan/silo symbols and explicitly requested
+that they be hidden. Native Left Alt (c_GI3dMap) removed them in the live v33c
+match; a capture confirms the minimap and top Titan health bars remain. This
+accepts hiding the markers, not the earlier stereo-projection correction.
+
+The next client defaults HideWorldMarkers=1 and uses the verified native
+culled-point sentinel (0,0,-1,0) for type-3 glued world-marker projections,
+including both icon positions and scope calls. Preserve the original call,
+return pointer, other tag types and unglued labels. The profile additionally
+verifies native sentinel bytes at RendDX9+0xf38cd. Only enabled VR hides them;
+HideWorldMarkers=0 retains the optional v33c projection candidate. No game
+archives, minimap data, server objects or native player-name code are changed.
+
+## Titan direction-marker candidate: v33c
+
+The owner reached Suez Titan on the actual v33b VR client and dedicated server.
+The reported duplication is the in-world Titan arrows, NOT the HP bars/top HUD.
+CPU eye/UI captures showed clean HUD isolation; do not change the HUD capture
+or menu panel to address this. Native nametags use RendDX9+0xef210 to project
+3D-map items, with independent +/-0.65 NDC edge clamping. Equal clamped NDC on
+asymmetric OpenXR eyes describes different directions.
+
+v33c hooks that signature-checked projection, preserving its native call and
+return pointer. Only type-3, glue-to-edge markers inside an ordinary stereo eye
+are corrected. Derive one head camera from the current eye/request, choose the
+edge direction in the common eye frustum, then project the same 100-metre cue
+into each eye. In-view markers retain their actual world point. Scope/outside-eye
+calls, ordinary player labels and unknown profiles use the native result.
+Native visibility/selection remains in charge; no game archives are changed.
+
+66 CTests and ten D3D9 GPU fixtures pass, including asymmetric-eye ray agreement,
+rigid-frame invariance, native fallback/return handling and identical reconstructed
+head frames across both GPU eye passes. x64 also builds. The renderer signatures
+were verified read-only against the live process. Actual v33c marker appearance
+and current-build bot-mirror arm IK still require in-game acceptance. Protocol v3
+is unchanged; the existing v33b server can remain running. Accepted v33b is the
+private rollback. No public release or SP experiment has been changed.
+
+## Multiplayer movement and visible weapons: v33a/v33b
+
+v33a fixes the invisible hands/weapon report. NativeRender copies the current
+world-eye matrix into the weapon camera before first-person drawing. It ALREADY
+contains HMD motion/IPD. The pre-render weapon camera can still be at (0,100,0)
+or an older spawn. CameraSetterHook must accept this native copy for normal
+motion hands; retain explicit overrides for world, scope and legacy trackedWeapon.
+A fresh real dedicated spawn and move/turn capture show hands and gun with v33a.
+The old note calling this desktop-only was incorrect. The XR fence fix stays.
+
+v33b additionally addresses movement diverging from the recoil-free view. In a
+native desktop match, W traveled at -0.188 degrees while the rendered heading
+was -4.464 degrees: native view yaw retained 4.274 degrees of accumulated recoil.
+NativeComfort's movement getter wrapper replaces only the exact walking/sprint
+basis read: client getter 0x189000, return 0x18b033; server getter 0x12bab0,
+return 0x12d7d6. Verify entry/tail/call bytes. Native getter side effects are kept,
+all other calls return its original pointer, and no camera/body memory is changed.
+The temporary level matrix applies tracked movement yaw minus removed recoil.
+The keyboard/left stick then use ordinary forward/strafe keys without applying
+tracking yaw twice. Preserve stock speed, sprint eligibility, pose/fire and IK.
+
+Client ownership is exact live local infantry plus weak identity, focus and
+150 ms tracking freshness. Menus, recenter, reset, mounts and tracking loss
+invalidate it. Server requires a fresh authenticated matching-weapon human pose,
+foot state and its input thread; flat players and AI retain their native basis.
+Protocol v3 appends a bounded movement offset and MovementValid flag (616 bytes).
+Use a matched client/server pair; v2 checkpoints must be rolled back together.
+65 CTests, x64 build and 10 real D3D9 GPU cases pass, including 720 recoil/turn/
+view agreement cases and native caller/owner/freshness guards. A fresh v33b
+dedicated spawn shows hands/gun. After firing, unobstructed W travel measured
+48.550-48.561 degrees against the 48.555-degree comfort heading (native input
+50.470 degrees, removed recoil 1.915). Stair/collision slides were excluded.
+On 2026-09-24 the owner accepted the actual v33b VR multiplayer session:
+"works great." Individual movement settings and sprint cases were not separately
+reported. Current-build mirrored arm IK, Titan gameplay and two real VR clients
+remain pending. A simulated head-turn walk was interrupted by focus loss; no
+result is claimed for it. Private validation.json retains these distinctions.
+
+Private checkpoints remain outside source. v33a is a separate weapon-camera-only
+checkpoint, v33b adds movement. Normal/public v30 and SP experiments are untouched.
 
 ## Multiplayer turn/crate/render work: v33
 
@@ -35,9 +689,9 @@ accepted renderer timing on every completed pair.
 Verification so far: x86 build/64 CTests, x64 presenter build, 13 real D3D9 GPU
 cases, a 30-degree dedicated/client heading match, and a native server-created
 left-hand medkit throw at the measured controller release velocity. Headset-visible
-completion and two real clients still require testing. A desktop-only viewmodel
-visibility issue reproduced with both v33 and the saved v32a DLL in the same lab;
-do not attribute it to the utility port or claim headset visual validation.
+completion and two real clients still require testing. The viewmodel visibility
+issue reproduced with both v33 and the saved v32a DLL; see the v33a fix above.
+Do not claim headset visual validation from the desktop result.
 The scene-flicker fix addresses a proven flat-render fallback at the XR consumer
 fence; whether it completely resolves the owner's headset report is still pending.
 

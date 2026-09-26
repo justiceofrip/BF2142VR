@@ -26,16 +26,16 @@ try {
   if(-not $NoShortcut){
    try {
     $shell=New-Object -ComObject WScript.Shell
-    $linkPath=Join-Path ([Environment]::GetFolderPath('Desktop')) 'Battlefield 2142 VR Alpha.lnk'
+    $linkPath=Join-Path ([Environment]::GetFolderPath('Desktop')) 'Battlefield 2142 VR Beta.lnk'
     $link=$shell.CreateShortcut($linkPath)
     $ps=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $expected='-NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $installed 'tools\Player.ps1')+'" -Action Play'
-    if((Test-Path -LiteralPath $linkPath) -and ($link.TargetPath -ne $ps -or $link.Arguments -ne $expected)){Write-Warning 'An existing Alpha shortcut was left untouched. Use Play VR.cmd in the game''s BF2142VR folder.'}
-    else {$link.TargetPath=$ps;$link.Arguments=$expected;$link.WorkingDirectory=$installed;$link.Description='Battlefield 2142 VR Alpha';$icon=Join-Path $installed 'generated\BF2142VR.ico';if(Test-Path -LiteralPath $icon){$link.IconLocation=$icon};$link.Save()}
+    if((Test-Path -LiteralPath $linkPath) -and ($link.TargetPath -ne $ps -or $link.Arguments -ne $expected)){Write-Warning 'An existing Beta shortcut was left untouched. Use Play VR.cmd in the game''s BF2142VR folder.'}
+    else {$link.TargetPath=$ps;$link.Arguments=$expected;$link.WorkingDirectory=$installed;$link.Description='Battlefield 2142 VR Beta';$icon=Join-Path $installed 'generated\BF2142VR.ico';if(Test-Path -LiteralPath $icon){$link.IconLocation=$icon};$link.Save()}
    } catch {Write-Warning 'Could not create the desktop shortcut. Use Play VR.cmd in the game''s BF2142VR folder.'}
   }
   Write-Host "Ready: $installed\Play VR.cmd"
-  Write-Host 'Connect your headset, start SteamVR, then launch Battlefield 2142 VR Alpha.'
+  Write-Host 'Connect your headset, start SteamVR, then launch Battlefield 2142 VR Beta.'
   exit 0
  }
  if(-not(Test-Path -LiteralPath (Join-Path $root 'install.json'))){
@@ -48,7 +48,7 @@ try {
  }
  if($Action -eq 'Uninstall'){
   Run-Worker @('uninstall','--root',$root)
-  $linkPath=Join-Path ([Environment]::GetFolderPath('Desktop')) 'Battlefield 2142 VR Alpha.lnk'
+  $linkPath=Join-Path ([Environment]::GetFolderPath('Desktop')) 'Battlefield 2142 VR Beta.lnk'
   if(Test-Path -LiteralPath $linkPath){
    $shell=New-Object -ComObject WScript.Shell;$link=$shell.CreateShortcut($linkPath)
    $expected='-NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $root 'tools\Player.ps1')+'" -Action Play'

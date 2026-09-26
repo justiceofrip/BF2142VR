@@ -1,6 +1,8 @@
 #include "NativeRoster.h"
 #include "LoopbackTransport.h"
 #include "../GrenadeArc.h"
+#include "../MovementFrame.h"
+#include "../voice/VoiceProtocol.h"
 #include <MinHook.h>
 #include <cstdio>
 #include <cstdarg>
@@ -11,8 +13,9 @@
 namespace bfvr::bf2142::net {
 namespace {
 BYTE* game=nullptr;void* manager=nullptr;HANDLE logFile=INVALID_HANDLE_VALUE;Settings settings;Transport transport;
+voice::Server voiceServer;bool voiceReady=false;
 DWORD ownerThread=0;ULONGLONG lastPump=0;std::array<Actor,256> actors{};
-struct Peer {FreshPose pose;void* weak=nullptr;unsigned port=0,mirror=256;bool reported=false;
+struct Peer {FreshPose pose,subscription;void* player=nullptr;void* weak=nullptr;unsigned port=0,mirror=256;bool reported=false;
  EventWindow snaps,throws;float pendingSnap=0;ULONGLONG snapTime=0,throwTime=0;
  Packet pendingThrow{};void* throwWeapon=nullptr;
 };
@@ -21,12 +24,20 @@ using Constructor=void*(__thiscall*)(void*);Constructor originalConstructor=null
 using Lookup=void*(__thiscall*)(void*,int);Lookup originalLookup=nullptr;
 using List=void*(__thiscall*)(void*);List originalList=nullptr;
 using Launch=const Matrix*(__thiscall*)(void*);Launch originalLaunch=nullptr,originalCrateLaunch=nullptr;
+using MoveCameraGetter=const Matrix*(__thiscall*)(void*);MoveCameraGetter originalMoveCamera=nullptr;
+thread_local Matrix movementCamera{};
 using LookDelta=float(__thiscall*)(void*);LookDelta originalLook=nullptr;
 using Fire=void*(__thiscall*)(void*,const Matrix*,const Matrix*,const stereo::Vec3*);Fire originalFire=nullptr;
 thread_local Matrix mappedLaunch{},mappedGun{};thread_local void* mappedReceiver=nullptr;thread_local unsigned mappedId=256,mappedSequence=0;
 unsigned shots=0,snaps=0,crateShots=0;
 thread_local stereo::Vec3 mappedVelocity{};thread_local std::uint32_t mappedThrowSerial=0;
 bool Crate(const Actor& a){return !std::strcmp(a.name.data(),"unl_hub_medic")||!std::strcmp(a.name.data(),"unl_hub_ammo");}
+bool MovementProfile(){
+ const BYTE getter[]={0x55,0x8b,0xec,0x81,0xec,0xf8,0,0,0,0x8b,0x81,8,2,0,0,0x8b,8,0x56,0x8b,0x71,0x10};
+ const BYTE tail[]={0x8b,0x10,0x8b,0xc8,0xff,0x52,0x78,0x5e,0x8b,0xe5,0x5d,0xc3};
+ const BYTE caller[]={0x8b,0xcb,0x89,0x45,0xfc,0xe8,0xda,0xe2,0xff,0xff,0x8b,0xf0,0x8b,0x4e,0x20,0x8b,0x56,0x28};
+ return !memcmp(game+0x12bab0,getter,sizeof(getter))&&!memcmp(game+0x12bb3b,tail,sizeof(tail))&&!memcmp(game+0x12d7cc,caller,sizeof(caller));
+}
 bool EventProfile(){
  const BYTE look[]={0x8b,0x81,0x18,2,0,0,0x83,0xf8,0xff,0x74,0x3f,0x8b,0x91,0x88,1,0,0};
  const BYTE tail[]={0xff,0xa0,0x20,1,0,0};
@@ -48,18 +59,47 @@ bool ProfileValid(){
   const BYTE list[]={0x8d,0x41,0x0c,0xc3};
   const BYTE launch[]={0x55,0x8b,0xec,0x83,0xec,0x10,0x53,0x56,0x8b,0xf1,0x8b,0x4e,0xfc,0x57};
   const BYTE fire[]={0x55,0x8b,0xec,0x83,0xec,0x28,0x53,0x56,0x8b,0xf1,0x8b,0x4e,0x0c,0x8b,0x81,0xa0,1,0,0,0x57};
-  return EventProfile()&&!memcmp(game+0x3f540,constructor,sizeof(constructor))&&Read<void*>(game,0x3f54b)==game+ServerProfile.managerVt&&
+  return MovementProfile()&&EventProfile()&&!memcmp(game+0x3f540,constructor,sizeof(constructor))&&Read<void*>(game,0x3f54b)==game+ServerProfile.managerVt&&
    !memcmp(game+0x3e6f0,lookup,sizeof(lookup))&&!memcmp(game+0x3dd50,list,sizeof(list))&&Read<void*>(game+ServerProfile.managerVt,0x20)==game+0x3e6f0&&Read<void*>(game+ServerProfile.managerVt,0x40)==game+0x3dd50&&!memcmp(game+0x1999d0,launch,sizeof(launch))&&!memcmp(game+0x19a8b0,fire,sizeof(fire))&&
    Read<void*>(game+ServerProfile.managerVt,0x30)==game+0x3dd70&&Read<void*>(game+ServerProfile.fireVt,0xd4)==game+0x1999d0;
  }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
 }
+int VoiceTeam(const Actor& a){
+ __try {
+  const BYTE getter[]={0x8b,0x81,0xd8,0,0,0,0xc3};
+  const BYTE caller[]={0x8b,0x16,0x8b,0xce,0xff,0x92,0xf8,0,0,0};
+  if(!a.player||Read<void*>(a.player,0)!=game+ServerProfile.playerVt||
+   Read<void*>(game+ServerProfile.playerVt,0xf8)!=game+0x13e930||
+   memcmp(game+0x13e930,getter,sizeof(getter))||memcmp(game+0x106ebc,caller,sizeof(caller)))return 0;
+  const int team=Read<int>(a.player,0xd8);return team==1||team==2?team:0;
+ }__except(EXCEPTION_EXECUTE_HANDLER){return 0;}
+}
+void PumpVoice(ULONGLONG now){
+ if(!voiceReady)return;voice::Members members;
+ for(unsigned i=0;i<256;++i){const auto& a=actors[i];const auto& p=peers[i];
+  if(!a.player||a.ai||!a.soldier||!InverseRigid(a.body)||p.player!=a.player||p.weak!=a.weak)continue;
+  auto& m=members[i];m.alive=true;m.owner=reinterpret_cast<std::uintptr_t>(a.weak);
+  m.session=p.pose.received?p.pose.packet.session:p.subscription.received?p.subscription.packet.session:0;
+  m.position={a.body.values[3][0],a.body.values[3][1],a.body.values[3][2]};m.team=VoiceTeam(a);
+ }
+ voiceServer.Pump(members,now);
+}
 void Pump(){
  if(!manager||GetCurrentThreadId()!=ownerThread)return;const auto now=GetTickCount64();if(now-lastPump<15)return;lastPump=now;
- if(!ReadRoster(manager,game,ServerProfile,&actors)){for(auto& p:peers)p={};return;}
- for(unsigned i=0;i<256;++i)if(peers[i].weak!=actors[i].weak||!actors[i].soldier){peers[i]={};peers[i].weak=actors[i].weak;}
+ if(!ReadRoster(manager,game,ServerProfile,&actors)){for(auto& p:peers)p={};if(voiceReady)voiceServer.Pump({},now);return;}
+ for(unsigned i=0;i<256;++i)if(peers[i].player!=actors[i].player||peers[i].weak!=actors[i].weak||!actors[i].player){peers[i]={};peers[i].player=actors[i].player;peers[i].weak=actors[i].weak;}
  Packet packet;unsigned port=0;
  for(unsigned work=0;work<32&&transport.Receive(&packet,&port,settings.secret);++work){
-  if(packet.kind!=Pose)continue;const auto id=packet.player;auto& actor=actors[id];auto& peer=peers[id];
+  if(packet.kind!=Pose&&packet.kind!=Subscribe)continue;const auto id=packet.player;auto& actor=actors[id];auto& peer=peers[id];
+  if(!actor.player||actor.ai)continue;
+  if(peer.port&&peer.port!=port&&(peer.pose.Read(now,1000)||peer.subscription.Read(now,1000)))continue;
+  if(packet.kind==Subscribe){
+   // Keep this separate from tracking: subscribed flat players remain native
+   // even while dead/unspawned. No mirrored hands or authority events originate here.
+   if(peer.pose.Read(now,1000)||!peer.subscription.Accept(packet,now))continue;
+   peer.port=port;continue;
+  }
+  if(peer.subscription.Read(now,1000))continue;
   if(!actor.soldier||!actor.weapon||actor.ai||packet.weaponName!=actor.name||!InverseRigid(actor.body)||Distance(packet.body,actor.body)>3.f)continue;
   if(peer.port&&peer.port!=port&&peer.pose.Read(now,1000))continue;
   if(!peer.pose.Accept(packet,now))continue;peer.port=port;
@@ -67,7 +107,7 @@ void Pump(){
   if(packet.throwSerial&&peer.throws.Accept(packet.session,packet.throwSerial,now,200)){peer.pendingThrow=packet;peer.throwTime=now;peer.throwWeapon=actor.weapon;}
   if(!peer.reported){peer.reported=true;Log("Pose channel accepted live human player %u; loopback peer port %u.",id,port);}
   auto relay=packet;relay.kind=Relay;relay.body=actor.body;
-  for(unsigned other=0;other<256;++other)if(other!=id&&peers[other].port&&peers[other].pose.Read(now,1000))transport.Send(relay,peers[other].port);
+  for(unsigned other=0;other<256;++other)if(other!=id&&peers[other].port&&(peers[other].pose.Read(now,1000)||peers[other].subscription.Read(now,1000)))transport.Send(relay,peers[other].port);
   if(settings.mirror){
    if(peer.mirror>255||!actors[peer.mirror].soldier||!actors[peer.mirror].weapon||Distance(actor.body,actors[peer.mirror].body)>60.f){
     unsigned best=256;float distance=std::numeric_limits<float>::max();
@@ -77,6 +117,7 @@ void Pump(){
    if(peer.mirror<256){relay.kind=Mirror;relay.player=peer.mirror;relay.body=actors[peer.mirror].body;transport.Send(relay,port);}
   }
  }
+ PumpVoice(now);
 }
 void* __fastcall ConstructorHook(void* self,void*){void* result=originalConstructor(self);manager=self;ownerThread=GetCurrentThreadId();actors={};peers={};lastPump=0;Log("Dedicated PlayerManager captured on the game thread.");return result;}
 // Dedicated servers skip render/animation finalization. These ordinary manager
@@ -113,6 +154,19 @@ float ServerLookInput(void* soldier,const void* caller,float native){
 }
 float __fastcall LookHook(void* soldier,void*){const auto caller=_ReturnAddress();return ServerLookInput(soldier,caller,originalLook(soldier));}
 bool CopyLaunch(const Matrix* p,Matrix* out){__try{if(!p)return false;*out=*p;return true;}__except(EXCEPTION_EXECUTE_HANDLER){return false;}}
+const Matrix* ServerMovementCamera(void* soldier,const void* caller,const Matrix* native){
+ if(caller!=game+0x12d7d6||GetCurrentThreadId()!=ownerThread)return native;
+ Pump();const auto now=GetTickCount64();
+ for(unsigned id=0;id<256;++id)if(actors[id].soldier==soldier){
+  const auto pose=peers[id].pose.Read(now,150);Matrix source{};
+  if(!pose||!(pose->flags&MovementValid)||!Foot(actors[id],soldier)||pose->weaponName!=actors[id].name||!CopyLaunch(native,&source))return native;
+  const auto mapped=MakeMovementCamera(source,pose->movementYawDegrees);if(!mapped)return native;
+  movementCamera=*mapped;return &movementCamera;
+ }return native;
+}
+const Matrix* __fastcall MovementCameraHook(void* soldier,void*){
+ const auto caller=_ReturnAddress();return ServerMovementCamera(soldier,caller,originalMoveCamera(soldier));
+}
 const Matrix* __fastcall LaunchHook(void* self,void*){
  Pump();const auto native=originalLaunch(self);mappedReceiver=nullptr;mappedId=256;mappedThrowSerial=0;
  unsigned id=256;void* receiver=static_cast<BYTE*>(self)-0x10;const auto p=PoseFor(receiver,&id);Matrix source{};
@@ -159,11 +213,13 @@ extern "C" __declspec(dllexport) DWORD WINAPI BF2142VRInitialize(void* parameter
  if(logFile==INVALID_HANDLE_VALUE)return 0;
  if(!settings.enabled||!ProfileValid()||!transport.Open(true,settings.port)){Log("Server extension unavailable: explicit configuration, verified profile or loopback port missing.");return 0;}
  if(MH_Initialize()!=MH_OK)return 0;
- void* targets[]={game+0x3f540,game+0x3e6f0,game+0x3dd50,game+0x1999d0,game+0x19a8b0,game+0x129160,game+0x18c720};
- void* hooks[]={reinterpret_cast<void*>(ConstructorHook),reinterpret_cast<void*>(LookupHook),reinterpret_cast<void*>(ListHook),reinterpret_cast<void*>(LaunchHook),reinterpret_cast<void*>(FireHook),reinterpret_cast<void*>(LookHook),reinterpret_cast<void*>(CrateLaunchHook)};
- void** originals[]={reinterpret_cast<void**>(&originalConstructor),reinterpret_cast<void**>(&originalLookup),reinterpret_cast<void**>(&originalList),reinterpret_cast<void**>(&originalLaunch),reinterpret_cast<void**>(&originalFire),reinterpret_cast<void**>(&originalLook),reinterpret_cast<void**>(&originalCrateLaunch)};
+ void* targets[]={game+0x3f540,game+0x3e6f0,game+0x3dd50,game+0x1999d0,game+0x19a8b0,game+0x129160,game+0x18c720,game+0x12bab0};
+ void* hooks[]={reinterpret_cast<void*>(ConstructorHook),reinterpret_cast<void*>(LookupHook),reinterpret_cast<void*>(ListHook),reinterpret_cast<void*>(LaunchHook),reinterpret_cast<void*>(FireHook),reinterpret_cast<void*>(LookHook),reinterpret_cast<void*>(CrateLaunchHook),reinterpret_cast<void*>(MovementCameraHook)};
+ void** originals[]={reinterpret_cast<void**>(&originalConstructor),reinterpret_cast<void**>(&originalLookup),reinterpret_cast<void**>(&originalList),reinterpret_cast<void**>(&originalLaunch),reinterpret_cast<void**>(&originalFire),reinterpret_cast<void**>(&originalLook),reinterpret_cast<void**>(&originalCrateLaunch),reinterpret_cast<void**>(&originalMoveCamera)};
  const unsigned count=unsigned(std::size(targets));unsigned created=0;for(;created<count;++created)if(MH_CreateHook(targets[created],hooks[created],originals[created])!=MH_OK)break;
  if(created!=count){for(unsigned i=0;i<created;++i)MH_RemoveHook(targets[i]);return 0;}
  for(unsigned i=0;i<count;++i)if(MH_EnableHook(targets[i])!=MH_OK){for(void* t:targets){MH_DisableHook(t);MH_RemoveHook(t);}return 0;}
- Log("BF2142VR experimental dedicated extension ready: authoritative tracked fire, snap turns, support throws and pose relay (protocol v2); loopback UDP %u; mirror=%u.",settings.port,settings.mirror?1:0);return 1;
+ if(settings.voiceEnabled){voiceReady=voiceServer.Open(settings.voicePort,settings.secret,{settings.voiceRange,settings.enemyProximity});
+  Log("Proximity voice relay %s: loopback UDP %u, range %.0f m, audience %s.",voiceReady?"ready":"unavailable",settings.voicePort,settings.voiceRange,settings.enemyProximity?"everyone nearby":"teammates only");}
+ Log("BF2142VR experimental dedicated extension ready: authoritative tracked fire, snap turns, support throws movement heading and pose relay (protocol v4); loopback UDP %u; mirror=%u.",settings.port,settings.mirror?1:0);return 1;
 }

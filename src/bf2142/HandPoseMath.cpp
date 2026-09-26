@@ -113,6 +113,28 @@ bool PoseEmptyFingers(HandBones& bones,int wrist,const M& palm,const std::array<
     }
     bones=out;return true;
 }
+bool PoseFingerContact(HandBones& bones,int base,V target) noexcept {
+    if(base<0||base+3>=int(bones.size())||!Finite(target))return false;
+    std::array<V,4> p{};float length[3]{},reach=0;
+    for(int i=0;i<4;++i){if(!InverseRigid(bones[base+i]))return false;p[i]=Pos(bones[base+i]);}
+    for(int i=0;i<3;++i){length[i]=Length(Sub(p[i+1],p[i]));if(length[i]<.002f||length[i]>.10f)return false;reach+=length[i];}
+    if(Length(Sub(target,p[0]))>reach*.995f)return false;
+    const V root=p[0];
+    // FABRIK only changes the thumb chain. Every phalanx retains its length;
+    // an unreachable switch leaves the normal grip pose in place.
+    for(int pass=0;pass<16;++pass){
+        p[3]=target;
+        for(int i=2;i>=0;--i)p[i]=Add(p[i+1],Mul(Unit(Sub(p[i],p[i+1])),length[i]));
+        p[0]=root;
+        for(int i=0;i<3;++i)p[i+1]=Add(p[i],Mul(Unit(Sub(p[i+1],p[i])),length[i]));
+        if(Length(Sub(p[3],target))<.0005f)break;
+    }
+    if(Length(Sub(p[3],target))>.003f)return false;
+    HandBones out=bones;
+    for(int i=0;i<3;++i){out[base+i]=Multiply(bones[base+i],RotateFromTo(Sub(Pos(bones[base+i+1]),Pos(bones[base+i])),Sub(p[i+1],p[i])));SetPos(out[base+i],p[i]);}
+    const auto inverse=InverseRigid(bones[base+2]);if(!inverse)return false;
+    out[base+3]=Multiply(bones[base+3],Multiply(*inverse,out[base+2]));SetPos(out[base+3],p[3]);bones=out;return true;
+}
 bool SupportGripEligible(bool pressed,bool previous,float distance,float separation) noexcept {
     return pressed && std::isfinite(distance)&&std::isfinite(separation)&&distance>=0 && distance<(previous?.30f:.20f)&&separation>.12f&&separation<.80f;
 }
@@ -237,6 +259,7 @@ std::optional<HandResult> SolveTrackedHands(const HandBones& native,const HandFr
             else (void)PoseFreeFingers(result.bones,7,leftCurls);
         }
     }
+    if(f.leftValid&&f.leftThumbContact)(void)PoseFingerContact(result.bones,8,*f.leftThumbContact);
     return result;
 }
 }

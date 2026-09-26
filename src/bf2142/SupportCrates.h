@@ -12,7 +12,7 @@ struct SupportObservation {
 };
 struct SupportFrame {
     bool busy=false,leftCrate=false,consumeLeft=false,fire=false,throwNow=false;
-    int select=0,crateItem=0;stereo::Vec3 throwVelocity{};
+    int hovered=-1,select=0,crateItem=0;stereo::Vec3 throwVelocity{};
     std::array<bool,10> unavailable{};
 };
 class SupportCrates {

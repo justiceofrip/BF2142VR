@@ -11,7 +11,7 @@ namespace bfvr::shared
 using SharedTextureLogCallback = void (*)(void* context, const wchar_t* message);
 
 constexpr DWORD kProtocolMagic = 0x52564642; // "BFVR"
-constexpr DWORD kProtocolVersion = 23;
+constexpr DWORD kProtocolVersion = 26;
 constexpr std::size_t kTextureCount = 3;
 constexpr std::size_t kDepthTextureCount = 2;
 constexpr std::size_t kSharedNameCapacity = 128;
@@ -264,6 +264,11 @@ struct ControlBlock
     volatile LONG hapticShotBothSequence = 0;
     volatile LONG hapticDeathSequence = 0;
     volatile LONG hapticNativeMenuHoverSequence = 0;
+    volatile LONG hapticRadioLeftSequence = 0;
+    volatile LONG hapticFistLeftSequence = 0;
+    volatile LONG hapticFistRightSequence = 0;
+    volatile LONG hapticEquipmentLeftSequence = 0;
+    volatile LONG hapticEquipmentRightSequence = 0;
     // Producer-to-presenter authoritative local-kill event. The x64 audio
     // owner consumes deltas and creates one independent voice per event.
     volatile LONG killSoundSequence = 0;

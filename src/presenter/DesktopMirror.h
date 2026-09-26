@@ -1,6 +1,7 @@
 #pragma once
 
 #include "openxr/OpenXRPresentation.h"
+#include "presenter/DesktopMirrorVisibility.h"
 
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -28,13 +29,15 @@ public:
         OpenXRLogCallback logCallback,
         void* logContext);
     void PumpMessages();
+    void SetRuntimeVisible(bool visible);
     void Render(
         const OpenXRPresentationTextures& textures,
         const OpenXRPresentationView* rightEyeView = nullptr,
         OpenXRUiPresentationMode uiPresentationMode =
             OpenXRUiPresentationMode::Standard,
         const OpenXRPresentationPose* scopeRollInView = nullptr,
-        const OpenXRQuickMenuMirrorState* quickMenu = nullptr);
+        const OpenXRQuickMenuMirrorState* quickMenu = nullptr,
+        bool freshSource = true);
     void Shutdown();
 
 private:
@@ -59,6 +62,7 @@ private:
         const float sourceScale[2],
         const float sourceOffset[2]);
     void UpdateWindowBounds();
+    void UpdateVisibility();
     void ReleaseSourceViews();
     void ReleaseQuickMenuViews();
     void ReleaseSwapchain();
@@ -91,6 +95,7 @@ private:
     ID3D11Texture2D* quickMenuCommandTexture_ = nullptr;
     ID3D11Texture2D* quickMenuVersionTexture_ = nullptr;
     ID3D11Texture2D* quickMenuCursorTexture_ = nullptr;
+    DesktopMirrorVisibility visibility_;
     HWND parentWindow_ = nullptr;
     HWND window_ = nullptr;
     DWORD producerProcessId_ = 0;

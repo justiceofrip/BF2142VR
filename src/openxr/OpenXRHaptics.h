@@ -9,7 +9,9 @@ enum class OpenXRHapticEvent : std::uint32_t
 {
     Hover = 0,
     Shot,
-    Death
+    Death,
+    FistBump,
+    Equipment
 };
 
 constexpr std::uint32_t kOpenXRHapticHandLeft = 0x1;
@@ -34,6 +36,10 @@ struct OpenXRHapticPulse
         return {0.55F, 45'000'000};
     case OpenXRHapticEvent::Death:
         return {0.80F, 250'000'000};
+    case OpenXRHapticEvent::Equipment:
+        return {0.38F, 45'000'000};
+    case OpenXRHapticEvent::FistBump:
+        return {0.35F, 35'000'000};
     default:
         return {};
     }

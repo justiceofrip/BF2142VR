@@ -659,8 +659,11 @@ target_include_directories(BFVROpenXRScopeOverlayLayerTests PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}"
   "${BFVR_OPENXR_INCLUDE_DIRECTORY}")
 
+add_executable(BFVRDesktopMirrorVisibilityTests presenter/DesktopMirrorVisibilityTests.cpp)
+target_include_directories(BFVRDesktopMirrorVisibilityTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 include(CTest)
 if(BUILD_TESTING)
+  add_test(NAME BFVRDesktopMirrorVisibilityTests COMMAND BFVRDesktopMirrorVisibilityTests)
   add_test(
     NAME BFVRBf42PlusPlusCompatibilityTests
     COMMAND BFVRBf42PlusPlusCompatibilityTests)

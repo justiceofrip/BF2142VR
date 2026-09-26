@@ -2745,6 +2745,12 @@ bool OpenXRPresentation::IsSessionRunning() const noexcept
 {
     return impl_ != nullptr && impl_->sessionRunning;
 }
+bool OpenXRPresentation::IsSessionVisible() const noexcept
+{
+    return impl_ != nullptr && impl_->sessionRunning &&
+        (impl_->sessionState == XR_SESSION_STATE_VISIBLE ||
+         impl_->sessionState == XR_SESSION_STATE_FOCUSED);
+}
 OpenXRPresentationTextureRequirements OpenXRPresentation::GetTextureRequirements() const noexcept
 {
     return impl_ == nullptr ? OpenXRPresentationTextureRequirements{} : impl_->textureRequirements;
