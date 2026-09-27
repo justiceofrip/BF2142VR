@@ -1,8 +1,8 @@
-# Battlefield 2142 VR — 0.2.0-beta.1
+# Battlefield 2142 VR — 0.2.0-beta.2
 
 A PC VR port based on [BFVR by JayBiggsGMG and the BFVR contributors](https://github.com/JayBiggsGMG/BFVR-Battlefield-1942-VR-Mod). Play bot matches or join compatible multiplayer servers alongside desktop players.
 
-**[Beta release and downloads](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.1)**
+**[VR quality hotfix and downloads](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.2)** — [resolution / AA settings](docs/BF2142_RENDER_QUALITY.md).
 
 | Download | Who needs it? |
 | --- | --- |
