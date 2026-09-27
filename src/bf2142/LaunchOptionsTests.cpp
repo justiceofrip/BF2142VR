@@ -80,6 +80,14 @@ int main() {
     check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--flat",L"--join-server",L"play.example.org",L"--port",L"17567",L"--observer-profile",L"G:\\Observer\nInjected"},options,error),"remote isolation rejects initialization protocol injection");
     check(ParseOptions({L"--game-dir",L"G:\\Game",L"--flat",L"--join-server",L"play.example.org",L"--port",L"17567"},options,error) &&
           bfvr::bf2142::GameCommand(L"BF2142.exe",options).find(L"+multi")==std::wstring::npos,"normal remote join retains the single-instance guard");
+    check(ParseOptions({L"--game-dir",L"G:\\Game",L"--windowed",L"--presenter",L"p.exe"},options,error),"headset quality default");
+    check(bfvr::bf2142::GameCommand(L"BF2142.exe",options).find(L"+szx 1600 +szy 900")!=std::wstring::npos,"widescreen eye source fits a 1080p desktop and retains native Flash layout");
+    check(ParseOptions({L"--game-dir",L"G:\\Game",L"--windowed",L"--flat"},options,error),"flat quality unchanged");
+    check(bfvr::bf2142::GameCommand(L"BF2142.exe",options).find(L"+szx 1280 +szy 720")!=std::wstring::npos,"observer retains desktop size");
+    check(ParseOptions({L"--game-dir",L"G:\\Game",L"--render-size",L"2064x2208"},options,error),"explicit native-eye size");
+    check(bfvr::bf2142::GameCommand(L"BF2142.exe",options).find(L"+szx 2064 +szy 2208")!=std::wstring::npos,"custom source applied");
+    for(const auto& size:{L"",L"1x1",L"8192x8192",L"1920x",L"1920x1080 +foo",L"-1x1080",L"9999999999x720"})
+        check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--render-size",size},options,error),"invalid or oversized source rejected");
     if (!failed) puts("BF2142 launcher option and quoting checks passed.");
     return failed ? 1 : 0;
 }

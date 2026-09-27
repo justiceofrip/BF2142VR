@@ -109,12 +109,13 @@ int Run(int argc, wchar_t** argv) {
     }
     if (options.help) {
         wprintf(L"BF2142VR development launcher\n"
-            L"Usage: BF2142VRLauncher --game-dir PATH [--mod FOLDER] [--windowed] [--join-local PORT | --join-server HOST --port PORT] [--flat] [--inspect] [--presenter PATH]\n"
+            L"Usage: BF2142VRLauncher --game-dir PATH [--mod FOLDER] [--windowed] [--render-size WIDTHxHEIGHT] [--join-local PORT | --join-server HOST --port PORT] [--flat] [--inspect] [--presenter PATH]\n"
             L"Use --presenter with the x64 BFVRPresenter.exe to enable experimental head-tracked stereo.\n"
             L"--diagnostic-stereo uses synthetic head poses and saves local eye/UI images; no headset input is generated.\n"
             L"--desktop-vr runs stereo, native VR hands and menus with keyboard simulated controllers, without OpenXR.\n"
             L"--network-observer receives multiplayer arms in the native flat view; requires private network configuration.\n"
             L"--observer-profile PATH isolates Documents for a second flat client; requires an explicit join destination.\n"
+            L"Windowed headset launches default to 1600x900 per eye; --render-size overrides this.\n"
             L"--inspect validates paths and x86 images without starting the game.\n");
         return 0;
     }

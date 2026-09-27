@@ -1,5 +1,15 @@
 # BFVR AI and Developer Handoff
 
+## Quality hotfix invariants
+
+Keep native window, D3D9 backbuffer and Flash canvas at the same widescreen size.
+NativeAntialiasing only changes supported automatic-depth discard swapchains;
+creation/reset failures retry original parameters. Unknown paths stay native.
+WorldMSAASamples defaults to 8 (4/2 or 0 for native behavior). Flat observers
+keep their native AA. Do not restore the square-source/compact-mirror experiment.
+See BF2142_RENDER_QUALITY.md and BF2142_FEEDBACK.md.
+
+
 ## Current BF2142 beta invariants (0.2.0-beta.1)
 
 Current status supersedes older private notes: see `docs/ik/README.md`, `docs/BF2_POST_ALPHA_UPDATES.md`, `docs/FLAT_ADDON.md` and `docs/BF2142_BETA_READINESS.md`. Owner authorized release without another headset test; latest visual/haptic fixes are not claimed accepted. Proximity voice with vrtester is user-confirmed.

@@ -1,4 +1,7 @@
 #include "StereoSession.h"
+#include "NativeAntialiasing.h"
+#include "VrSettings.h"
+#include <initializer_list>
 #include "LegacyShaderMemory.h"
 #include "NativeVehicle.h"
 #include "NativeQueryGuard.h"
@@ -20,6 +23,7 @@ SRWLOCK logLock = SRWLOCK_INIT;
 SRWLOCK hookLock = SRWLOCK_INIT;
 std::atomic<bool> started = false;
 bool networkObserver = false;
+unsigned requestedWorldSamples=0;
 std::atomic<bool> alternateImplementationLogged = false;
 std::atomic<unsigned long> presentations = 0;
 std::atomic<unsigned long> swapPresentations = 0;
@@ -216,7 +220,14 @@ HRESULT STDMETHODCALLTYPE EndSceneHook(IDirect3DDevice9* device) {
 HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
     D3DPRESENT_PARAMETERS* parameters) {
     bfvr::bf2142::StereoReset();
-    const HRESULT result = originalReset(device, parameters);
+    D3DPRESENT_PARAMETERS saved{};bool changed=false;
+    if(parameters){saved=*parameters;IDirect3D9* api=nullptr;D3DDEVICE_CREATION_PARAMETERS creation{};
+        if(SUCCEEDED(device->GetDirect3D(&api))){
+            if(SUCCEEDED(device->GetCreationParameters(&creation)))changed=bfvr::bf2142::SelectWorldSamples(api,creation.AdapterOrdinal,creation.DeviceType,requestedWorldSamples,*parameters);
+            api->Release();}}
+    HRESULT result = originalReset(device, parameters);
+    if(FAILED(result)&&changed){*parameters=saved;result=originalReset(device,parameters);Log("VR MSAA reset fallback: original native settings retained.");}
+    if(SUCCEEDED(result)&&parameters)Log("World AA reset: samples=%u quality=%lu.",unsigned(parameters->MultiSampleType),parameters->MultiSampleQuality);
     const auto count = resets.fetch_add(1, std::memory_order_relaxed) + 1;
     if (count <= 16) Log("Reset result=0x%08lX size=%ux%u windowed=%d",
         static_cast<unsigned long>(result), parameters ? parameters->BackBufferWidth : 0,
@@ -227,7 +238,11 @@ HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
 HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
     D3DDEVTYPE type, HWND window, DWORD behavior,
     D3DPRESENT_PARAMETERS* parameters, IDirect3DDevice9** output) {
-    const HRESULT result = originalCreateDevice(factory, adapter, type, window, behavior, parameters, output);
+    D3DPRESENT_PARAMETERS saved{};bool changed=false;
+    if(parameters){saved=*parameters;changed=bfvr::bf2142::SelectWorldSamples(factory,adapter,type,requestedWorldSamples,*parameters);}
+    HRESULT result = originalCreateDevice(factory, adapter, type, window, behavior, parameters, output);
+    if(FAILED(result)&&changed){*parameters=saved;result=originalCreateDevice(factory,adapter,type,window,behavior,parameters,output);Log("VR MSAA creation fallback: original native settings retained.");}
+    if(SUCCEEDED(result)&&parameters)Log("World AA creation: samples=%u quality=%lu; autoDepth=%d depthFormat=%u swap=%u; nativeSamples=%u requested=%u.",unsigned(parameters->MultiSampleType),parameters->MultiSampleQuality,parameters->EnableAutoDepthStencil,unsigned(parameters->AutoDepthStencilFormat),unsigned(parameters->SwapEffect),unsigned(saved.MultiSampleType),requestedWorldSamples);
     Log("CreateDevice result=0x%08lX adapter=%u size=%ux%u windowed=%d flags=0x%08lX",
         static_cast<unsigned long>(result), adapter, parameters ? parameters->BackBufferWidth : 0,
         parameters ? parameters->BackBufferHeight : 0, parameters ? parameters->Windowed : 0, behavior);
@@ -301,6 +316,7 @@ extern "C" DWORD WINAPI BF2142VRInitialize(void* parameter) {
         reinterpret_cast<void**>(&originalCreate9), create9Target)) return 0;
     Log("Direct3DCreate9 connection installed.");
     networkObserver=presenter==L"@observer";
+    if(!presenter.empty()&&!networkObserver)requestedWorldSamples=bfvr::bf2142::LoadVrSettings(logPath).worldSamples;
     if (networkObserver) Log("Flat network observer requested: receive-only poses, native camera/input; no OpenXR.");
     if (!presenter.empty() && !networkObserver && !bfvr::bf2142::StartStereo(presenter,logPath,Log)) {
         Log("Headset session could not start: %lu",GetLastError()); return 0;

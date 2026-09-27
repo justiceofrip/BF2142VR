@@ -1,4 +1,5 @@
 #include "FrameCapture.h"
+#include "NativeAntialiasing.h"
 #include "NativeUiCapture.h"
 #include <MinHook.h>
 #include <cstdarg>
@@ -11,6 +12,36 @@
 #include <string>
 void UiLog(const char* format,...) {
     va_list args; va_start(args,format); vprintf(format,args); va_end(args); puts("");
+}
+bool CheckMsaaCoverage(IDirect3D9* factory,IDirect3DDevice9* device){
+    IDirect3DSurface9* saved=nullptr;IDirect3DSurface9* depth=nullptr;IDirect3DStateBlock9* state=nullptr;
+    if(FAILED(device->GetRenderTarget(0,&saved))||FAILED(device->CreateStateBlock(D3DSBT_ALL,&state))){if(saved)saved->Release();return false;}
+    device->GetDepthStencilSurface(&depth);state->Capture();bool ok=true;unsigned exercised=0;
+    struct Vertex{float x,y,z,rhw;DWORD color;};
+    const Vertex triangle[]={{20.3f,17.6f,.5f,1,0xffffffff},{279.7f,206.2f,.5f,1,0xffffffff},{28.4f,219.1f,.5f,1,0xffffffff}};
+    for(unsigned samples:{0u,2u,4u,8u}){
+        D3DPRESENT_PARAMETERS p{};p.Windowed=TRUE;p.SwapEffect=D3DSWAPEFFECT_DISCARD;p.BackBufferFormat=D3DFMT_A8R8G8B8;
+        p.EnableAutoDepthStencil=TRUE;p.AutoDepthStencilFormat=D3DFMT_D24S8;
+        const bool selected=bfvr::bf2142::SelectWorldSamples(factory,0,D3DDEVTYPE_HAL,samples,p);
+        if(samples&&(!selected||unsigned(p.MultiSampleType)!=samples))continue;
+        IDirect3DSurface9* target=nullptr;
+        if(FAILED(device->CreateRenderTarget(320,240,p.BackBufferFormat,p.MultiSampleType,0,FALSE,&target,nullptr))){ok=false;continue;}
+        device->SetDepthStencilSurface(nullptr);device->SetRenderTarget(0,target);D3DVIEWPORT9 viewport{0,0,320,240,0,1};device->SetViewport(&viewport);
+        device->SetVertexShader(nullptr);device->SetPixelShader(nullptr);device->SetFVF(D3DFVF_XYZRHW|D3DFVF_DIFFUSE);device->SetTexture(0,nullptr);
+        device->SetTextureStageState(0,D3DTSS_COLOROP,D3DTOP_SELECTARG1);device->SetTextureStageState(0,D3DTSS_COLORARG1,D3DTA_DIFFUSE);
+        for(auto setting:{D3DRS_ZENABLE,D3DRS_LIGHTING,D3DRS_ALPHABLENDENABLE,D3DRS_ALPHATESTENABLE,D3DRS_SCISSORTESTENABLE})device->SetRenderState(setting,FALSE);
+        device->SetRenderState(D3DRS_CULLMODE,D3DCULL_NONE);device->SetRenderState(D3DRS_MULTISAMPLEANTIALIAS,TRUE);
+        ok=SUCCEEDED(device->Clear(0,nullptr,D3DCLEAR_TARGET,0xff000000,1,0))&&ok;
+        ok=SUCCEEDED(device->BeginScene())&&ok;ok=SUCCEEDED(device->DrawPrimitiveUP(D3DPT_TRIANGLELIST,1,triangle,sizeof(Vertex)))&&ok;ok=SUCCEEDED(device->EndScene())&&ok;
+        bfvr::bf2142::FrameCapture capture;std::vector<DWORD> pixels;
+        ok=SUCCEEDED(capture.ReadSurface(device,target,DXGI_FORMAT_B8G8R8A8_UNORM,pixels))&&ok;
+        size_t blended=0;for(auto pixel:pixels){const DWORD value=pixel&255;blended+=value>0&&value<255;}
+        printf("Native %ux AA: %zu partially covered edge pixels preserved in eye readback.\n",samples,blended);
+        ok=(samples?blended>100:blended==0)&&ok;++exercised;
+        device->SetRenderTarget(0,saved);target->Release();
+    }
+    device->SetRenderTarget(0,saved);device->SetDepthStencilSurface(depth);state->Apply();state->Release();saved->Release();if(depth)depth->Release();
+    return ok&&exercised>=2;
 }
 int wmain() {
     wchar_t self[32768]{};
@@ -182,6 +213,7 @@ int wmain() {
         ok = SUCCEEDED(chain->Present(nullptr, nullptr, nullptr, nullptr, 0)) && ok;
         chain->Release();
     } else ok = false;
+    ok=CheckMsaaCoverage(factory,device)&&ok;
     device->Release();
     factory->Release();
     DestroyWindow(window);

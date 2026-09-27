@@ -1,5 +1,13 @@
 # BFVR Changelog
 
+## BF2142 quality hotfix
+
+- Raise headset source to 1600x900 and add a bounded render-size override.
+- Request native 8x geometry MSAA with supported 4x/2x fallback and original-device retry.
+- Move VR CONTROLS away from the native Exit button.
+- Document player feedback, source-resolution behavior, and remaining installer/gameplay work.
+
+
 ## 0.2.0-beta.1 — multiplayer and observer IK beta
 
 - Publish full VR and lightweight flat downloads, community join/host source and Reclamation integration guide.

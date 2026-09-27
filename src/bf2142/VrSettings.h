@@ -7,6 +7,7 @@ struct VrSettings {
     bool proximityVoice=true,proximityMuted=false;
     float voiceThreshold=-40,voiceVolume=1;
     unsigned voiceInput=~0u,voiceOutput=~0u; // default communications devices
+    unsigned worldSamples=8; // 0 preserves native AA; 2/4/8 request supported MSAA
     bool controllerRelativeMovement=false;
     bool snapTurning=false,hideCrosshair=true,hideWorldMarkers=true,physicalStance=true,menuRoom=true;
     bool controllers=true,trackedWeapon=false,motionHands=true,weaponOptics=true,automaticAds=true,bodyInventory=true,fingerPoses=true,motionActions=true,leftSupportCrates=true,weaponFaceFade=false,toggleWeaponGrip=true,grenadeArc=true;

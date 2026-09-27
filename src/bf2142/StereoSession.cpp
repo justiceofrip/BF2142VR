@@ -137,7 +137,7 @@ bool PrepareTransport() {
     shared::PublishState(&b->producerState,shared::ProcessState::TexturesReady);
     (void)channel.SignalProducerUpdate();
     transport=true;
-    logger("Stereo transport ready: source=%ux%u format=%u; separate eye textures and HUD.",width,height,unsigned(colorFormat));
+    logger("Stereo transport ready: source=%ux%u format=%u; separate eye textures and HUD; source MSAA=%u quality=%lu.",width,height,unsigned(colorFormat),unsigned(d.MultiSampleType),d.MultiSampleQuality);
     return true;
 }
 stereo::Pose Pose(const shared::SharedPresentationPose& p) {

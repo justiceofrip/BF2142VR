@@ -19,6 +19,8 @@ VrSettings LoadVrSettings(const std::wstring& logPath) {
     s.voiceThreshold=value(L"VoiceThresholdDb",-40,-65,-15);s.voiceVolume=value(L"VoiceVolume",1,0,2);
     s.voiceInput=GetPrivateProfileIntW(L"VR",L"VoiceInputDevice",UINT(-1),path.c_str());
     s.voiceOutput=GetPrivateProfileIntW(L"VR",L"VoiceOutputDevice",UINT(-1),path.c_str());
+    const unsigned samples=GetPrivateProfileIntW(L"VR",L"WorldMSAASamples",8,path.c_str());
+    s.worldSamples=(samples==0||samples==2||samples==4||samples==8)?samples:8;
     s.worldScale=value(L"WorldScale",1,.25f,4);
     s.heightOffset=value(L"HeightOffset",0,-1,1);
     s.turnSpeed=value(L"TurnSpeed",600,50,2000);
@@ -54,6 +56,7 @@ bool SaveVrPreferences(const VrSettings& s) {
     put(L"ProximityVoice",s.proximityVoice?L"1":L"0");put(L"ProximityMicMuted",s.proximityMuted?L"1":L"0");
     put(L"VoiceThresholdDb",std::to_wstring(s.voiceThreshold));put(L"VoiceVolume",std::to_wstring(s.voiceVolume));
     put(L"VoiceInputDevice",std::to_wstring(s.voiceInput));put(L"VoiceOutputDevice",std::to_wstring(s.voiceOutput));
+    put(L"WorldMSAASamples",std::to_wstring(s.worldSamples));
     put(L"MovementDirection",s.controllerRelativeMovement?L"controller":L"head");
     put(L"SnapTurning",s.snapTurning?L"1":L"0");put(L"SnapAngle",std::to_wstring(s.snapAngle));
     put(L"HideWorldMarkers",s.hideWorldMarkers?L"1":L"0");

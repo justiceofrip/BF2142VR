@@ -230,7 +230,7 @@ int main(){
     posture.Update(true,height.Drop(0),2,tick+=10000000);
     st=posture.Update(true,height.Drop(0),2,tick+=210000000);if(!st.proneKey||st.crouch)return 100;
     height.Reset();height.Ensure(1.2f,1.7f);if(!Close(height.Drop(1.2f),.5f))return 101;
-    if(bf2142::VrMenuHit(.8f,.04f,false)!=0||bf2142::VrMenuHit(.2f,.3f,false)!=-1||bf2142::VrMenuHit(.2f,.26f,true)!=1||bf2142::VrMenuHit(.87f,.15f,true)!=10)return 84;
+    if(bf2142::VrMenuHit(.5f,.04f,false)!=0||bf2142::VrMenuHit(.96f,.04f,false)!=-1||bf2142::VrMenuHit(.2f,.3f,false)!=-1||bf2142::VrMenuHit(.2f,.26f,true)!=1||bf2142::VrMenuHit(.87f,.15f,true)!=10)return 84;
     bf2142::VrControlsMenu options;bf2142::VrSettings values;options.Hotkey(true);options.Hotkey(false);
     values.configPath=(std::filesystem::temp_directory_path()/L"BF2142VR-controls-test.ini").wstring();
     if(!options.Interact(.2f,.26f,true,false,values,1.7f)||!values.snapTurning)return 85;

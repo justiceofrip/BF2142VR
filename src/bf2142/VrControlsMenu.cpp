@@ -7,7 +7,7 @@
 namespace bfvr::bf2142 {
 int VrMenuHit(float x,float y,bool open) noexcept {
  if(!std::isfinite(x)||!std::isfinite(y)||x<0||x>1||y<0||y>1)return -1;
- if(!open)return x>=.76f && x<.98f && y>=.018f && y<.078f?0:-1;
+ if(!open)return x>=.39f && x<.61f && y>=.018f && y<.078f?0:-1;
  if(x>=.70f&&x<.82f&&y>=.12f&&y<.19f)return 11;
  if(x>=.83f && x<.93f && y>=.12f && y<.19f)return 10;
  if(x>=.09f && x<.48f && y>=.245f && y<.245f+9*.064f){
@@ -66,7 +66,7 @@ void VrControlsMenu::Draw(std::vector<DWORD>& image,UINT w,UINT h,DXGI_FORMAT fo
    const auto old=SelectObject(dc,font);SetBkMode(dc,TRANSPARENT);SetTextColor(dc,color);TextOutW(dc,int(x*aw),int(y*ah),text.c_str(),int(text.size()));SelectObject(dc,old);DeleteObject(font);
   };
   const COLORREF ink=RGB(226,239,241),muted=RGB(150,177,185),accent=RGB(74,215,221);
-  if(!open){rect(.76f,.018f,.22f,.06f,hover==0?RGB(30,94,106):RGB(17,39,50));label(.775f,.026f,L"VR CONTROLS",28,ink,true);}
+  if(!open){rect(.39f,.018f,.22f,.06f,hover==0?RGB(30,94,106):RGB(17,39,50));label(.405f,.026f,L"VR CONTROLS",28,ink,true);}
   else{
    rect(.055f,.10f,.89f,.81f,RGB(13,26,36));rect(.055f,.10f,.006f,.81f,accent);
    label(.085f,.133f,L"BATTLEFIELD 2142  /  VR CONTROLS",30,ink,true);

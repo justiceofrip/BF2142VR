@@ -11,6 +11,7 @@ struct LaunchOptions {
     bool inspect = false;
     bool help = false;
     bool windowed = false;
+    unsigned renderWidth=0,renderHeight=0;
     bool diagnosticStereo = false;
     bool desktopVr = false;
     bool networkObserver = false;
@@ -38,6 +39,19 @@ inline bool ParseOptions(const std::vector<std::wstring>& args,
         else if (args[i] == L"--diagnostic-stereo") result.diagnosticStereo = true;
         else if (args[i] == L"--desktop-vr") result.desktopVr = true;
         else if ((args[i] == L"--network-observer" || args[i] == L"--flat")) result.networkObserver = true;
+        else if (args[i] == L"--render-size") {
+            if(++i>=args.size()){error=L"--render-size requires WIDTHxHEIGHT.";return false;}
+            const auto split=args[i].find(L'x');
+            if(split==std::wstring::npos){error=L"--render-size requires WIDTHxHEIGHT.";return false;}
+            const auto parse=[](const std::wstring& text,unsigned& value){
+                if(text.empty()||text.size()>4)return false;value=0;
+                for(wchar_t c:text){if(c<L'0'||c>L'9')return false;value=value*10+unsigned(c-L'0');}
+                return value>=640&&value<=3072;
+            };
+            if(!parse(args[i].substr(0,split),result.renderWidth)||!parse(args[i].substr(split+1),result.renderHeight)){
+                error=L"Render dimensions must be 640-3072 pixels each.";return false;
+            }
+        }
         else if (args[i] == L"--windowed") result.windowed = true;
         else if (args[i] == L"--game-dir" || args[i] == L"--mod" || args[i] == L"--presenter" || args[i] == L"--join-local" || args[i] == L"--observer-profile" || args[i] == L"--join-server" || args[i] == L"--port") {
             const auto option = args[i];
@@ -91,7 +105,14 @@ inline std::wstring QuoteArgument(const std::wstring& argument) {
 inline std::wstring GameCommand(const std::wstring& executable, const LaunchOptions& options) {
     std::wstring command = QuoteArgument(executable) + L" +modPath mods/" + options.mod;
     if (!options.observerProfile.empty()) command += L" +multi 1";
-    if (options.windowed) command += L" +fullscreen 0 +szx 1280 +szy 720";
+    if (options.windowed) command += L" +fullscreen 0";
+    // Keep the native window, renderer and legacy Flash canvas at one supported
+    // widescreen size. Flat and simulated clients retain their desktop default.
+    if(options.windowed||options.renderWidth){
+        const unsigned w=options.renderWidth?options.renderWidth:options.presenter.empty()?1280:1600;
+        const unsigned h=options.renderHeight?options.renderHeight:options.presenter.empty()?720:900;
+        command+=L" +szx "+std::to_wstring(w)+L" +szy "+std::to_wstring(h);
+    }
     if (options.joinLocalPort) command += L" +joinServer 127.0.0.1 +port " + std::to_wstring(options.joinLocalPort);
     if(!options.joinServer.empty())command+=L" +joinServer "+options.joinServer+L" +port "+std::to_wstring(options.joinPort);
     return command;
