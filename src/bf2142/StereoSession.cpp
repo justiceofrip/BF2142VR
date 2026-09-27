@@ -91,7 +91,7 @@ void Fail(const char* reason,HRESULT hr=E_FAIL) {
     if (!enabled) return;
     SetNativeWeaponHeld(true);
     logger("Stereo stopped: %s (0x%08lX). Normal game rendering continues.",reason,static_cast<unsigned long>(hr));
-    enabled=false; pairReady=false; ClearNativeSnapTurn();ConfigureNativeMovement(false,0);ResetAutomaticAds();ClearControllerCommand();ClearNativeHands();menuPointer.Reset();
+    enabled=false; pairReady=false; ClearNativeSnapTurn();ConfigureNativeMovement(false,0);ConfigureNativeLookPitch(false,{});ResetAutomaticAds();ClearControllerCommand();ClearNativeHands();menuPointer.Reset();
     if (auto* block=channel.Get()) {
         shared::PublishState(&block->producerState,shared::ProcessState::Failed);
         InterlockedExchange(&block->shutdownRequested,1);
@@ -144,7 +144,7 @@ stereo::Pose Pose(const shared::SharedPresentationPose& p) {
     return {{p.positionX,p.positionY,p.positionZ},{p.orientationX,p.orientationY,p.orientationZ,p.orientationW}};
 }
 void Recenter(bool calibrateStanding=false) {
-    ClearNativeSnapTurn();ConfigureNativeMovement(false,0);RecenterNativeVehicle();
+    ClearNativeSnapTurn();ConfigureNativeMovement(false,0);ConfigureNativeLookPitch(false,{});RecenterNativeVehicle();
     const auto head=Pose(request.headPose);
     if(calibrateStanding && standingHeight.Recenter(head.position.y)){
         physicalStance.Reset();
@@ -177,7 +177,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     }
     request=b->renderRequest;
     if (!request.shouldRender || !request.viewsValid || !request.headPoseValid) {
-        ClearNativeSnapTurn();ConfigureNativeMovement(false,0);ResetAutomaticAds();homePolicy.Update(false,GetTickCount64());menuPointer.Reset();
+        ClearNativeSnapTurn();ConfigureNativeMovement(false,0);ConfigureNativeLookPitch(false,{});ResetAutomaticAds();homePolicy.Update(false,GetTickCount64());menuPointer.Reset();
         ClearControllerCommand();ClearNativeHands();shoulderRadio.Reset();radioFrame={};controllerPolicy={};pending=0;return false;
     }
     DWORD foregroundPid=0;GetWindowThreadProcessId(GetForegroundWindow(),&foregroundPid);
@@ -210,6 +210,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     if(!nativeSnap)ClearNativeSnapTurn();
     const float movementYaw=vehicleKnown?0.f:LocomotionYaw(settings.controllerRelativeMovement,reference,Pose(request.headPose),sample);
     const bool nativeMovement=ConfigureNativeMovement(accepted&&gameplay&&!showMenu&&!mounted,movementYaw);
+    ConfigureNativeLookPitch(accepted&&gameplay&&!showMenu&&!mounted&&settings.motionHands,Pose(request.headPose));
     if(accepted) {
         command=MapControllers(controllerPolicy,sample,gameplay && !showMenu,nativeMovement?0.f:movementYaw,settings.turnSpeed,settings.motionHands&&!vehicleKnown,nativeSnap,settings.snapAngle);
         if(command.snapDegrees && !command.recenter)
@@ -600,7 +601,7 @@ void StereoPresent(IDirect3DDevice9* device) {
 }
 void StereoReset() {
     RecenterNativeVehicle();traversalControls.Reset();weaponGrip.Reset();SetNativeWeaponHeld(true);controlsMenu.Reset();physicalStance.Reset();ConfigurePhysicalCamera(false);standingHeight.Reset();
-    ClearNativeSnapTurn();ConfigureNativeMovement(false,0);ResetAutomaticAds();ClearControllerCommand();ClearNativeHands(); controllerPolicy={}; haveGripReference=false; previousGameplay=false;
+    ClearNativeSnapTurn();ConfigureNativeMovement(false,0);ConfigureNativeLookPitch(false,{});ResetAutomaticAds();ClearControllerCommand();ClearNativeHands(); controllerPolicy={}; haveGripReference=false; previousGameplay=false;
     menuPointer.Reset();shoulderRadio.Reset();radioFrame={};supportCrates.Reset();supportFrame={};PublishNativeSupport({});bodyInventory.Reset();ResetMotionActions();rightEquipmentCue.Reset();leftEquipmentCue.Reset();ResetDesktopSimulation();
     uiCapture.Reset(); uiReady=false;outsideUiReady=false;homePolicy={}; warnedUi=false;
     lastMenuCapture=0;

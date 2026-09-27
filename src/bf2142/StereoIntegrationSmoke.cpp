@@ -102,6 +102,7 @@ bool NativeSnapTurnAvailable(){return false;}
 bool RequestNativeSnapTurn(float,std::int64_t){return false;}
 void ClearNativeSnapTurn(){}
 bool ConfigureNativeMovement(bool,float){return false;}
+bool ConfigureNativeLookPitch(bool,const stereo::Pose&){return false;}
 bool ReadNativeTraversal(TraversalSample*){return false;}
 bool ReadNativeVehicle(VehicleSample*){return false;}
 void UpdateNativeVehicle(const VehicleSample*,const shared::SharedControllerSample*,const stereo::Pose&,const stereo::Pose&,float,float,ControllerCommand&){}

@@ -10,6 +10,8 @@ bool ReadNativeComfortCamera(const stereo::Matrix4& nativeWorld,stereo::Matrix4*
 bool ReadNativeStance(int* stance);
 // Returns true only when the movement-only native adapter owns this infantry.
 bool ConfigureNativeMovement(bool enabled,float trackedYawRadians);
+// Match the hidden stock infantry pitch without rotating the comfort camera.
+bool ConfigureNativeLookPitch(bool enabled,const stereo::Pose& head);
 bool ReadNativeMovementYaw(const void* soldier,float* offsetDegrees);
 void ConfigurePhysicalCamera(bool enabled);
 bool NativeSnapTurnAvailable();

@@ -1,5 +1,14 @@
 # BFVR Changelog
 
+## BF2142 0.2.0-beta.3 ladder/input hotfix
+
+- Fix ladders rejecting attachment while the VR view looks level: keep the hidden native look pitch aligned with the headset through stock networked input.
+- Stop a stationary held grip from cancelling intentional ladder thumbstick movement.
+- Send snap turns through ordinary game input, removing the dependency on a custom server snap event. Keep the existing comfort frame and IK solver.
+- Retain beta.2 resolution, native MSAA, menu Exit accessibility and installer diagnostic fixes.
+- Ladder ascent confirmed in the desktop VR simulator; both builds and 71 native tests pass. Headset/server ladder testing remains pending. The intermittent installer failure on another PC remains under investigation.
+
+
 ## BF2142 0.2.0-beta.2 quality hotfix
 
 - Raise headset source to 1600x900 and add a bounded render-size override.

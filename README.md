@@ -1,12 +1,12 @@
-# Battlefield 2142 VR — 0.2.0-beta.2
+# Battlefield 2142 VR — 0.2.0-beta.3
 
 A PC VR port based on [BFVR by JayBiggsGMG and the BFVR contributors](https://github.com/JayBiggsGMG/BFVR-Battlefield-1942-VR-Mod). Play bot matches or join compatible multiplayer servers alongside desktop players.
 
-**[VR quality hotfix and downloads](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.2)** — [resolution / AA settings](docs/BF2142_RENDER_QUALITY.md).
+**[VR ladder/input hotfix and downloads](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.3)** — [resolution / AA settings](docs/BF2142_RENDER_QUALITY.md).
 
 | Download | Who needs it? |
 | --- | --- |
-| [BF2142-VR-0.2.0-beta.2.zip](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.2/BF2142-VR-0.2.0-beta.2.zip) | VR players: quality-updated runtime and reversible setup. Includes the remote-player IK receiver. |
+| [BF2142-VR-0.2.0-beta.3.zip](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.3/BF2142-VR-0.2.0-beta.3.zip) | VR players: ladder/input fixes, quality update and reversible setup. Includes the remote-player IK receiver. |
 | [BF2142-Flat-0.2.0-beta.1.zip](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.1/BF2142-Flat-0.2.0-beta.1.zip) | Monitor players: run the included EXE to join the community test server with tracked-player visuals. No SteamVR, headset or separate .NET installation. |
 
 VR players do **not** install the flat addon too. Unmodified desktop clients can play on a compatible server, but need the addon to see VR gestures and use our proximity voice. The server also needs the VR server adapter and community bridge. This is a beta, with remaining animation and compatibility issues.
@@ -19,7 +19,7 @@ You need your own working **BF2142 v1.51** installation on Windows x64. Set up R
 2. Connect your headset to SteamVR. Use **Battlefield 2142 VR Beta** / installed `Play VR.cmd` for singleplayer.
 3. The separate [community helper](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.1) still selects its beta.1 runtime. Normal servers are selectable in-game from the updated Play VR launcher.
 
-**Updating from alpha or beta.1:** run the old installation's `Uninstall.cmd`, then rename that game's `BF2142VR` folder to keep its backups. Install the beta from a fresh extraction. Do not overwrite the old installer folder. For a flat-addon update, close the game and use the new EXE instead of the older playtest EXE.
+**Updating from alpha or an earlier beta:** run the old installation's `Uninstall.cmd`, then rename that game's `BF2142VR` folder to keep its backups. Install the beta from a fresh extraction. Do not overwrite the old installer folder. For a flat-addon update, close the game and use the new EXE instead of the older playtest EXE.
 
 - [Full installation instructions](scripts/bf2142/package/START%20HERE.txt) / [controls](scripts/bf2142/package/CONTROLS.txt) / [troubleshooting](scripts/bf2142/package/TROUBLESHOOTING.txt)
 - [Flat addon and Reclamation Hub integration](docs/FLAT_ADDON.md)

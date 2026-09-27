@@ -1,5 +1,10 @@
 # BFVR AI and Developer Handoff
 
+## Beta.3 ladder/input hotfix
+
+Native ladder entry checks native pitch even when the headset uses the level comfort camera. A local reproduction showed +81.5 degrees hidden downward look; correcting it enabled attachment and ~5m ascent. The owner also confirmed the permanent desktop build. NativeLookPitch supplies HMD pitch with a native-only 5-degree upward bias to pass the stock bottom-entry gate at level view. NativeComfort writes axis 5 once per generated action batch and clears other pitch values in that batch. The existing stock input adapter also carries snap yaw (axis 4), replacing the custom snap event. Signature checks cover input layout, native axis factors, weapon look scale and signed-short /100 codec. Fresh focused on-foot local VR samples only; menus, stale/lost tracking, death, vehicles and mounted traversal retain native behavior. No IK solver, rendered comfort frame or network protocol change. Tests cover batch wrap, yaw/pitch coexistence, untouched unrelated bytes, owner/focus/death/mount guards and codec convergence. Both builds and 71 tests pass. Headset and remote-server ladder acceptance is pending; release authorized by owner after the desktop climb check. Exact staged install/check/reinstall/rollback checks are recorded in release CHECKS.txt.
+
+
 ## Quality hotfix invariants
 
 Keep native window, D3D9 backbuffer and Flash canvas at the same widescreen size.

@@ -76,6 +76,13 @@ void TraversalControls::Update(const TraversalSample& s,const shared::SharedCont
   if((stick.flags&shared::kControllerHandFlagThumbstickActive)&&std::isfinite(stick.thumbstickY)&&std::abs(stick.thumbstickY)>.25f)climbing=false;
  }
  hand=selected;
+ // An intentional thumbstick climb wins over a stationary held grip. A player
+ // commonly reaches the ladder still squeezing the weapon hand. That must not
+ // enter gesture mode and cancel all upward input.
+ const auto& climbStick=input.hands[0];
+ if((climbStick.flags&shared::kControllerHandFlagThumbstickActive)&&std::isfinite(climbStick.thumbstickY)&&std::abs(climbStick.thumbstickY)>.25f){
+  climbing=false;debt=0;hand=-1;
+ }
  if(climbing){c.keys[0x11]=selected>=0&&debt>.018f?0x80:0;c.keys[0x1f]=selected>=0&&debt<-.018f?0x80:0;c.keys[0x1e]=c.keys[0x20]=0;}
  c.buttons[0]=c.buttons[1]=0;
 }

@@ -1,20 +1,20 @@
-BF2142 VR 0.2.0-beta.2 - Quality hotfix
+BF2142 VR 0.2.0-beta.3 - Ladder/input hotfix
 
-- Headset source raised from 1280x720 to 1600x900; menus keep a matching canvas.
-- Actual native 8x MSAA with supported 4x/2x fallback and device-create retry.
-- VR CONTROLS moved to top center, leaving the native Exit X accessible.
-- Setup preserves error output and exit codes in LocalAppData/BF2142VR/SetupLogs.
+- Fix ladder attachment blocked by an invisible downward native look angle.
+- Held grips no longer cancel deliberate ladder thumbstick movement.
+- Snap turning now uses the game's stock network input; no custom snap event.
+- Includes beta.2: 1600x900 source, actual native MSAA, accessible menu Exit,
+  and persistent installer errors/logs.
 
 Use your own BF2142 v1.51 installation. Close the game before setup.
 Updating: run the old installed Uninstall.cmd, move its BF2142VR folder aside
 with backups intact, then run this package's Setup.cmd. Do not merge ZIPs.
-This VR package is for the installed Play VR launcher. The separate community
-helper and flat addon retain beta.1 until their own update is prepared.
+The separate community helper and flat addon remain at beta.1.
 
-Installer failures reported on another PC are still under investigation; logs
-now retain enough detail to diagnose them. Crosshair VISIBLE still means the
-native flat HUD crosshair, not a controller-directed aim marker. Leave hidden.
-Further weapon/ladder changes and texture upscaling are not in this hotfix.
-
-Build/tests, GPU readback and local desktop checks do not replace headset
-comfort/performance testing. No new headset acceptance claim for this hotfix.
+Ladder ascent was confirmed in desktop VR simulation. Both native builds and
+71 tests pass; this is not new headset or remote-server ladder acceptance.
+Installer failures reported on another PC remain under investigation. If setup
+fails, retain the log from LocalAppData/BF2142VR/SetupLogs. A successful local
+install does not establish that the reported intermittent failure is solved.
+Experimental optics, weapon grip changes and texture upscaling are not included.
+Crosshair VISIBLE still means the native flat HUD; leave it hidden in VR.

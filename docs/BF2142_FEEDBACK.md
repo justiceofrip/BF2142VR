@@ -10,7 +10,7 @@ Reported 2026-09-27, primarily from Alpha.1 with Beta.1 setup attempts.
 | VR CONTROLS overlaps native Exit X | Fixed in quality hotfix: move button and hit region to top center; right-hand exit area no longer intercepted. |
 | Severe geometry jaggies despite 8x in video menu | Native MSAA fix included; GPU resolve/readback checked at 0/2/4/8x. Transparency shimmer and old textures are separate issues. |
 | Native ADS reticle below weapon, missing EU SMG/launcher optics, sniper alignment, launcher grip | Private gameplay candidate; keep separate from urgent quality release until native checks finish. |
-| Cannot attach to / climb ladders | Private candidate fixes stick input suppressed by grip gestures; attachment still requires reproduction. |
+| Cannot attach to / climb ladders | Beta.3 fixes hidden downward native pitch blocking entry, and held-grip/stick conflict. Owner confirmed climbing in desktop VR simulation. Headset/server ladder acceptance remains pending. |
 | Muddy textures / upscale comparison | Lowest priority; optional experiment only, no texture pack installed or distributed. |
 
 These reports do not establish that every EA/Reclamation installation fails.

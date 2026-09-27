@@ -1,5 +1,6 @@
 #include "NativeComfort.h"
-#include "multiplayer/NativeNetwork.h"
+#include "StockTurnAxis.h"
+#include "NativeLookPitch.h"
 #include "ComfortCamera.h"
 #include "MovementFrame.h"
 #include "ComfortControls.h"
@@ -22,6 +23,11 @@ SRWLOCK lock=SRWLOCK_INIT;
 ComfortYaw yaw;NativeTurnPulse turnPulse;TraversalView traversalView;bool traversalProfile=false;
 bool physicalCamera=false;PhysicalCameraHeight physicalHeight;
 bool installed=false;volatile LONG reported=0;
+using InputBatch=void(__thiscall*)(void*,int,float);
+using LookScale=float(__thiscall*)(void*);
+InputBatch nativeInputBatch=nullptr;LookScale nativeLookScale=nullptr;
+bool stockTurnInstalled=false,stockPitchInstalled=false;
+struct PitchSample {std::uint64_t owner=0;ULONGLONG tick=0;float degrees=0;} lookPitch;
 LogFunction logLine=nullptr;
 template<class T>T Read(const void* p,size_t offset){T v{};std::memcpy(&v,static_cast<const BYTE*>(p)+offset,sizeof(v));return v;}
 bool Match(const BYTE* p,std::initializer_list<int> values){size_t i=0;for(int v:values){if(v>=0&&p[i]!=v)return false;++i;}return true;}
@@ -66,21 +72,119 @@ bool ReadInfantry(Infantry* out){
 std::uint64_t TurnOwner(const Infantry& owner){return (std::uint64_t(reinterpret_cast<std::uintptr_t>(owner.identity))<<32)|reinterpret_cast<std::uintptr_t>(owner.soldier);}
 bool Focused(){DWORD pid=0;GetWindowThreadProcessId(GetForegroundWindow(),&pid);return pid==GetCurrentProcessId();}
 float LocalLookInput(void* soldier,const void* caller,float result){
-    // The native caller adds this exact horizontal delta to its look input.
-    // Only this local input call may consume a snap. Native heading, soldier
-    // orientation and HUD/minimap then advance through the normal game path.
-    // Record actual recoil separately so comfort never subtracts intentional turns.
+    // Observe actual recoil only at the local infantry input caller. Snap yaw
+    // lives in its generated action, so comfort never subtracts intentional turns.
     if(caller==game+0x18acfe){
         Infantry owner{};
         if(ReadInfantry(&owner) && owner.soldier==soldier){
             AcquireSRWLockExclusive(&lock);
             yaw.Bind(reinterpret_cast<std::uintptr_t>(owner.identity));yaw.AddRecoil(result);
-            const float turn=turnPulse.Consume(TurnOwner(owner),Focused(),GetTickCount64());
             ReleaseSRWLockExclusive(&lock);
-            return result+turn;
+            // Recoil stays native. Intentional yaw is already in the stock
+            // action shared by local prediction and every multiplayer server.
+            return result;
         }
     }
     return result;
+}
+// The verified input manager builds a ring of 0x118-byte actions. Insert
+// into its first newly built action after all control maps have contributed,
+// before GetAction, native prediction or the compact network codec can read it.
+bool ApplyStockTurn(void* action,float factor){
+ Infantry owner{};
+ const bool valid=installed&&stockTurnInstalled&&Focused()&&ReadInfantry(&owner);
+ AcquireSRWLockExclusive(&lock);
+ const float degrees=turnPulse.Consume(valid?TurnOwner(owner):0,valid,GetTickCount64());
+ ReleaseSRWLockExclusive(&lock);
+ if(!degrees||!action)return false;
+ __try {
+  const auto mask=Read<DWORD>(action,0x100);
+  const auto value=StockTurnAxis(mask&0x10?Read<float>(action,0x10):0.f,degrees,factor);
+  if(!value)return false;
+  std::memcpy(static_cast<BYTE*>(action)+0x10,&*value,sizeof(float));
+  const DWORD present=mask|0x10;std::memcpy(static_cast<BYTE*>(action)+0x100,&present,sizeof(present));
+  return true;
+ }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+}
+bool ReadInputBatch(void* input,int* sequence,int* capacity,BYTE** actions){
+ __try {
+  if(!input||Read<void*>(input,0)!=game+0x58de40||Read<int>(input,0x38)!=0)return false;
+  *sequence=Read<int>(input,0x24);*capacity=Read<int>(input,0x2c);*actions=Read<BYTE*>(input,0x34);
+  return *sequence>=0&&*capacity==16&&*actions;
+ }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+}
+float StockLookFactor(){
+ Infantry owner{};if(!installed||!ReadInfantry(&owner)||!nativeLookScale)return 0;
+ __try {
+  const auto factor=Read<const float*>(game,0x668e4c);
+  return factor?*factor*nativeLookScale(owner.soldier):0;
+ }__except(EXCEPTION_EXECUTE_HANDLER){return 0;}
+}
+bool ApplyStockPitch(BYTE* actions,int start,int capacity,int count,float factor){
+ Infantry owner{};
+ if(!actions||start<0||capacity!=16||count<=0||count>capacity||!installed||!stockPitchInstalled||!Focused()||!ReadInfantry(&owner))return false;
+ TraversalSample traversal;
+ if(!ReadNativeTraversal(&traversal)||traversal.mode!=TraversalMode::Foot)return false;
+ AcquireSRWLockShared(&lock);const auto sample=lookPitch;ReleaseSRWLockShared(&lock);
+ const auto now=GetTickCount64();
+ if(sample.owner!=TurnOwner(owner)||!sample.tick||now<sample.tick||now-sample.tick>150)return false;
+ __try {
+  const auto value=NativePitchAxis(Read<float>(owner.soldier,0x270),sample.degrees,factor);
+  if(!value)return false;
+  // One correction across the batch, not once per action. Later actions clear
+  // native mouse pitch too, so a stall cannot apply the same correction twice.
+  for(int i=0;i<count;++i){
+   auto* a=actions+size_t((std::int64_t(start)+i)%capacity)*0x118;
+   const float pitch=i?0.f:*value;const DWORD mask=Read<DWORD>(a,0x100)|0x20;
+   std::memcpy(a+0x14,&pitch,sizeof(pitch));std::memcpy(a+0x100,&mask,sizeof(mask));
+  }
+  return true;
+ }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+}
+float StockPitchFactor(){
+ Infantry owner{};if(!installed||!stockPitchInstalled||!nativeLookScale||!ReadInfantry(&owner))return 0;
+ __try {const auto factor=Read<const float*>(game,0x668f24);return factor?*factor*nativeLookScale(owner.soldier):0;}
+ __except(EXCEPTION_EXECUTE_HANDLER){return 0;}
+}
+bool StockPitchProfile(){
+ __try {
+  return Match(game+0x18abe5,{0x83,0xe6,0x20})&&
+   Match(game+0x18abf1,{0xd9,0x85,0x44,0xfe,0xff,0xff})&&
+   Match(game+0x18abff,{0x8b,0x15})&&Read<void*>(game,0x18ac01)==game+0x668f24&&
+   Match(game+0x18ac51,{0xe8,0xca,0xb7,0xff,0xff})&&
+   Match(game+0x18ad21,{0xd8,0x83,0x70,2,0,0})&&Match(game+0x18ad35,{0xd9,0x9b,0x70,2,0,0})&&
+   Match(game+0x183c70,{0x83,0xe0,0x20})&&Match(game+0x183c79,{0x8b,0x4f,0x14})&&
+   Match(game+0x183c9c,{0x66,0x89,0x46,0x0e})&&Read<float>(game,0x56545c)==100.f;
+ }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+}
+void __fastcall InputBatchHook(void* input,void*,int count,float dt){
+ int before=0,capacity=0;BYTE* actions=nullptr;
+ const bool eligible=count>0&&count<=16&&ReadInputBatch(input,&before,&capacity,&actions);
+ nativeInputBatch(input,count,dt);
+ if(!eligible)return;
+ int after=0,newCapacity=0;BYTE* current=nullptr;
+ if(ReadInputBatch(input,&after,&newCapacity,&current)&&current==actions&&capacity==newCapacity&&
+    std::int64_t(after)-before==count){
+  ApplyStockTurn(actions+size_t(before%capacity)*0x118,StockLookFactor());
+  ApplyStockPitch(actions,before,capacity,count,StockPitchFactor());
+ }
+}
+bool InstallStockTurn(){
+ __try {
+  if(!Match(game+0x277b70,{0x55,0x8b,0xec,0x83,0xec,0x2c,0x53,0x56,0x8b,0xf1,0x8b,0x46,0x38})||
+     !Match(game+0x277c3d,{0x8b,0x45,0xfc,0x99,0xf7,0x7e,0x2c,0x8b,0x7e,0x34})||
+     !Match(game+0x277c94,{0x8b,0x4e,0x34,0x03,0xcb,0x8b,0xd0,0xe8,0x10,0xf1,1,0})||
+     !Match(game+0x277d78,{0x8b,0x45,0xfc,0x83,0x46,0x3c,1,0x5f,0x89,0x46,0x24})||
+     !Match(game+0x277dbd,{0xc7,6})||Read<void*>(game,0x277dbf)!=game+0x58de40||
+     !Match(game+0x18abcf,{0xd9,0x85,0x40,0xfe,0xff,0xff})||
+     !Match(game+0x18abdd,{0x8b,0x0d})||Read<void*>(game,0x18abdf)!=game+0x668e4c||
+     !Match(game+0x186420,{0x55,0x8b,0xec,0x81,0xec,0,1,0,0,0x56,0x57})||
+     !Match(game+0x183c43,{0x8b,0x57,0x10,0x89,0x55,8})||
+     !Match(game+0x183c66,{0x66,0x89,0x46,0x0c})||Read<float>(game,0x56545c)!=100.f)return false;
+ }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+ if(MH_CreateHook(game+0x277b70,InputBatchHook,reinterpret_cast<void**>(&nativeInputBatch))!=MH_OK)return false;
+ if(MH_EnableHook(game+0x277b70)!=MH_OK){MH_RemoveHook(game+0x277b70);return false;}
+ nativeLookScale=reinterpret_cast<LookScale>(game+0x186420);return true;
 }
 bool CopyMovementCamera(const stereo::Matrix4* source,stereo::Matrix4* out){
  __try {if(!source)return false;*out=*source;return true;}__except(EXCEPTION_EXECUTE_HANDLER){return false;}
@@ -148,18 +252,24 @@ bool ConfigureNativeMovement(bool enabled,float trackedYawRadians){
  Infantry owner{};const bool valid=enabled&&installed&&movementInstalled&&Focused()&&std::isfinite(trackedYawRadians)&&ReadInfantry(&owner);
  AcquireSRWLockExclusive(&lock);movement=valid?MovementSample{TurnOwner(owner),GetTickCount64(),trackedYawRadians}:MovementSample{};ReleaseSRWLockExclusive(&lock);return valid;
 }
+bool ConfigureNativeLookPitch(bool enabled,const stereo::Pose& head){
+ Infantry owner{};TraversalSample traversal;const auto pitch=NativeHeadPitch(head);
+ const bool valid=enabled&&installed&&stockPitchInstalled&&Focused()&&pitch&&ReadInfantry(&owner)&&
+  ReadNativeTraversal(&traversal)&&traversal.mode==TraversalMode::Foot;
+ AcquireSRWLockExclusive(&lock);lookPitch=valid?PitchSample{TurnOwner(owner),GetTickCount64(),*pitch}:PitchSample{};ReleaseSRWLockExclusive(&lock);return valid;
+}
 bool ReadNativeMovementYaw(const void* soldier,float* offsetDegrees){
  Infantry owner{};if(!offsetDegrees||!installed||!movementInstalled||!Focused()||!ReadInfantry(&owner)||owner.soldier!=soldier)return false;
  AcquireSRWLockShared(&lock);const auto sample=movement;const auto recoil=yaw.owner==reinterpret_cast<std::uintptr_t>(owner.identity)?yaw.recoilDegrees:0;ReleaseSRWLockShared(&lock);
  const auto now=GetTickCount64();if(sample.owner!=TurnOwner(owner)||!sample.tick||now<sample.tick||now-sample.tick>150)return false;
  const auto offset=MovementYawOffset(recoil,sample.trackedYaw);if(!offset)return false;*offsetDegrees=*offset;return true;
 }
-bool NativeSnapTurnAvailable(){TraversalSample traversal;if(ReadNativeTraversal(&traversal)&&traversal.mode!=TraversalMode::Foot)return false;Infantry owner{};return installed && ReadInfantry(&owner);}
+bool NativeSnapTurnAvailable(){TraversalSample traversal;if(ReadNativeTraversal(&traversal)&&traversal.mode!=TraversalMode::Foot)return false;Infantry owner{};return installed && stockTurnInstalled && ReadInfantry(&owner);}
 bool RequestNativeSnapTurn(float degrees,std::int64_t sampleTime){
-    Infantry owner{};if(!installed||!Focused()||!ReadInfantry(&owner))return false;
+    Infantry owner{};if(!installed||!stockTurnInstalled||!Focused()||!ReadInfantry(&owner))return false;
     AcquireSRWLockExclusive(&lock);
     const bool queued=turnPulse.Queue(TurnOwner(owner),degrees,sampleTime,GetTickCount64());
-    ReleaseSRWLockExclusive(&lock);if(queued)PublishNetworkSnap(owner.soldier,degrees);return queued;
+    ReleaseSRWLockExclusive(&lock);return queued;
 }
 void ClearNativeSnapTurn(){AcquireSRWLockExclusive(&lock);turnPulse.Cancel();ReleaseSRWLockExclusive(&lock);}
 bool InstallNativeComfort(LogFunction logger){
@@ -177,9 +287,11 @@ bool InstallNativeComfort(LogFunction logger){
         Read<void*>(game+0x567790,0x50)==game+0x19e1a0 && Read<void*>(game+0x56e518,0x50)==game+0x1d0280 &&
         Match(game+0x19ded1,{0xc7,0x06}) && Read<void*>(game,0x19ded3)==game+0x5673d8 &&
         Match(game+0x1d0092,{0xc7,0x06}) && Read<void*>(game,0x1d0094)==game+0x56e818;
+    stockTurnInstalled=InstallStockTurn();logger("Snap turn stock multiplayer input: %s; no server snap event.",stockTurnInstalled?"connected":"profile unavailable");
+    stockPitchInstalled=stockTurnInstalled&&StockPitchProfile();logger("VR ladder entry pitch: %s.",stockPitchInstalled?"stock network input follows headset":"profile unavailable; original input retained");
     movementInstalled=InstallMovementCamera();logger("VR movement basis: %s.",movementInstalled?"native walking/sprint heading connected":"unavailable; original input retained");
     installed=true;logger("Traversal comfort profile: %s.",traversalProfile?"ladder and stock parachute":"unavailable");
-    logger("Infantry VR comfort connected: native snap-turn input, level heading, head recoil excluded, native recoil retained.");return true;
+    logger("Infantry VR comfort connected: stock action snap-turn input, level heading, head recoil excluded, native recoil retained.");return true;
 }
 bool ReadNativeComfortCamera(const stereo::Matrix4& nativeWorld,stereo::Matrix4* stableWorld,const void* expectedSoldier){
     if(!installed||!stableWorld)return false;

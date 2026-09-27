@@ -65,5 +65,9 @@ int main(){
  input.hands[0].flags|=shared::kControllerHandFlagThumbstickActive;input.hands[0].thumbstickY=1;
  input.predictedDisplayTime+=20000000;command={};command.keys[0x1e]=0x80;command.mouseY=120;command.snapDegrees=30;
  controls.Update(state,input,{},command);CHECK(command.keys[0x11]&&!command.keys[0x1e]&&!command.mouseY&&!command.snapDegrees);
+ // Holding a grip during ladder entry must not eat explicit stick climbing.
+ for(auto& h:input.hands)h.squeezeValue=1;
+ for(int i=0;i<5;++i){input.predictedDisplayTime+=20000000;command={};controls.Update(state,input,{},command);CHECK(command.keys[0x11]&&!command.keys[0x1f]);}
+ input.hands[0].thumbstickY=-1;input.predictedDisplayTime+=20000000;command={};controls.Update(state,input,{},command);CHECK(command.keys[0x1f]&&!command.keys[0x11]);
  puts("Mirrored fist flexion, independent off-hand, mounted horizon/translation, native chute pulses and ladder pull debt passed.");
 }
