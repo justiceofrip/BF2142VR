@@ -1,24 +1,20 @@
-BATTLEFIELD 2142 VR 0.2.0-beta.1
+BF2142 VR 0.2.0-beta.2 - Quality hotfix
 
-Multiplayer beta: tracked head/arms/fingers/items, coherent observer smoothing,
-body follow, cosmetic self-collision and fist-bump haptic implementation.
-VR includes the same remote-player receiver shipped in the separate flat addon.
+- Headset source raised from 1280x720 to 1600x900; menus keep a matching canvas.
+- Actual native 8x MSAA with supported 4x/2x fallback and device-create retry.
+- VR CONTROLS moved to top center, leaving the native Exit X accessible.
+- Setup preserves error output and exit codes in LocalAppData/BF2142VR/SetupLogs.
 
-Latest fixes: stronger equipment pulses and left-hand crate cues, observer-only
-native arm-recoil isolation and improved arm-segment clearance. Automated tests
-pass; those changes have not had another visual/haptic session. Existing torso
-calibration remains; some body/shoulder jank is still present.
+Use your own BF2142 v1.51 installation. Close the game before setup.
+Updating: run the old installed Uninstall.cmd, move its BF2142VR folder aside
+with backups intact, then run this package's Setup.cmd. Do not merge ZIPs.
+This VR package is for the installed Play VR launcher. The separate community
+helper and flat addon retain beta.1 until their own update is prepared.
 
-Includes community controller aiming, MP ADS/movement/snap fixes, left-hand
-crate throws, Titan/silo marker suppression, signed downloads and encrypted
-pose/audio transport. Proximity voice worked with the second vrtester client;
-separate-PC microphone routing/quality still needs broader testing.
+Installer failures reported on another PC are still under investigation; logs
+now retain enough detail to diagnose them. Crosshair VISIBLE still means the
+native flat HUD crosshair, not a controller-directed aim marker. Leave hidden.
+Further weapon/ladder changes and texture upscaling are not in this hotfix.
 
-Preserves stereo/6DoF, tracked hands/weapons, physical ADS/stance, two-hand grips,
-body holsters, laser UI, floating HUD, walker lobby and vehicle/traversal work.
-No manual reloads, physical steering wheels, knife hand-to-hand transfer or new
-cockpits in this main beta. Separate SP experiments remain parked.
-Stock v1.51 required; Remaster and full collision-aware roomscale unverified.
-
-Both native builds/71 CTests and 279 community checks pass. See release CHECKS.
-Source/IK guide: https://github.com/justiceofrip/BF2142VR/tree/main/docs/ik
+Build/tests, GPU readback and local desktop checks do not replace headset
+comfort/performance testing. No new headset acceptance claim for this hotfix.

@@ -4,8 +4,26 @@ $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $worker=Join-Path $PSScriptRoot 'SetupAssets.exe'
 function Run-Worker([string[]]$Arguments){
- & $worker @Arguments
- if($LASTEXITCODE -ne 0){throw 'Setup did not finish. Read the message above; your backup is retained.'}
+ # Native stderr must not become a terminating PowerShell exception that hides
+ # the actual worker traceback or bypasses its exit-code check.
+ $logs=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'BF2142VR\SetupLogs'
+ [void][IO.Directory]::CreateDirectory($logs)
+ $log=Join-Path $logs ('setup-'+[DateTime]::Now.ToString('yyyyMMdd-HHmmss-fff')+'.log')
+ Write-Host "Setup log: $log"
+ $savedPreference=$ErrorActionPreference
+ try {
+  $ErrorActionPreference='Continue'
+  & $worker @Arguments 2>&1 | ForEach-Object {
+   $line=$_.ToString();Write-Host $line
+   Add-Content -LiteralPath $log -Value $line -Encoding UTF8
+  }
+  $code=$LASTEXITCODE
+ } finally {$ErrorActionPreference=$savedPreference}
+ if($code -ne 0){
+  $hex='{0:X8}' -f ([long]$code -band 0xffffffffL)
+  Add-Content -LiteralPath $log -Value "Worker exit: $code (0x$hex)" -Encoding UTF8
+  throw "Setup stopped (exit $code / 0x$hex). Details: $log. Original backups are retained if setup reached the backup stage."
+ }
 }
 function Pick-Game {
  Add-Type -AssemblyName System.Windows.Forms

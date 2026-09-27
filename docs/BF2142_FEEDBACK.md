@@ -4,7 +4,7 @@ Reported 2026-09-27, primarily from Alpha.1 with Beta.1 setup attempts.
 
 | Report | Status / next action |
 | --- | --- |
-| Setup fails inconsistently, sometimes only “Setup did not finish”, sometimes “function object is not iterable”, sometimes during weapon repair | Open. Preserve the exact error; add persistent worker logs/tracebacks and investigate the failing stage. Origin/EA App + Reclamation reported. Do not call repeated retries a fix. |
+| Setup fails inconsistently, sometimes only “Setup did not finish”, sometimes “function object is not iterable”, sometimes during weapon repair | Open. Preserve the exact error; Beta.2 retains worker output, traceback, crash trace and exit code under LocalAppData/BF2142VR/SetupLogs. All 28 stock repairs and rollback passed locally; investigate the failing machine using its log. Origin/EA App + Reclamation reported. Do not call repeated retries a fix. |
 | Low-resolution, blurry VR; in-game resolution/AA settings unclear | Quality hotfix: 1600x900 headset source, explicit render-size override, actual native MSAA with capability fallback. See render-quality guide. 8x source and readable menus checked on desktop; headset performance still needs feedback. |
 | Enabled crosshair does not follow tracked gun | Confirmed design gap: existing toggle controls the flat HUD crosshair, not a gun-directed world reticle. Default stays hidden. Track a proper controller/bore-directed alternative separately. |
 | VR CONTROLS overlaps native Exit X | Fixed in quality hotfix: move button and hit region to top center; right-hand exit area no longer intercepted. |

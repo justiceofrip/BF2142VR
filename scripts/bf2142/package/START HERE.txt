@@ -1,4 +1,4 @@
-BATTLEFIELD 2142 VR 0.2.0-beta.1
+BATTLEFIELD 2142 VR 0.2.0-beta.2
 
 Requires your own working stock BF2142 v1.51 on Windows x64.
 Set up Reclamation/OpenSpy separately and confirm you can log in.
@@ -6,7 +6,7 @@ VR already includes the remote IK receiver. Do not also install the flat addon.
 Remaster/other weapon packs are not supported by this installer.
 
 INSTALL / UPDATE
-1. Close BF2142. Updating alpha? Run its installed Uninstall.cmd first.
+1. Close BF2142. Updating alpha/beta.1? Run its installed Uninstall.cmd first.
    Rename that game's BF2142VR folder to preserve backups/settings.
    Do not overwrite the old installer folder with this ZIP.
 2. Extract the entire beta ZIP into a new folder.
@@ -16,12 +16,11 @@ INSTALL / UPDATE
    desktop or installed Play VR.cmd for singleplayer/bot matches.
 
 COMMUNITY MULTIPLAYER
-Use Join Community Server.cmd from this extracted ZIP. Choose Play in VR and
-log in with your own Reclamation/OpenSpy account. Leave the helper running.
-It verifies/downloads the community payload and joins the temporary test server.
-If direct join stalls after login: IP 18.190.153.177, port 17567.
-The server may be offline. Ordinary game/Hub shortcuts do not activate this mod.
-Other community hosts need the VR server adapter and bridge too.
+This hotfix updates the installed Play VR runtime. The separate community
+join helper/flat addon remains at beta.1 and selects its own signed runtime.
+Use the previous community download for that path; this ZIP does not bundle it.
+Normal servers can be selected in-game; custom gestures/voice need the matching
+server adapter and bridge. The community test server may be offline.
 
 CONTROLS
 Right-stick click recenters. B opens the game menu; VR CONTROLS opens settings.

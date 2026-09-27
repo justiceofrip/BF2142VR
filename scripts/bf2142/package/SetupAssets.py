@@ -9,7 +9,7 @@ import ExportLobbyScene as lobby
 from PIL import Image
 
 APP='BF2142VR'
-VERSION='0.2.0-beta.1'
+VERSION='0.2.0-beta.2'
 STOCK='1a9903113df3fa5b24282ce8d2adbf54ddb58160155b28dea09f26fe85b782f9'
 COMPLETE='e5d605ed915adac29c57840835d900bbc68a3c3ea4a2c7f7077000f6db8c144d'
 WEAPONS='mods/bf2142/Objects/Weapons_client.zip'
@@ -142,7 +142,7 @@ def refresh_settings(root):
         # Native Windows INI writes may add a UTF-16 BOM.
         raw=path.read_bytes();text=raw.decode('utf-16') if raw[:2] in (b'\xff\xfe',b'\xfe\xff') else raw.decode('utf-8-sig');c.read_string(text)
     if not c.has_section('VR'):c.add_section('VR')
-    defaults={'WorldScale':'1.0','HeightOffset':'0','TurnSpeed':'600','Controllers':'1','TrackedWeapon':'0','MotionHands':'1','WeaponOptics':'1','AutomaticADS':'1','BodyInventory':'1','FingerPoses':'1','MotionActions':'1','WeaponFaceFade':'0','SnapTurning':'1','SnapAngle':'30','HideCrosshair':'1','PhysicalStance':'1','StandingHeight':'0','MenuRoom':'1','ToggleWeaponGrip':'1','GrenadeArc':'1','MovementDirection':'head'}
+    defaults={'WorldMSAASamples':'8','WorldScale':'1.0','HeightOffset':'0','TurnSpeed':'600','Controllers':'1','TrackedWeapon':'0','MotionHands':'1','WeaponOptics':'1','AutomaticADS':'1','BodyInventory':'1','FingerPoses':'1','MotionActions':'1','WeaponFaceFade':'0','SnapTurning':'1','SnapAngle':'30','HideCrosshair':'1','PhysicalStance':'1','StandingHeight':'0','MenuRoom':'1','ToggleWeaponGrip':'1','GrenadeArc':'1','MovementDirection':'head'}
     for key,value in defaults.items():
         if key not in c['VR']:c['VR'][key]=value
     c['VR']['BodyEquipmentFile']=str(root/'generated/BodyEquipment.bin');c['VR']['LobbySceneFile']=str(root/'generated/LobbyScene.bin')
@@ -202,7 +202,7 @@ def install(game,payload):
         if exe!=patched:
             (stage/'backups/BF2142.exe').write_bytes(exe);(stage/'generated/BF2142.exe').write_bytes(patched)
             changes.append({'target':'BF2142.exe','backup':'backups/BF2142.exe','original':hashlib.sha256(exe).hexdigest(),'installed':hashlib.sha256(patched).hexdigest()})
-        m={'app':APP,'version':VERSION,'build':'v35h-beta1','game':str(game),'status':'prepared','changes':changes}
+        m={'app':APP,'version':VERSION,'build':'quality-hotfix-beta2','game':str(game),'status':'prepared','changes':changes}
         write_json(stage/'install.json',m);running(game)
         for row in changes:
             if sha(child(game,row['target']))!=row['original']:raise ValueError('Game files changed during setup')
@@ -245,5 +245,10 @@ def main():
             m=json.loads((root/'install.json').read_text(encoding='utf-8'));restore(root,m)
             print('Original game files restored. VR is disabled. This BF2142VR folder retains your backups and settings; you may remove it after closing setup.')
 if __name__=='__main__':
+    import faulthandler,traceback
+    faulthandler.enable()
     try:main()
-    except Exception as error:print('\nSETUP STOPPED:',error,flush=True);sys.exit(1)
+    except Exception as error:
+        print('\nSETUP STOPPED:',error,flush=True)
+        traceback.print_exc()
+        sys.exit(1)

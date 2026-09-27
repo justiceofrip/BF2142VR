@@ -47,3 +47,16 @@ when setup needed to enable its large-address-aware memory flag.
 REINSTALL / MOVING THE GAME
 Uninstall before moving the game or installing another weapon pack. After
 uninstall, move the old BF2142VR folder aside and run a fresh Setup.cmd.
+
+SETUP STOPS WITHOUT A USEFUL MESSAGE
+Use beta.2 or newer. Setup prints and retains a log under
+%LOCALAPPDATA%\BF2142VR\SetupLogs, including the worker exit code and
+Python traceback. Share that log when reporting failures; review paths first.
+A differing error on each attempt is not proof that reinstalling will fix it.
+
+BLUR / JAGGIES
+The updated launcher uses a 1600x900 source per eye; its size overrides the
+in-game resolution at startup. The VR runtime requests actual 8x geometry AA.
+For lower GPU cost, set WorldMSAASamples=4 or 2 in BF2142VR.ini, then restart.
+0 preserves native AA behavior. Texture detail and wireless streaming blur
+are separate. No texture pack is included.
