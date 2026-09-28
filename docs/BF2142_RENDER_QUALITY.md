@@ -1,14 +1,13 @@
 # BF2142 VR render quality
 
-## Separate beta.4-test.1 experimental build
+## Separate beta.4-test.2 experimental build
 
-The test launcher queries the active OpenXR runtime before starting BF2142.
-Its recommended eye dimensions determine a widescreen source, capped at
-3072x1728 to bound the 32-bit renderer's memory use. An explicit
-`--render-size 1920x1080` (or another supported size) takes precedence. A missing
-headset or failed query retains 1600x900. Restart after changing runtime render
-resolution. The exact source and recommendation are printed by the launcher.
-Runtime output remains the runtime's recommended dimensions and FOV.
+Test.2 restores the verified **1600x900 native source**. Test.1 automatically
+raised that source using the runtime recommendation and broke the native menu
+layout in the owner playtest. That automatic enlargement has been removed.
+OpenXR continues to choose output eye dimensions and FOV. Output supersampling
+does not recover detail absent from the source. Explicit --render-size remains
+experimental: unsupported layouts may distort the native menus.
 
 This is a higher-detail candidate, not a promise of higher FPS. Rendering more
 pixels costs more; reduce runtime resolution or use --render-size if needed.

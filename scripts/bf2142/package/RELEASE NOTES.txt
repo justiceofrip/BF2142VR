@@ -1,12 +1,13 @@
-BF2142 VR 0.2.0-beta.4-test.1 - Experimental wrist / rendering hotfix
+BF2142 VR 0.2.0-beta.4-test.2 - Experimental wrist / rendering hotfix
 
-Separate optional test build. Beta.3 remains the previous fallback.
+Menu correction to test.1. Separate optional build; beta.3 remains the fallback.
 - Look at the left wrist, then use the right laser/trigger on DEPLOY to open
   the native spawn/loadout panel. This does not open the settings menu.
 - Holstered equipment uses full-resolution GPU rendering and filtered textures,
   replacing its low-resolution CPU image. Setup regenerates nearer model LODs.
-- OpenXR-recommended source sizing, bounded to 3072x1728 for the native renderer;
-  explicit --render-size wins, unavailable query falls back to 1600x900.
+- Fix test.1 distorted/unusable native menus: restore the verified 1600x900
+  source and remove automatic runtime-based source enlargement. OpenXR still
+  controls output eye resolution/FOV; larger native sources remain opt-in.
 - Request the game's native FPS unlock in focused headset gameplay, respecting
   its restrictions; remove desktop VSync from actual headset presentation.
 - Suppress known stray ADS HUD widgets when the crosshair is hidden.
@@ -14,7 +15,7 @@ Separate optional test build. Beta.3 remains the previous fallback.
 - Includes beta.3 ladder/snap and beta.2 installer diagnostics/AA/menu fixes.
 
 Performance changes are attempts to address bottlenecks, not measured FPS
-improvements on every PC. Higher resolution increases rendering/transfer cost.
+improvements on every PC. Larger explicit source overrides increase rendering/transfer cost.
 Try WorldMSAASamples=4 or 2 in installed BF2142VR.ini for lower AA cost.
 Both architectures build and 73 tests pass. Final packaged headset testing is
 pending. The final equipment/wrist GPU check passes, including MSAA, stereo,

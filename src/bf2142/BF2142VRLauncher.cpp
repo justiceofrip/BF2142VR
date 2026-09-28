@@ -84,23 +84,6 @@ bool InitializeClient(Process& child, const fs::path& client, const fs::path& lo
     DWORD result = 0;
     return CallRemoteString(child.info.hProcess, remote, log.wstring() + (presenter.empty() ? L"" : L"\n" + presenter) + (observerProfile.empty()?L"":L"\n"+observerProfile), result);
 }
-void RuntimeSource(bfvr::bf2142::LaunchOptions& options,const fs::path& folder) {
-    if(options.presenter.empty()||options.renderWidth||!options.windowed)return;
-    const auto output=folder/(L"runtime-view-"+std::to_wstring(GetCurrentProcessId())+L"-"+std::to_wstring(GetTickCount64())+L".txt");
-    const auto quote=bfvr::bf2142::QuoteArgument;
-    std::wstring command=quote(options.presenter)+L" --query-bf2142-view-size "+quote(output.wstring());
-    STARTUPINFOW startup{};startup.cb=sizeof(startup);startup.dwFlags=STARTF_USESHOWWINDOW;startup.wShowWindow=SW_HIDE;PROCESS_INFORMATION child{};
-    bool queried=false;
-    if(CreateProcessW(options.presenter.c_str(),command.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&startup,&child)){
-        if(WaitForSingleObject(child.hProcess,8000)==WAIT_OBJECT_0){DWORD code=1;GetExitCodeProcess(child.hProcess,&code);queried=code==0;}
-        else {TerminateProcess(child.hProcess,1);WaitForSingleObject(child.hProcess,2000);} // Only this owned preflight child.
-        CloseHandle(child.hThread);CloseHandle(child.hProcess);
-    }
-    unsigned w=0,h=0;if(queried){std::ifstream f(output);queried=bool(f>>w>>h)&&bfvr::bf2142::RuntimeSourceSize(w,h,options);}
-    std::error_code ignored;fs::remove(output,ignored);
-    if(queried)wprintf(L"OpenXR recommends %ux%u per eye; widescreen native source %ux%u (3072-wide safety limit). Override with --render-size.\n",w,h,options.renderWidth,options.renderHeight);
-    else wprintf(L"OpenXR view-size preflight unavailable; retaining the 1600x900 source.\n");
-}
 bool AlreadyRunning(const fs::path& executable) {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE) throw std::runtime_error("Could not inspect running processes.");
@@ -132,7 +115,7 @@ int Run(int argc, wchar_t** argv) {
             L"--desktop-vr runs stereo, native VR hands and menus with keyboard simulated controllers, without OpenXR.\n"
             L"--network-observer receives multiplayer arms in the native flat view; requires private network configuration.\n"
             L"--observer-profile PATH isolates Documents for a second flat client; requires an explicit join destination.\n"
-            L"Headset source follows OpenXR recommendations with a widescreen memory limit; --render-size overrides. Fallback: 1600x900.\n"
+            L"Headset source defaults to menu-compatible 1600x900. --render-size is an experimental explicit override.\n"
             L"--inspect validates paths and x86 images without starting the game.\n");
         return 0;
     }
@@ -167,7 +150,6 @@ int Run(int argc, wchar_t** argv) {
     swprintf_s(logName, L"bf2142-renderer-%04u%02u%02u-%02u%02u%02u-%lu.log",
         now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond, GetCurrentProcessId());
     const fs::path logPath = folder / L"logs" / logName;
-    RuntimeSource(options,folder / L"logs");
     std::wstring command = bfvr::bf2142::GameCommand(executable.wstring(), options);
     STARTUPINFOW startup{};
     startup.cb = sizeof(startup);

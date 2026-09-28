@@ -88,15 +88,6 @@ inline bool ParseOptions(const std::vector<std::wstring>& args,
     if ((result.desktopVr && result.diagnosticStereo) || ((result.diagnosticStereo || result.desktopVr) && !result.presenter.empty())) { error=L"Diagnostic stereo does not use a headset presenter."; return false; }
     return true;
 }
-// Match runtime pixel density while retaining BF2142's widescreen Flash
-// canvas. 32-bit renderer/MSAA memory needs a bounded source, not arbitrary
-// SteamVR supersampling allocations. Explicit --render-size always wins.
-inline bool RuntimeSourceSize(unsigned eyeWidth,unsigned eyeHeight,LaunchOptions& o){
-    if(o.presenter.empty()||o.renderWidth||eyeWidth<256||eyeHeight<256||eyeWidth>16384||eyeHeight>16384)return false;
-    const unsigned wanted=std::max(eyeWidth,(eyeHeight*16+8)/9);
-    const unsigned units=std::clamp((wanted+15)/16,80u,192u);
-    o.renderWidth=units*16;o.renderHeight=units*9;return true;
-}
 // Windows CRT quoting, including quotes and trailing backslashes.
 inline std::wstring QuoteArgument(const std::wstring& argument) {
     std::wstring out = L"\"";

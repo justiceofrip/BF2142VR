@@ -1,5 +1,19 @@
 # BFVR AI and Developer Handoff
 
+## Beta.4-test.2 native menu correction
+
+The owner playtest rejected test.1 automatic source sizing: the launcher passed
+3072x1728 and the native menu showed stretched text/unusable layout. Remove the
+launcher preflight application of runtime dimensions. Default native source is
+1600x900 again; runtime output swapchains keep their own recommended dimensions.
+The optional x64 query utility remains available for development only. Do not
+restore automatic enlargement without actual native menu/layout acceptance.
+Wrist/equipment, FPS request, VSync changes and IK are otherwise unchanged.
+The native soldier-selection menu is readable again at 1600x900. All 73 native
+tests pass. The test.2 headset session is running; user acceptance remains
+pending. A widescreen aspect ratio alone does not validate native Flash layout.
+The following test.1 section is historical; its auto-sizing was withdrawn.
+
 ## Beta.4-test.1 experimental wrist / rendering candidate
 
 WristMenu is a gaze-revealed, right-ray-selected native Enter shortcut; preserve

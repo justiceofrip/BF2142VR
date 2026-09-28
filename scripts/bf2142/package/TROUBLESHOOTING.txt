@@ -30,7 +30,7 @@ session. Avoid treating missing tracking as a new standing-height reference.
 
 CRASH OR BAD RENDERING
 Save the exact error and what you were doing. Reports should include version
-0.2.0-beta.4-test.1, headset/runtime, GPU, game mod, map and the failed action.
+0.2.0-beta.4-test.2, headset/runtime, GPU, game mod, map and the failed action.
 Client/presenter logs are under BF2142VR/runtime/x86/logs. Optional branding
 messages are under BF2142VR/logs. Check logs before sharing them for any personal
 paths or account information. Do not post credentials, original game archives,
@@ -56,9 +56,9 @@ Python traceback. Share that log when reporting failures; review paths first.
 A differing error on each attempt is not proof that reinstalling will fix it.
 
 BLUR / JAGGIES
-This test queries OpenXR for source sizing, bounded to 3072x1728 and falling
-back to 1600x900 if unavailable. It overrides the in-game resolution at startup.
-More pixels cost more performance; this is not a guaranteed FPS improvement.
+Test.2 restores the verified 1600x900 native source. Test.1 auto-sizing caused
+distorted menus and has been removed. OpenXR still controls output eye size.
+Larger explicit sources cost more work and may break native menu layout.
 The VR client requests actual 8x geometry AA with supported fallback.
 For lower GPU cost, set WorldMSAASamples=4 or 2 in BF2142VR.ini, then restart.
 0 preserves native AA behavior. Texture detail and wireless streaming blur

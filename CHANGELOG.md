@@ -1,5 +1,15 @@
 # BFVR Changelog
 
+## BF2142 0.2.0-beta.4-test.2 — menu regression hotfix
+
+- Remove test.1 automatic runtime-based source enlargement, which caused
+  distorted native menu text/layout and blocked menu use in the owner playtest.
+- Restore the previously working 1600x900 native window/backbuffer/Flash source.
+  OpenXR retains control of output eye dimensions; manual source overrides are
+  experimental. No arbitrary headset recommendation changes the native canvas.
+- Keep test.1 GPU equipment, wrist Deploy, frame pacing, kit pickup and ADS HUD
+  changes. No IK solver or network protocol changes.
+
 ## BF2142 0.2.0-beta.4-test.1 — experimental wrist / rendering hotfix
 
 - Looking at the left wrist reveals a Deploy button. Right laser/trigger opens
