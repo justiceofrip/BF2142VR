@@ -43,6 +43,7 @@ bool NativeUiCapture::Begin(IDirect3DDevice9* source,bool clear) {
     if(FAILED(hr))return Failure("describe native target",hr);
     if (!texture || width!=desc.Width || height!=desc.Height || samples!=desc.MultiSampleType || sampleQuality!=desc.MultiSampleQuality) {
         surface.Reset();texture.Reset();capture.Reset();width=desc.Width;height=desc.Height;
+        if(!opticActive){opticTexture.Reset();opticSurface.Reset();}
         samples=desc.MultiSampleType;sampleQuality=desc.MultiSampleQuality;clear=true;
         hr=device->CreateTexture(width,height,1,D3DUSAGE_RENDERTARGET,D3DFMT_A8R8G8B8,D3DPOOL_DEFAULT,&texture,nullptr);
         if(FAILED(hr))return Failure("create alpha texture",hr);
@@ -130,7 +131,21 @@ bool NativeUiCapture::CompositeDesktop() {
     const HRESULT restore=state->Apply();
     return SUCCEEDED(draw) && SUCCEEDED(end) && SUCCEEDED(restore) && SUCCEEDED(targetRestore) && SUCCEEDED(depthRestore);
 }
+bool NativeUiCapture::BeginOptic(IDirect3DDevice9* source){
+ if(active||opticActive)return false;
+ opticActive=true;texture.Swap(opticTexture);surface.Swap(opticSurface);
+ if(Begin(source,true))return true;
+ texture.Swap(opticTexture);surface.Swap(opticSurface);opticActive=false;return false;
+}
+bool NativeUiCapture::EndOptic(){
+ if(!opticActive)return false;const bool ok=Detach();
+ texture.Swap(opticTexture);surface.Swap(opticSurface);opticActive=false;return ok;
+}
+bool NativeUiCapture::ReadOptic(DXGI_FORMAT format,std::vector<DWORD>& pixels){
+ return !opticActive&&opticSurface&&SUCCEEDED(capture.ReadSurface(device,opticSurface.Get(),format,pixels,true));
+}
 void NativeUiCapture::Reset() {
+    if(opticActive)EndOptic();opticTexture.Reset();opticSurface.Reset();
     if (active && device) Detach();
     capture.Reset(); backbuffer.Reset(); surface.Reset(); texture.Reset(); width=height=0;
     samples=D3DMULTISAMPLE_NONE;sampleQuality=0;failureLogged=false;

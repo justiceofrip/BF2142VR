@@ -1,4 +1,5 @@
 #include "NativeFramePacing.h"
+#include "RenderTimeBudget.h"
 #include <vector>
 #include <array>
 #include <cstdio>
@@ -6,6 +7,13 @@ using namespace bfvr::bf2142;
 #define CHECK(x) do{if(!(x)){printf("Frame pacing line %d\n",__LINE__);return 1;}}while(0)
 template<class T>void Put(BYTE* p,size_t at,T v){std::memcpy(p+at,&v,sizeof(v));}
 int main(){
+ RenderTimeBudget time;double advanced=0;
+ for(int i=1;i<=1000;++i){if(i%14)time.Skip(.001);else advanced+=time.Take(.001);}advanced+=time.Take(0);
+ CHECK(std::abs(advanced-1)<1.e-9);CHECK(time.Take(0)==0);
+ time.Skip(.1);time.Reset();CHECK(time.Take(.01)==.01);
+ for(int i=0;i<1000;++i)time.Skip(.001);CHECK(time.Take(.001)==.25);
+ time.Skip(.01);CHECK(time.Take(1000.016667)==1000.016667);CHECK(time.Take(0)==0);
+
  std::vector<BYTE> image(0x680000);auto* g=image.data();std::array<BYTE,256> object{};
  const BYTE getter[]={0x8b,0x81,0x9c,0,0,0,0xc3};const BYTE setter[]={0x55,0x8b,0xec,0x8b,0x45,8,0x85,0xc0,0x56,0x8b,0xf1,0x7e,0x0b,0x89,0x86,0x9c,0,0,0,0x5e,0x5d,0xc2,4,0,0xe8};const BYTE suffix[]={0x84,0xc0,0x75,0x0a,0xc7,0x86,0x9c,0,0,0,0,0,0,0,0x5e,0x5d,0xc2,4,0};
  std::memcpy(g+0x1afc00,getter,sizeof(getter));std::memcpy(g+0x3030,setter,sizeof(setter));std::memcpy(g+0x304d,suffix,sizeof(suffix));std::memcpy(g+0x519464,"lockFps",8);

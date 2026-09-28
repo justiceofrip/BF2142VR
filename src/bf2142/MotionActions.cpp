@@ -29,18 +29,18 @@ MotionResult MotionActions::Update(const MotionInput& in) noexcept {
     velocity=Mix(velocity,Scale(step,1/dt),blend);
     relativeVelocity=Mix(relativeVelocity,Scale(Sub(step,headStep),1/dt),blend);
     const float speed=Length(relativeVelocity);
-    const bool ready=in.time-started>=900000000;
+    const bool ready=in.time-started>=450000000;
     if(speed<.4f){
         if(!restSince)restSince=in.time;
-        if(in.time-restSince>=120000000){rested=true;travel=0;swingSince=0;}
+        if(in.time-restSince>=90000000){rested=true;travel=0;swingSince=0;}
     }else restSince=0;
     if(in.kind==MotionKind::Knife){
-        if(rested && speed>.55f){
+        if(rested && speed>.4f){
             if(!swingSince)swingSince=in.time;
             travel+=Length(Sub(step,headStep));
-            if(in.time-swingSince>300000000){rested=false;travel=0;}
+            if(in.time-swingSince>350000000){rested=false;travel=0;}
         }
-        if(ready && rested && speed>1.15f && travel>.09f && in.time-lastStrike>550000000 && Length(Sub(in.hand,in.head))>.20f){
+        if(ready && rested && speed>.65f && travel>.045f && in.time-lastStrike>550000000 && Length(Sub(in.hand,in.head))>.20f){
             out.action=MotionKind::Knife;out.position=in.hand;out.velocity=relativeVelocity;
             pressedUntil=in.time+140000000;lastStrike=in.time;rested=false;travel=0;swingSince=0;
         }

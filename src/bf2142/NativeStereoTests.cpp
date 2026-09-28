@@ -8,6 +8,7 @@ bool IsScopeRender(){return scopeFixture;}
 bool IsSecondStereoEye(){return false;}
 bool StereoHudBegin(bool){return false;}
 void StereoHudEnd(){}
+bool StereoOpticHudBegin(){return false;}void StereoOpticHudEnd(){}
 bool RenderStereo(void*,NativeRender,double,float){return true;}
 bool ReadNativeComfortCamera(const stereo::Matrix4&,stereo::Matrix4*,const void*){return false;}
 bool ReadNativeVehicleCamera(const stereo::Matrix4&,stereo::Matrix4*){return false;}
@@ -17,6 +18,7 @@ bool InstallNativeQueryGuard(BYTE*,LogFunction){return false;}
 bool InstallNativeMenus(BYTE*,LogFunction){return false;}
 bool InstallNativeWorldMarkers(BYTE*,LogFunction){return false;}
 CrosshairScope::CrosshairScope(){}
+CrosshairScope::CrosshairScope(const void*,bool){}
 CrosshairScope::~CrosshairScope(){}
 }
 using namespace bfvr;using namespace bfvr::bf2142;

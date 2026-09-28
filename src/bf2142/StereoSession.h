@@ -13,6 +13,8 @@ void StereoPresent(IDirect3DDevice9* device);
 void StereoReset();
 bool StereoHudBegin(bool standaloneMenu=false);
 void StereoHudEnd();
+bool StereoOpticHudBegin();
+void StereoOpticHudEnd();
 bool SuppressStereoPresent(IDirect3DDevice9* device);
 bool IsSecondStereoEye();
 bool IsScopeRender();

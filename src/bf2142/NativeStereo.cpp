@@ -150,6 +150,10 @@ void __fastcall HudHook(void* hud,void*) {
     const bool captured=StereoHudBegin();
     {CrosshairScope crosshair;nativeHud(hud);}
     if (captured) StereoHudEnd();
+    // Replay HUD only while the engine's scene is open. Native cache/device
+    // state stay synchronized; no additional world or animation tick occurs.
+    CrosshairScope optic(nullptr,true);
+    if(optic.Optic()&&StereoOpticHudBegin()){nativeHud(hud);StereoOpticHudEnd();}
 }
 bool __fastcall RenderHook(void* renderer,void*,double delta,float interpolation) {
     if (replayActive) return nativeRender(renderer,delta,interpolation);

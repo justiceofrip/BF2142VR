@@ -11,7 +11,7 @@ struct SupportObservation {
     stereo::Pose left{},anchor{};
 };
 struct SupportFrame {
-    bool busy=false,leftCrate=false,consumeLeft=false,fire=false,throwNow=false;
+    bool busy=false,leftCrate=false,consumeLeft=false,fire=false,throwNow=false,holster=false;
     int hovered=-1,select=0,crateItem=0;stereo::Vec3 throwVelocity{};
     std::array<bool,10> unavailable{};
 };
@@ -21,7 +21,7 @@ public:
     void Reset(){*this={};}
 private:
     std::uint64_t owner=0;std::int64_t last=0,deadline=0,pulseUntil=0;
-    int crate=0,restore=0,phase=0;bool pressed=false,leftObserved=false;
+    int crate=0,phase=0;bool pressed=false,leftObserved=false,released=false;
     stereo::Vec3 velocity{},throwVelocity{};
     std::array<stereo::Vec3,6> history{};std::array<std::int64_t,6> times{};unsigned samples=0;
 };

@@ -44,7 +44,8 @@ pilot guns stay fixed to aircraft direction; looking does not steer flight.
 Nekomata main gun follows head pitch; steer its hull for horizontal aim.
 
 MENUS
-Look at your left wrist to reveal DEPLOY; point the right-hand laser at it and
+Look directly at the left wrist for 0.4 seconds to reveal the smaller DEPLOY
+button; point the right-hand laser at it and
 pull the trigger. The native spawn/loadout screen opens on the larger panel.
 Release trigger before selecting a spawn point. This button does not open VR
 settings. Commander-specific shortcuts and right-click orders are future work.

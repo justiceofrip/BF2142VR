@@ -1,4 +1,4 @@
-BATTLEFIELD 2142 VR 0.2.0-beta.4-test.2 - EXPERIMENTAL TEST BUILD
+BATTLEFIELD 2142 VR 0.2.0-beta.4-test.3 - EXPERIMENTAL TEST BUILD
 
 Requires your own working stock BF2142 v1.51 on Windows x64.
 Set up Reclamation/OpenSpy separately and confirm you can log in.
@@ -15,6 +15,7 @@ Beta.3 remains available as the previous build.
 2. Extract the entire beta ZIP into a new folder.
 3. Run Setup.cmd, select BF2142.exe, and wait for local weapon/body/lobby setup.
    Original files are backed up for rollback. No game content is downloaded.
+   Startup movies are skipped in this game copy; uninstall restores them.
 4. Connect through Steam Link/SteamVR. Use Battlefield 2142 VR Beta on the
    desktop or installed Play VR.cmd for singleplayer/bot matches.
 
@@ -26,7 +27,8 @@ Normal servers can be selected in-game; custom gestures/voice need the matching
 server adapter and bridge. The community test server may be offline.
 
 CONTROLS
-Look at your left wrist, then point/click DEPLOY with the right controller
+Look directly at your left wrist for 0.4 seconds, then point/click the small
+DEPLOY button with the right controller
 to open spawn/loadout. Right-stick click recenters. B opens the game menu;
 VR CONTROLS opens settings.
 Read CONTROLS.txt for body slots, aiming, vehicles and menus.

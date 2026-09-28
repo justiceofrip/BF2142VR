@@ -9,7 +9,8 @@ import ExportLobbyScene as lobby
 from PIL import Image
 
 APP='BF2142VR'
-VERSION='0.2.0-beta.4-test.2'
+VERSION='0.2.0-beta.4-test.3'
+INTRO_MOVIES=tuple('mods/bf2142/Movies/'+name+'.bik' for name in ('Dice','EA','Intro','Legal','Legal_na'))
 STOCK='1a9903113df3fa5b24282ce8d2adbf54ddb58160155b28dea09f26fe85b782f9'
 COMPLETE='e5d605ed915adac29c57840835d900bbc68a3c3ea4a2c7f7077000f6db8c144d'
 WEAPONS='mods/bf2142/Objects/Weapons_client.zip'
@@ -166,7 +167,7 @@ def mutations(root,m):
     if Path(m['game']).resolve()!=game or m.get('app')!=APP:raise ValueError('Install state belongs to a different game folder')
     rows=[]
     for row in m['changes']:
-        if row['target'] not in [WEAPONS,'BF2142.exe']:raise ValueError('Unrecognized game-file change')
+        if row['target'] not in [WEAPONS,'BF2142.exe',*INTRO_MOVIES]:raise ValueError('Unrecognized game-file change')
         target=child(game,row['target']);backup=child(root,row['backup']);current=sha(target) if target.exists() else None
         if sha(backup)!=row['original']:raise ValueError('Backup verification failed; no files restored')
         if current is not None and current not in (row['original'],row['installed']):raise ValueError('Another mod changed '+row['target']+'. Automatic restore stopped; original backup is preserved.')
@@ -202,14 +203,23 @@ def install(game,payload):
         if exe!=patched:
             (stage/'backups/BF2142.exe').write_bytes(exe);(stage/'generated/BF2142.exe').write_bytes(patched)
             changes.append({'target':'BF2142.exe','backup':'backups/BF2142.exe','original':hashlib.sha256(exe).hexdigest(),'installed':hashlib.sha256(patched).hexdigest()})
-        m={'app':APP,'version':VERSION,'build':'menu-recovery-beta4-test2','game':str(game),'status':'prepared','changes':changes}
+        for movie in INTRO_MOVIES:
+            source=child(game,movie)
+            if not source.is_file():continue
+            backup='backups/intro/'+Path(movie).name
+            child(stage,backup).parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(source,child(stage,backup))
+            changes.append({'target':movie,'backup':backup,'original':sha(source),'installed':None})
+        m={'app':APP,'version':VERSION,'build':'interaction-timing-beta4-test3','game':str(game),'status':'prepared','changes':changes}
         write_json(stage/'install.json',m);running(game)
         for row in changes:
             if sha(child(game,row['target']))!=row['original']:raise ValueError('Game files changed during setup')
         stage.rename(final);committed=True
         try:
             refresh_settings(final)
-            for row in changes:replace_copy(final/'generated'/Path(row['target']).name,child(game,row['target']))
+            for row in changes:
+                if row['target'] in INTRO_MOVIES:child(game,row['target']).unlink()
+                else:replace_copy(final/'generated'/Path(row['target']).name,child(game,row['target']))
             m['status']='installed';write_json(final/'install.json',m)
         except BaseException:
             restore(final,m);raise

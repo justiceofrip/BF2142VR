@@ -46,6 +46,16 @@ std::uint32_t Sample(const std::vector<DWORD>& p,unsigned w,unsigned h,float u,f
     return Blend(Blend(p[size_t(b)*w+a],p[size_t(b)*w+c],x-a),Blend(p[size_t(d)*w+a],p[size_t(d)*w+c],x-a),y-b);
 }
 }
+void IsolateOpticHud(std::vector<DWORD>& hud,const std::vector<DWORD>& baseline,unsigned w,unsigned h){
+ if(!w||!h||hud.size()!=size_t(w)*h||baseline.size()!=hud.size()){hud.clear();return;}
+ size_t visible=0;
+ for(unsigned y=0;y<h;++y)for(unsigned x=0;x<w;++x){auto& p=hud[size_t(y)*w+x];const auto b=baseline[size_t(y)*w+x];
+  if(x<w/4||x>=w*3/4||y<h/4||y>=h*3/4){p=0;continue;}
+  unsigned difference=0;for(unsigned s=0;s<32;s+=8)difference+=unsigned(std::abs(int((p>>s)&255)-int((b>>s)&255)));
+  if(difference<8)p=0;visible+=(p>>24)>0;
+ }
+ if(!visible)hud.clear(); // unrecognized/custom HUD keeps the tested fallback reticle
+}
 const OpticDefinition* FindGunOptic(std::string_view name) noexcept{for(const auto& d:definitions)if(name==d.name)return &d;return nullptr;}
 std::optional<OpticView> MakeOpticView(const GunOptic& o,const std::array<EyeCamera,2>& eyes) noexcept{
     if(!Valid(o))return {};const auto inv=InverseRigid(o.gun);if(!inv)return {};
@@ -71,7 +81,7 @@ std::optional<OpticView> MakeOpticView(const GunOptic& o,const std::array<EyeCam
     out.fov={-tx,tx,ty,-ty};return out;
 }
 size_t CompositeGunOptic(std::vector<DWORD>& pixels,const std::vector<DWORD>& scope,
-    unsigned w,unsigned h,const GunOptic& o,const EyeCamera& eye,const OpticView& frame,unsigned index,bool rgba){
+    unsigned w,unsigned h,const GunOptic& o,const EyeCamera& eye,const OpticView& frame,unsigned index,bool rgba,const std::vector<DWORD>& nativeHud){
     if(!Valid(o)||!w||!h||w>8192||h>8192||index>1||pixels.size()!=size_t(w)*h||(o.magnification>1.01f && scope.size()!=pixels.size())||frame.visibility[index]<.02f)return 0;
     const auto inverse=InverseRigid(eye.world),gunInverse=InverseRigid(o.gun);if(!inverse||!gunInverse)return 0;
     const auto& d=*o.definition;const V e=Transform(Pos(eye.world),*gunInverse);const float relief=d.center.z-e.z;
@@ -102,8 +112,22 @@ size_t CompositeGunOptic(std::vector<DWORD>& pixels,const std::vector<DWORD>& sc
         const bool center=dx*dx+dy*dy<line*line*2.25f;
         const bool cross=(std::abs(dx)<line && std::abs(dy)<d.halfHeight*.45f && std::abs(dy)>line*3) ||
             (std::abs(dy)<line && std::abs(dx)<d.halfWidth*.45f && std::abs(dx)>line*3);
-        if(reflex && !center)continue;
-        if(center||(d.magnification>=4 && cross))color=amber;
+        const bool hasHud=nativeHud.size()==pixels.size();
+        if(hasHud){
+            // Native 800x600 UI coordinates: central 400x300 contains the
+            // stock scope reticle, compass, rangefinder and stabilizer.
+            const float hu=.5f+(su-.5f)*.5f,hv=.5f+(sv-.5f)*.5f;
+            if(hu>=.25f&&hu<.75f&&hv>=.25f&&hv<.75f){
+                const DWORD hud=nativeHud[size_t(hv*h)*w+unsigned(hu*w)];const unsigned a=hud>>24;
+                if(reflex&&!a)continue;
+                DWORD blended=0xff000000;for(unsigned channel=0;channel<24;channel+=8)
+                    blended|=std::min<DWORD>(255u,((hud>>channel)&255)+(((color>>channel)&255)*(255-a)+127)/255)<<channel;
+                color=blended;
+            }else if(reflex)continue;
+        }else {
+            if(reflex && !center)continue;
+            if(center||(d.magnification>=4 && cross))color=amber;
+        }
         const float edge=d.rectangular?std::max(std::abs(u),std::abs(v)):std::sqrt(u*u+v*v);
         const float alpha=frame.visibility[index]*std::clamp((1-edge)*25.f,0.f,1.f);
         auto& dest=pixels[size_t(y)*w+x];dest=Blend(dest,color,alpha);++marked;

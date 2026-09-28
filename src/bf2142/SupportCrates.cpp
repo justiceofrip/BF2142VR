@@ -22,7 +22,9 @@ SupportFrame SupportCrates::Update(const SupportObservation& s){
     V measured{};unsigned count=0;
     for(unsigned i=0;i<std::min(samples,6u);++i){const auto dt=s.time-times[i];if(dt<18000000||dt>110000000)continue;
         const float seconds=float(dt)*1.e-9f;measured.x+=(s.left.position.x-history[i].x)/seconds;measured.y+=(s.left.position.y-history[i].y)/seconds;measured.z+=(s.left.position.z-history[i].z)/seconds;++count;}
-    if(count){measured.x/=count;measured.y/=count;measured.z/=count;velocity=measured;}
+    if(count){measured.x/=count;measured.y/=count;measured.z/=count;
+        if(Distance(measured,{})<=14.f)velocity=measured;else {velocity={};samples=0;}}
+    else velocity={};
     // Native ammo readiness, not an invented cooldown timer, drives holster visibility.
     if(s.leftCrates)for(int i=1;i<10;++i)if(SupportCrateWeapon(Name(s.names,i)))out.unavailable[i]=!s.ammo[i].valid||(s.ammo[i].deployable>=0?s.ammo[i].deployable==0:s.ammo[i].rounds<1);
     if(!s.leftCrates){crate=0;phase=0;return out;}
@@ -32,33 +34,38 @@ SupportFrame SupportCrates::Update(const SupportObservation& s){
             const float d=Distance(hand->position,slot.offset)/slot.radius;
             if(d<nearest){nearest=d;out.hovered=int(slot.item);}
         }
-        if(rising&&out.hovered>0){crate=out.hovered;restore=s.equipped;phase=1;deadline=s.time+1800000000;}
+        if(rising&&out.hovered>0){crate=out.hovered;released=false;phase=1;deadline=s.time+1800000000;}
     }
     if(crate){
         out.busy=out.consumeLeft=true;out.crateItem=crate;
+        if(falling&&!released){released=true;if(phase==2)deadline=s.time+1200000000;throwVelocity=velocity;
+            const float speed=Distance(throwVelocity,{});
+            if(!std::isfinite(speed)||speed<.25f){
+                // A relaxed release is a gentle toss along the left hand, not a failed gesture.
+                const auto q=s.left.orientation;const V forward{-2*(q.x*q.z+q.w*q.y),2*(q.w*q.x-q.y*q.z),2*(q.x*q.x+q.y*q.y)-1};
+                throwVelocity={forward.x*2.f,forward.y*2.f+.8f,forward.z*2.f};
+            }else if(speed>9.f){throwVelocity.x*=9.f/speed;throwVelocity.y*=9.f/speed;throwVelocity.z*=9.f/speed;}
+        }
         if(phase==1){
-            if(s.equipped==crate){phase=2;deadline=s.time+30000000000LL;}
-            else if(s.time<deadline&&s.leftGrip)out.select=crate;
-            else {crate=0;phase=0;return out;}
+            if(s.equipped==crate){phase=2;deadline=s.time+(released?1200000000LL:30000000000LL);}
+            else if(s.time<deadline)out.select=crate;
+            else {out.holster=released;crate=0;phase=0;return out;}
         }
         if(phase==2){
-            if(s.equipped!=crate||!s.ammo[crate].valid){crate=0;phase=0;return out;}
+            if(s.equipped!=crate||!s.ammo[crate].valid){out.holster=released;crate=0;phase=0;return out;}
             out.leftCrate=true;
-            if(falling||s.time>deadline){
-                const float speed=Distance(velocity,{});
-                if(s.ammo[crate].rounds>0 && falling && std::isfinite(speed)&&speed>.65f){
-                    const float scale=std::min(1.f,9.f/speed);throwVelocity={velocity.x*scale,velocity.y*scale,velocity.z*scale};
-                    out.throwNow=true;phase=3;pulseUntil=s.time+120000000;deadline=s.time+900000000;
-                }else {phase=4;deadline=s.time+1200000000;}
-            }
+            if(released&&s.ammo[crate].rounds>0){
+                out.throwNow=true;phase=3;pulseUntil=s.time+120000000;deadline=s.time+900000000;
+            }else if(s.time>deadline){phase=4;deadline=s.time+1200000000;}
+
         }
         if(phase==3){
             out.leftCrate=true;out.throwVelocity=throwVelocity;out.fire=s.time<pulseUntil;
             if(s.ammo[crate].rounds<1||s.time>deadline){phase=4;deadline=s.time+1200000000;}
         }
         if(phase==4){
-            if(s.equipped==restore||s.time>deadline){crate=0;phase=0;}
-            else out.select=restore;
+            out.leftCrate=false;out.fire=false;out.holster=true;
+            if(s.time>deadline){crate=0;phase=0;}
         }
     }
     return out;

@@ -77,5 +77,11 @@ int main(){
     eyes[0].world.values[3][0]+=.1f;
     const auto offAxis=MakeOpticView(gun,eyes);if(!offAxis||offAxis->visibility[0]!=0)return 24;
     if(CompositeGunOptic(pixels,{},512,512,gun,eyes[0],*offAxis,0,false))return 25;
+    std::vector<DWORD> baseline(512*512),hud(512*512);baseline[5]=hud[5]=0xffaabbcc;hud[512*300+256]=0x80800000;
+    IsolateOpticHud(hud,baseline,512,512);if(hud.empty()||hud[5]||hud[512*300+256]!=0x80800000)return 26;
+    gun={d,Identity(),2};pixels.assign(pixels.size(),0xff112233);std::fill(hud.begin(),hud.end(),0xff123456);
+    if(!CompositeGunOptic(pixels,scope,512,512,gun,original[0],*view,0,false,hud)||pixels.front()!=0xff112233)return 27;
+    bool native=false;for(auto c:pixels){native|=c==0xff123456;if(c==0xffffdc70)return 28;}if(!native)return 29;
+    hud=baseline;IsolateOpticHud(hud,baseline,512,512);if(!hud.empty())return 30;
     puts("Weapon-specific optics, eye relief, monocular alignment, magnification, aperture clipping, reticle colors and rigid-frame invariance passed.");
 }

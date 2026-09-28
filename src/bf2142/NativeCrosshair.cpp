@@ -6,10 +6,10 @@ namespace bfvr::bf2142 {
 namespace {
 bool hidden=true;
 template<class T>T Read(const void* p,size_t off=0){T v{};std::memcpy(&v,static_cast<const BYTE*>(p)+off,sizeof(v));return v;}
-// These are the stock ADS/hip HUD pairs, not gameplay zoom steps. The fixed
-// opacity dots ignore CrossHairColorAlpha. Select the corresponding hidden hip
-// crosshair only during HUD rendering; ordinary ammo/minimap/hit HUDs remain.
-int HipHud(int index){switch(index){case 59:return 58;case 63:return 62;case 78:return 77;case 80:return 79;case 84:return 83;case 88:return 87;case 90:return 89;default:return index;}}
+// Stock ADS HUD selectors. Disable the entire weapon widget root on the main
+// panel, including fixed-opacity rangefinders and scope stabilizers. The optic
+// layer replays the unchanged native selector, then isolates its pixels.
+bool OpticHud(int index){switch(index){case 59:case 63:case 78:case 80:case 81:case 84:case 88:case 90:case 92:return true;default:return false;}}
 void* NamedValue(const BYTE* manager,const char* key,size_t mapOffset){
  const auto sentinel=Read<const BYTE*>(manager,0x60);if(!sentinel)return nullptr;
  auto node=Read<const BYTE*>(sentinel,4);int id=-1;
@@ -56,10 +56,13 @@ int* ResolveGui(const BYTE* game){
 }
 void SetCrosshairHidden(bool value){hidden=value;}
 CrosshairScope::CrosshairScope():CrosshairScope(nullptr){}
-CrosshairScope::CrosshairScope(const void* module){
- if(!hidden)return;const auto game=module?static_cast<const BYTE*>(module):reinterpret_cast<const BYTE*>(GetModuleHandleW(nullptr));
+CrosshairScope::CrosshairScope(const void* module,bool optic){
+ if(!hidden&&!optic)return;const auto game=module?static_cast<const BYTE*>(module):reinterpret_cast<const BYTE*>(GetModuleHandleW(nullptr));
  __try {
-  alpha=Resolve(game);if(alpha){saved=*alpha;*alpha=0;gui=ResolveGui(game);if(gui){savedGui=*gui;*gui=HipHud(savedGui);}}
+  alpha=Resolve(game);if(alpha){saved=*alpha;gui=ResolveGui(game);if(gui)savedGui=*gui;
+   opticReady=gui&&OpticHud(savedGui);
+   if(optic){if(opticReady)*alpha=1;}else {*alpha=0;if(opticReady)*gui=1024;}
+  }
  }__except(EXCEPTION_EXECUTE_HANDLER){}
 }
 CrosshairScope::~CrosshairScope(){__try{if(gui)*gui=savedGui;if(alpha)*alpha=saved;}__except(EXCEPTION_EXECUTE_HANDLER){}}

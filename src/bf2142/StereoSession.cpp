@@ -21,6 +21,7 @@
 #include "DesktopSimulation.h"
 #include "EyeRestore.h"
 #include "WeaponGrip.h"
+#include "RenderTimeBudget.h"
 #include "GrenadeArc.h"
 #include "NativeComfort.h"
 #include "NativeVehicle.h"
@@ -56,6 +57,8 @@ IDirect3DDevice9* gameDevice=nullptr; // Borrowed: resources released before Res
 HANDLE presenterProcess=nullptr;
 bool diagnostic=false,desktop=false,desktopCaptureHeld=false;
 HWND desktopWindow=nullptr;
+RenderTimeBudget renderTime;bool opticHudReady=false;
+std::vector<DWORD> opticHudPixels,opticHudBaseline;
 BodyInventory bodyInventory;WeaponGrip weaponGrip;TraversalControls traversalControls;
 BodyEquipment bodyEquipment;SupportCrates supportCrates;SupportFrame supportFrame;
 BodyInventoryResult bodyFrame;
@@ -293,7 +296,8 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
         command.buttons[0]=supportFrame.fire?0x80:0;command.buttons[1]=0;
         command.blockedPhysicalButtons[0]=command.blockedPhysicalButtons[1]=1;
         if(supportFrame.select>0&&supportFrame.select<10)command.keys[supportFrame.select+1]=0x80;
-        if(supportFrame.leftCrate)SetNativeWeaponHeld(true);
+        if(supportFrame.holster){weaponGrip.Holster(sample.predictedDisplayTime);SetNativeWeaponHeld(false);}
+        else if(supportFrame.leftCrate)SetNativeWeaponHeld(true);
         RequestAutomaticAds(false);
     }
     PublishNativeHands(accepted && gameplay && !showMenu && !command.recenter && (!mounted||chuteHands) && settings.motionHands?&sample:nullptr,
@@ -447,16 +451,19 @@ void StereoDeviceCreated(IDirect3DDevice9* device) {
     if (enabled && !uiCapture.Connect(device,logger)) Fail("native interface capture could not be connected");
 }
 bool RenderStereo(void* renderer,NativeRender original,double delta,float interpolation) {
-    if (insideRender || !enabled || !NativeViewsAvailable(renderer))
-        return original(renderer,delta,interpolation);
+    if(insideRender)return original(renderer,delta,interpolation);
+    if(!enabled || !NativeViewsAvailable(renderer)){renderTime.Reset();return original(renderer,delta,interpolation);}
+    if(lastRenderer!=renderer)renderTime.Reset();
     lastRenderer=renderer;
     if (pairReady || !GetRequest(true)) {
         // A request/consumer wait is not a switch back to the flat ADS camera.
         // Simulation/input still run in the outer game loop.
-        if(enabled)return lastRenderResult;
-        return original(renderer,delta,interpolation);
+        if(enabled){renderTime.Skip(delta);return lastRenderResult;}
+        renderTime.Reset();return original(renderer,delta,interpolation);
     }
+    delta=renderTime.Take(delta);
     if(pairs==1)logger("Native renderer time argument retained: %.6f, interpolation=%.6f.",delta,double(interpolation));
+    opticHudReady=false;opticHudPixels.clear();
     insideRender=true;
     struct RenderScope { ~RenderScope() { insideRender=false; activeEye=-1; } } rendering;
     bool result=false, rendered=false;
@@ -486,6 +493,9 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
             if (!ReadFrame(pixels[eye])) return result;
         }
         if(!diagnostic && opticsReady)UpdateAutomaticAds(eyeCameras);
+        if(opticHudReady&&uiCapture.Read(colorFormat,opticHudBaseline)&&uiCapture.ReadOptic(colorFormat,opticHudPixels))
+            IsolateOpticHud(opticHudPixels,opticHudBaseline,width,height);
+        else opticHudPixels.clear();
         GunOptic optic;
         // Diagnostic fixtures can supply a synthetic native optic. Ordinary
         // diagnostic game runs have no hand adapter and always return false.
@@ -495,7 +505,7 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
                 // Reflex glass retains the normal stereo world. Only draw the
                 // sight's collimated dot; never re-render or magnify this eye.
                 const bool rgba=colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM||colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-                for(unsigned i=0;i<2;++i)CompositeGunOptic(pixels[i],{},width,height,optic,eyeCameras[i],*scope,i,rgba);
+                for(unsigned i=0;i<2;++i)CompositeGunOptic(pixels[i],{},width,height,optic,eyeCameras[i],*scope,i,rgba,opticHudPixels);
             }else if(scope){
                 activeEye=2;
                 bool captured=false;
@@ -506,7 +516,7 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
                 }
                 if(captured){
                     const bool rgba=colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM||colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-                    for(unsigned i=0;i<2;++i)CompositeGunOptic(pixels[i],scopePixels,width,height,optic,eyeCameras[i],*scope,i,rgba);
+                    for(unsigned i=0;i<2;++i)CompositeGunOptic(pixels[i],scopePixels,width,height,optic,eyeCameras[i],*scope,i,rgba,opticHudPixels);
                 }else{DisableNativeOptics();opticsReady=false;}
                 // The extra native Present stayed suppressed. Restore a normal
                 // eye before the one real desktop Present/OBS capture.
@@ -535,6 +545,12 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
         return rendered?result:original(renderer,delta,interpolation);
     }
 }
+bool StereoOpticHudBegin(){
+    if(!insideRender||activeEye!=1||!opticsReady||menuPointer.Active())return false;
+    GunOptic optic;if(!ReadNativeOptic(&optic))return false;
+    return uiCapture.BeginOptic(gameDevice);
+}
+void StereoOpticHudEnd(){opticHudReady=uiCapture.EndOptic();}
 bool SuppressStereoPresent(IDirect3DDevice9* device) {
     if (!insideRender || device!=gameDevice) return false;
     ++suppressedPresents;
@@ -624,6 +640,7 @@ void StereoPresent(IDirect3DDevice9* device) {
     } catch (...) { Fail("stereo presentation allocation or runtime exception"); }
 }
 void StereoReset() {
+    renderTime.Reset();opticHudReady=false;opticHudPixels.clear();opticHudBaseline.clear();
     RestoreFramePacing();
     RecenterNativeVehicle();traversalControls.Reset();weaponGrip.Reset();SetNativeWeaponHeld(true);controlsMenu.Reset();physicalStance.Reset();ConfigurePhysicalCamera(false);standingHeight.Reset();
     ClearNativeSnapTurn();ConfigureNativeMovement(false,0);ConfigureNativeLookPitch(false,{});ResetAutomaticAds();ClearControllerCommand();ClearNativeHands(); controllerPolicy={}; haveGripReference=false; previousGameplay=false;

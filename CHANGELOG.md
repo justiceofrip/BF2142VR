@@ -1,5 +1,16 @@
 # BFVR Changelog
 
+## BF2142 0.2.0-beta.4-test.3 — interaction / timing hotfix
+
+- Accumulate skipped native renderer delta; only the first eye advances effects.
+- Queue easy left-hand crate releases and keep hands empty afterward.
+- Isolate belt depth; restore native depth, viewport and multisample state.
+- Tune knife strokes and require a narrow 0.4-second wrist gaze on a smaller button.
+- Isolate native scope widgets into the sight, including stock sniper HUD elements.
+- Back up/skip five stock startup movies; restore them on uninstall.
+- Keep the 1600x900 menu fix, IK and network protocols unchanged.
+- New headset acceptance and the faint black HUD outline remain unverified.
+
 ## BF2142 0.2.0-beta.4-test.2 — menu regression hotfix
 
 - Remove test.1 automatic runtime-based source enlargement, which caused

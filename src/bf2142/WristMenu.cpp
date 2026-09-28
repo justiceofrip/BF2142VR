@@ -13,14 +13,17 @@ WristFrame WristMenu::Update(bool enabled,const shared::SharedControllerSample& 
  if(!enabled||!(sample.flags&shared::kControllerSampleFlagSessionFocused)||(l.flags&grip)!=grip||sample.predictedDisplayTime<=0){Reset();return {};}
  const bool gap=!previous||sample.predictedDisplayTime<previous||sample.predictedDisplayTime-previous>150000000;
  const bool trigger=(r.flags&shared::kControllerHandFlagTriggerActive)&&std::isfinite(r.triggerValue)&&r.triggerValue>.55f;
- if(gap){armed=false;pressedUntil=0;consuming=false;triggerHeld=trigger;}
+ if(gap){gazeSince=0;revealed=false;armed=false;pressedUntil=0;consuming=false;triggerHeld=trigger;}
  previous=sample.predictedDisplayTime;frame={};
  const auto hand=Pose(l.gripPose);if(!stereo::MakeRelativePose(head,hand)){Reset();return {};}
  const auto offset=Rotate(hand.orientation,{0,.045f,.09f});
  frame.panel={{hand.position.x+offset.x,hand.position.y+offset.y,hand.position.z+offset.z},head.orientation};
  const auto local=stereo::MakeRelativePose(head,frame.panel);if(!local){Reset();return {};}
  const auto p=local->position;const float distance=std::sqrt(p.x*p.x+p.y*p.y+p.z*p.z);
- frame.visible=distance>=.15f&&distance<=.85f&&p.z<-.08f&&std::hypot(p.x,p.y)<-p.z*.55f;
+ const bool looking=distance>=.20f&&distance<=.65f&&p.z<-.1f&&std::hypot(p.x,p.y)<-p.z*(revealed?.24f:.14f);
+ if(!looking){gazeSince=0;revealed=false;}
+ else {if(!gazeSince)gazeSince=previous;if(previous-gazeSince>=400000000)revealed=true;}
+ frame.visible=revealed;
  if(frame.visible&&(r.flags&aim)==aim){
   const auto ray=stereo::MakeRelativePose(frame.panel,Pose(r.aimPose));
   if(ray){const auto forward=Rotate(ray->orientation,{0,0,-1});

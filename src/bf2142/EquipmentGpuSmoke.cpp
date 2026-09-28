@@ -24,16 +24,19 @@ int wmain(int argc,wchar_t** argv){
  Microsoft::WRL::ComPtr<IDirect3DSurface9> target,depth;d->GetRenderTarget(0,&target);d->GetDepthStencilSurface(&depth);
  FrameCapture capture;std::vector<DWORD> eyes[2];
  for(int eye=0;eye<2;++eye){
-  CHECK(SUCCEEDED(d->Clear(0,nullptr,D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER,0xff18202a,1,0)));CHECK(SUCCEEDED(d->BeginScene()));
+  CHECK(SUCCEEDED(d->Clear(0,nullptr,D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER,0xff18202a,0,0)));CHECK(SUCCEEDED(d->BeginScene()));
   d->SetRenderState(D3DRS_FILLMODE,D3DFILL_WIREFRAME);d->SetRenderState(D3DRS_SCISSORTESTENABLE,TRUE);d->SetRenderState(D3DRS_COLORWRITEENABLE,3);
+  D3DVIEWPORT9 hostile{17,19,300,200,.75f,.8f};d->SetViewport(&hostile);d->SetRenderState(D3DRS_MULTISAMPLEMASK,0);
   CHECK(body.DrawGpu(d.Get(),request.views[eye],camera->projection,1,placement,names,3));
-  DWORD value=0;d->GetRenderState(D3DRS_FILLMODE,&value);CHECK(value==D3DFILL_WIREFRAME);d->GetRenderState(D3DRS_SCISSORTESTENABLE,&value);CHECK(value==TRUE);d->GetRenderState(D3DRS_COLORWRITEENABLE,&value);CHECK(value==3);
+  D3DVIEWPORT9 restored{};d->GetViewport(&restored);CHECK(restored.X==17&&restored.MinZ==.75f);
+  DWORD value=0;d->GetRenderState(D3DRS_MULTISAMPLEMASK,&value);CHECK(value==0);d->GetRenderState(D3DRS_FILLMODE,&value);CHECK(value==D3DFILL_WIREFRAME);d->GetRenderState(D3DRS_SCISSORTESTENABLE,&value);CHECK(value==TRUE);d->GetRenderState(D3DRS_COLORWRITEENABLE,&value);CHECK(value==3);
   CHECK(SUCCEEDED(d->EndScene()));CHECK(SUCCEEDED(capture.Read(d.Get(),DXGI_FORMAT_B8G8R8A8_UNORM,eyes[eye])));
  }
  unsigned painted=0;for(auto color:eyes[0])painted+=color!=0xff18202a;CHECK(painted>200&&eyes[0]!=eyes[1]);
  if(argc>2){std::ofstream file(std::filesystem::path(argv[2]),std::ios::binary);file<<"P6\n1600 900\n255\n";for(auto c:eyes[0]){const char rgb[]={char(c>>16),char(c>>8),char(c)};file.write(rgb,3);}}
+ D3DVIEWPORT9 full{0,0,1600,900,0,1};d->SetViewport(&full);d->SetRenderState(D3DRS_MULTISAMPLEMASK,0xffffffff);
  WristMenuGpu wrist;WristFrame f;f.visible=true;f.panel={{0,0,-.35f},{0,0,0,1}};shared::SharedPresentationView eye{};eye.pose.orientationW=1;
- CHECK(SUCCEEDED(d->Clear(0,nullptr,D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER,0xff18202a,1,0)));CHECK(SUCCEEDED(d->BeginScene()));CHECK(wrist.Draw(d.Get(),f,eye,camera->projection,1));CHECK(SUCCEEDED(d->EndScene()));std::vector<DWORD> wristPixels;CHECK(SUCCEEDED(capture.Read(d.Get(),DXGI_FORMAT_B8G8R8A8_UNORM,wristPixels)));unsigned letters=0;for(auto c:wristPixels)letters+=((c>>16)&255)>150;CHECK(letters>100);
+ CHECK(SUCCEEDED(d->Clear(0,nullptr,D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER,0xff18202a,0,0)));CHECK(SUCCEEDED(d->BeginScene()));CHECK(wrist.Draw(d.Get(),f,eye,camera->projection,1));CHECK(SUCCEEDED(d->EndScene()));std::vector<DWORD> wristPixels;CHECK(SUCCEEDED(capture.Read(d.Get(),DXGI_FORMAT_B8G8R8A8_UNORM,wristPixels)));unsigned letters=0;for(auto c:wristPixels)letters+=((c>>16)&255)>150;CHECK(letters>100);
  Microsoft::WRL::ComPtr<IDirect3DSurface9> afterTarget,afterDepth;d->GetRenderTarget(0,&afterTarget);d->GetDepthStencilSurface(&afterDepth);CHECK(afterTarget.Get()==target.Get()&&afterDepth.Get()==depth.Get());
  body.ResetGpu();wrist.Reset();capture.Reset();afterTarget.Reset();afterDepth.Reset();target.Reset();depth.Reset();CHECK(SUCCEEDED(d->Reset(&pp)));
  CHECK(SUCCEEDED(d->BeginScene()));CHECK(body.DrawGpu(d.Get(),request.views[0],camera->projection,1,placement,names,3));CHECK(wrist.Draw(d.Get(),f,eye,camera->projection,1));CHECK(SUCCEEDED(d->EndScene()));

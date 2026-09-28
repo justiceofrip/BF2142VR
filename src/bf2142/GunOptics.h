@@ -29,5 +29,6 @@ struct OpticView {
 // All coordinates use the same solved bone-54 basis as native projectile mapping.
 std::optional<OpticView> MakeOpticView(const GunOptic&,const std::array<EyeCamera,2>&) noexcept;
 size_t CompositeGunOptic(std::vector<DWORD>& eyePixels,const std::vector<DWORD>& scopePixels,
-    unsigned width,unsigned height,const GunOptic&,const EyeCamera&,const OpticView&,unsigned eye,bool rgba);
+    unsigned width,unsigned height,const GunOptic&,const EyeCamera&,const OpticView&,unsigned eye,bool rgba,const std::vector<DWORD>& nativeHud={});
+void IsolateOpticHud(std::vector<DWORD>&,const std::vector<DWORD>& baseline,unsigned width,unsigned height);
 }

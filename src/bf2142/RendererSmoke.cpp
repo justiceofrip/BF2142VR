@@ -166,6 +166,16 @@ int wmain() {
         ok=pixels.size()==320u*240u && pixels[40*320+30]==0xffaabbcc && pixels[80*320+70]==0xff445566 && pixels.back()==0 && ok;
         ok=SUCCEEDED(capture.ReadSurface(device,intermediate,DXGI_FORMAT_B8G8R8A8_UNORM,pixels)) && ok;
         ok=pixels.front()==0xff102030 && pixels[40*320+30]==0xff102030 && pixels.back()==0xff102030 && ok;
+        // HUD-only optic capture must neither erase nor contaminate the main
+        // UI layer, including MSAA resolves and native target restoration.
+        std::vector<DWORD> mainBefore,extra,mainAfter;
+        ok=ui.Read(DXGI_FORMAT_B8G8R8A8_UNORM,mainBefore)&&ok;
+        ok=SUCCEEDED(device->BeginScene())&&ok;
+        const bool optic=ui.BeginOptic(device);ok=optic&&ok;
+        if(optic){D3DRECT sight{110,110,140,140};ok=SUCCEEDED(device->Clear(1,&sight,D3DCLEAR_TARGET,0x80604020,1,0))&&ok;ok=ui.EndOptic()&&ok;}
+        ok=SUCCEEDED(device->EndScene())&&ok;
+        ok=ui.ReadOptic(DXGI_FORMAT_B8G8R8A8_UNORM,extra)&&ui.Read(DXGI_FORMAT_B8G8R8A8_UNORM,mainAfter)&&ok;
+        ok=mainBefore==mainAfter&&extra.size()==mainBefore.size()&&extra[120*320+120]==0x80604020&&extra[40*320+30]==0&&ok;
         // Desktop composition must restore the intermediate target and its
         // viewport/cache agreement before the native renderer continues.
         ok=ui.CompositeDesktop() && ok;

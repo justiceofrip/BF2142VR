@@ -1,6 +1,6 @@
 # BF2142 VR render quality
 
-## Separate beta.4-test.2 experimental build
+## Separate beta.4-test.3 experimental build
 
 Test.2 restores the verified **1600x900 native source**. Test.1 automatically
 raised that source using the runtime recommendation and broke the native menu
@@ -22,6 +22,9 @@ hangar was already rendered on the GPU and benefits from source size, but its
 stock textures have not been upscaled. Full game texture upscaling stays separate.
 
 Automated checks pass; headset visual quality and actual FPS still need testing.
+Test.3 preserves elapsed effects time when the XR consumer skips native render
+calls, isolates belt depth and captures supported native scope HUDs separately.
+The faint black HUD outline remains unconfirmed.
 The following describes the published beta.2/beta.3 behavior.
 
 

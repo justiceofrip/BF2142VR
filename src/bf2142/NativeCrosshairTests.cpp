@@ -25,13 +25,14 @@ int main(){
  const BYTE intMap[]={0x55,0x8b,0xec,0x83,0xec,8,0x56,0x8d,0x71,0x1c};
  std::memcpy(g+0x4e490,intMap,sizeof(intMap));const BYTE reg[]={0xff,0x52,0x1c};std::memcpy(g+0x39f84f,reg,sizeof(reg));
  Put(g,0x39f82f,g+0x5b4238);std::memcpy(g+0x5b4238,"GuiIndex",9);Put(g,0x5221e0+0x20,g+0x4e490);Put(g,0x5221e0+0x24,g+0x4e320);
- for(int zoom:{59,63,78,80,84,88,90}){
-  index=zoom;{CrosshairScope scope(g);if(index!=zoom-1||alpha!=0)return 5;
-   {CrosshairScope nested(g);if(index!=zoom-1||alpha!=0)return 6;}
-   if(index!=zoom-1||alpha!=0)return 7;
+ for(int zoom:{59,63,78,80,81,84,88,90,92}){
+  index=zoom;{CrosshairScope scope(g);if(index!=1024||alpha!=0)return 5;
+   {CrosshairScope nested(g);if(index!=1024||alpha!=0)return 6;}
+   if(index!=1024||alpha!=0)return 7;
   }if(index!=zoom||alpha!=.8f)return 8;
+  {CrosshairScope optic(g,true);if(!optic.Optic()||index!=zoom||alpha!=1)return 15;}if(alpha!=.8f)return 16;
  }
- for(int other:{0,24,25,55,81,82,92,93,777}){index=other;{CrosshairScope scope(g);if(index!=other||alpha!=0)return 9;}if(alpha!=.8f)return 10;}
+ for(int other:{0,24,25,55,82,93,777}){index=other;{CrosshairScope scope(g);if(index!=other||alpha!=0)return 9;}if(alpha!=.8f)return 10;}
  index=84;SetCrosshairHidden(false);{CrosshairScope scope(g);if(index!=84||alpha!=.8f)return 11;}SetCrosshairHidden(true);
  g[0x4e490]=0;{CrosshairScope scope(g);if(index!=84||alpha!=0)return 12;}if(alpha!=.8f)return 13;
  g[0x4e490]=intMap[0];Put(intEntry.data(),0x10,reinterpret_cast<int*>(1));if(ResolveGui(g))return 14;

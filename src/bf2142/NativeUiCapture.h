@@ -11,6 +11,10 @@ public:
     bool Detach();
     bool Read(DXGI_FORMAT format,std::vector<DWORD>& pixels);
     bool CompositeDesktop();
+    bool BeginOptic(IDirect3DDevice9*);
+    bool EndOptic();
+    bool ReadOptic(DXGI_FORMAT,std::vector<DWORD>&);
+
     bool Active() const { return active; }
     void Reset();
 private:
@@ -31,6 +35,9 @@ private:
     DWORD alphaStates[5]{};
     Microsoft::WRL::ComPtr<IDirect3DTexture9> texture;
     Microsoft::WRL::ComPtr<IDirect3DSurface9> surface,backbuffer;
+    Microsoft::WRL::ComPtr<IDirect3DTexture9> opticTexture;
+    Microsoft::WRL::ComPtr<IDirect3DSurface9> opticSurface;
+    bool opticActive=false;
     FrameCapture capture;
 };
 }

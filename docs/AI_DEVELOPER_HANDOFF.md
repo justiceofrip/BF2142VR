@@ -1,5 +1,33 @@
 # BFVR AI and Developer Handoff
 
+## Beta.4-test.3 interaction/timing hotfix
+
+RenderTimeBudget accumulates skipped native renderer delta (seconds) and consumes
+it once in the first eye; other eyes/scope replays get zero. Carry is bounded to
+250ms and reset on renderer change/device reset/flat fallback. Never change
+simulation/network time to fix renderer particle speed.
+
+Body equipment uses a separate matching MSAA depth surface, full target viewport
+and explicit sample mask; restore native depth and state afterward. The engine
+owns its render cache: scope HUD replay runs inside the existing native scene,
+after the main HUD draw, without externally restoring a stale native state block.
+NativeUiCapture swaps an auxiliary alpha target while preserving the main UI.
+Scoped signature-checked GuiIndex suppression removes known ADS widget roots;
+the native HUD-only replay restores the weapon root and isolates differences
+inside the central UI crop. CompositeGunOptic clips those pixels to the sight.
+No stock HUD assets are shipped. Unknown/missing capture retains the old reticle.
+
+SupportCrates queues early/low-speed releases, waits for native rounds, and
+explicitly holsters after completion. WeaponGrip briefly suppresses native
+post-throw auto-selection; deliberate body grabs still draw immediately.
+Startup movie removal is an installer mutation with a null installed hash,
+verified backup and exact allowlist. Uninstall restores originals and refuses
+later replacements or corrupt backups before changing any file.
+
+Both builds, 73 CTests and hidden GPU checks pass. Final headset acceptance is
+pending; faint HUD outline is unconfirmed. IK/network protocols are unchanged.
+
+
 ## Beta.4-test.2 native menu correction
 
 The owner playtest rejected test.1 automatic source sizing: the launcher passed

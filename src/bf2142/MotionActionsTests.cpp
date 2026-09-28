@@ -23,7 +23,10 @@ int main(){
     for(int i=0;i<55;++i)step();in.hand.x+=2;CHECK(step().action==MotionKind::None);
     for(int i=0;i<55;++i)step();for(int i=0;i<20;++i){in.hand.x+=.04f;in.head.x+=.04f;CHECK(step().action==MotionKind::None);}
     CHECK(step(300).action==MotionKind::None);
-    // Grenades no longer consume trigger or create gesture-fire pulses.
+    // Short, moderate-speed stabs work; millimetre-scale resting jitter does not.
+ for(int i=0;i<55;++i)step();for(int i=0;i<30;++i){in.hand.x+=(i%2?.002f:-.002f);CHECK(step().action==MotionKind::None);}
+ attacks=0;for(int i=0;i<7;++i){in.hand.z-=.018f;attacks+=step().action==MotionKind::Knife;}CHECK(attacks==1);
+ // Grenades no longer consume trigger or create gesture-fire pulses.
     in.kind=MotionKind::Frag;in.grip=true;in.trigger=true;
     for(int i=0;i<100;++i){in.hand.z-=.025f;const auto r=step();CHECK(r.action==MotionKind::None&&!r.primary&&!r.primed);}
     in.grip=false;CHECK(step().action==MotionKind::None);
@@ -37,6 +40,8 @@ int main(){
     grab.pressed=false;grab.time+=20000000;grip.Update(grab);grab.pressed=true;grab.slotGrab=true;grab.time+=20000000;CHECK(grip.Update(grab));
     grab.pressed=false;grab.time+=20000000;grip.Update(grab);grab.slotGrab=false;grab.pressed=true;grab.time+=20000000;CHECK(!grip.Update(grab));
     grab.equipped=2;grab.time+=20000000;CHECK(grip.Update(grab)); // wheel selection draws
+    grip.Holster(grab.time);grab.equipped=7;grab.time+=20000000;CHECK(!grip.Update(grab));
+    grab.pressed=false;grab.time+=20000000;grip.Update(grab);grab.pressed=true;grab.slotGrab=true;grab.time+=20000000;CHECK(grip.Update(grab));
     grab.owner++;grab.time+=20000000;CHECK(grip.Update(grab)); // new soldier starts normally
     GrenadeTrajectory trajectory{{0,1.5f,.2f},{0,4,20},5.3955f};
     const auto t=GrenadePoint(trajectory,1);CHECK(t&&std::abs(t->z-20.2f)<.0001f&&std::abs(t->y-(5.5f-2.69775f))<.0001f);

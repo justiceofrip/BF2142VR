@@ -16,7 +16,7 @@ public:
     // full-resolution multisample target and restores every device state.
     bool DrawGpu(IDirect3DDevice9*, const shared::SharedPresentationView&,const stereo::Matrix4& projection,
         float scale,const BodyInventoryResult&,const InventoryNames&,int equipped);
-    void ResetGpu(){device=nullptr;for(auto& m:models)for(auto& t:m.materials)t.gpu.Reset();}
+    void ResetGpu(){device=nullptr;gpuDepth.Reset();for(auto& m:models)for(auto& t:m.materials)t.gpu.Reset();}
     float FaceOpacity(std::string_view name,const stereo::Matrix4& gun,const std::array<stereo::Matrix4,2>& eyes) const;
     size_t ModelCount() const {return models.size();}
 private:
@@ -28,6 +28,7 @@ private:
     std::array<std::vector<DWORD>,2> layers;
     std::vector<Model> models;
     IDirect3DDevice9* device=nullptr;
+    Microsoft::WRL::ComPtr<IDirect3DSurface9> gpuDepth;
     std::vector<float> depth;
 };
 }

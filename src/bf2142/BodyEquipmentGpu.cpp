@@ -16,8 +16,22 @@ bool BodyEquipment::DrawGpu(IDirect3DDevice9* d,const shared::SharedPresentation
  if(!a)return false;for(const auto& row:projection.values)for(float v:row)if(!std::isfinite(v))return false;
  if(device!=d){ResetGpu();device=d;}
  Microsoft::WRL::ComPtr<IDirect3DStateBlock9> state;if(FAILED(d->CreateStateBlock(D3DSBT_ALL,&state)))return false;
+ // The native weapon projection is incompatible with the world's depth range.
+ // Give body props their own depth, so they occlude each other without reading
+ // unrelated native world depth or leaving it damaged for subsequent HUD draws.
+ Microsoft::WRL::ComPtr<IDirect3DSurface9> nativeDepth,target;
+ d->GetDepthStencilSurface(&nativeDepth);if(FAILED(d->GetRenderTarget(0,&target)))return false;
+ D3DSURFACE_DESC desc{},cached{};if(FAILED(target->GetDesc(&desc)))return false;
+ if(gpuDepth)gpuDepth->GetDesc(&cached);
+ if(!gpuDepth||cached.Width!=desc.Width||cached.Height!=desc.Height||cached.MultiSampleType!=desc.MultiSampleType||cached.MultiSampleQuality!=desc.MultiSampleQuality){
+  gpuDepth.Reset();if(FAILED(d->CreateDepthStencilSurface(desc.Width,desc.Height,D3DFMT_D24S8,desc.MultiSampleType,desc.MultiSampleQuality,TRUE,&gpuDepth,nullptr)))return false;
+ }
+ if(FAILED(d->SetDepthStencilSurface(gpuDepth.Get())))return false;
+ struct RestoreDepth {IDirect3DDevice9* d;IDirect3DSurface9* s;~RestoreDepth(){d->SetDepthStencilSurface(s);}} restoreDepth{d,nativeDepth.Get()};
  D3DMATRIX identity{};identity._11=identity._22=identity._33=identity._44=1;
  bool ok=true;const auto set=[&](HRESULT hr){ok=SUCCEEDED(hr)&&ok;};
+ D3DVIEWPORT9 viewport{0,0,desc.Width,desc.Height,0,1};set(d->SetViewport(&viewport));
+ set(d->Clear(0,nullptr,D3DCLEAR_ZBUFFER,0,1,0));set(d->SetRenderState(D3DRS_MULTISAMPLEMASK,0xffffffff));
  set(d->SetVertexShader(nullptr));set(d->SetPixelShader(nullptr));set(d->SetFVF(D3DFVF_XYZ|D3DFVF_TEX1));
  set(d->SetTransform(D3DTS_WORLD,&identity));set(d->SetTransform(D3DTS_VIEW,&identity));set(d->SetTransform(D3DTS_PROJECTION,reinterpret_cast<const D3DMATRIX*>(&projection)));
  set(d->SetStreamSourceFreq(0,1));set(d->SetStreamSourceFreq(1,1));set(d->SetRenderState(D3DRS_VERTEXBLEND,D3DVBF_DISABLE));set(d->SetRenderState(D3DRS_INDEXEDVERTEXBLENDENABLE,FALSE));

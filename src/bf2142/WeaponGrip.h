@@ -12,10 +12,11 @@ public:
     bool Update(const WeaponGripInput&) noexcept;
     bool Held() const noexcept {return held;}
     void Reset() noexcept {*this={};}
+    void Holster(std::int64_t time) noexcept {held=false;autoEquipUntil=time+1500000000;}
 private:
     bool held=true,previousPressed=false,observed=false;
     std::uint64_t owner=0;
-    std::int64_t previousTime=0;
+    std::int64_t previousTime=0,autoEquipUntil=0;
     int equipped=0;
 };
 }
