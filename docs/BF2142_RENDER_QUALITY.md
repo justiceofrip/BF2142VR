@@ -1,5 +1,31 @@
 # BF2142 VR render quality
 
+## Separate beta.4-test.1 experimental build
+
+The test launcher queries the active OpenXR runtime before starting BF2142.
+Its recommended eye dimensions determine a widescreen source, capped at
+3072x1728 to bound the 32-bit renderer's memory use. An explicit
+`--render-size 1920x1080` (or another supported size) takes precedence. A missing
+headset or failed query retains 1600x900. Restart after changing runtime render
+resolution. The exact source and recommendation are printed by the launcher.
+Runtime output remains the runtime's recommended dimensions and FOV.
+
+This is a higher-detail candidate, not a promise of higher FPS. Rendering more
+pixels costs more; reduce runtime resolution or use --render-size if needed.
+The native monitor vsync wait is removed for actual headset launches; OpenXR
+still schedules presentation. The native FPS-unlock request respects game
+restrictions and restores the previous cap outside focused gameplay.
+
+Holstered equipment now uses the full-resolution GPU eye target and its MSAA,
+with linear/mip texture filtering. Regenerating assets retains nearer stock mesh
+detail and 256px textures; older packs also benefit from GPU rendering. The
+hangar was already rendered on the GPU and benefits from source size, but its
+stock textures have not been upscaled. Full game texture upscaling stays separate.
+
+Automated checks pass; headset visual quality and actual FPS still need testing.
+The following describes the published beta.2/beta.3 behavior.
+
+
 Windowed headset launches use a **1600 x 900 source per eye**. Flat/observer and
 simulated launches default to 1280 x 720. The native window, backbuffer and Flash
 canvas share one size. The earlier square-source/compact-mirror experiment was

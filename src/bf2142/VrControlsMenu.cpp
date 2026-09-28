@@ -56,13 +56,13 @@ bool VrControlsMenu::Interact(float x,float y,bool click,bool back,VrSettings& s
 void VrControlsMenu::Draw(std::vector<DWORD>& image,UINT w,UINT h,DXGI_FORMAT format,const VrSettings& s){
  if(!w||!h||w>8192||h>8192||image.size()!=size_t(w)*h)return;
  if(dirty||cachedWidth!=w||cachedHeight!=h||cachedFormat!=format){
-  constexpr int aw=1280,ah=800;BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=aw;info.bmiHeader.biHeight=-ah;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;
+  const int aw=int(w),ah=int(h);BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=aw;info.bmiHeader.biHeight=-ah;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;
   void* bits=nullptr;HDC dc=CreateCompatibleDC(nullptr);if(!dc)return;
   HBITMAP bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0);if(!bitmap){DeleteDC(dc);return;}
   const auto previous=SelectObject(dc,bitmap);std::memset(bits,0,aw*ah*4);
   const auto rect=[&](float x,float y,float width,float height,COLORREF color){RECT box{LONG(x*aw),LONG(y*ah),LONG((x+width)*aw),LONG((y+height)*ah)};auto brush=CreateSolidBrush(color);FillRect(dc,&box,brush);DeleteObject(brush);};
   const auto label=[&](float x,float y,const std::wstring& text,int size,COLORREF color,bool bold=false){
-   HFONT font=CreateFontW(-size,0,0,0,bold?FW_SEMIBOLD:FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,L"Segoe UI");
+   HFONT font=CreateFontW(-std::max(8,int(size*float(ah)/800.f)),0,0,0,bold?FW_SEMIBOLD:FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,L"Segoe UI");
    const auto old=SelectObject(dc,font);SetBkMode(dc,TRANSPARENT);SetTextColor(dc,color);TextOutW(dc,int(x*aw),int(y*ah),text.c_str(),int(text.size()));SelectObject(dc,old);DeleteObject(font);
   };
   const COLORREF ink=RGB(226,239,241),muted=RGB(150,177,185),accent=RGB(74,215,221);
@@ -85,7 +85,7 @@ void VrControlsMenu::Draw(std::vector<DWORD>& image,UINT w,UINT h,DXGI_FORMAT fo
    const std::wstring values[]={L"TURNING     "+std::wstring(s.snapTurning?L"SNAP":L"SMOOTH"),L"SNAP ANGLE     "+std::to_wstring(int(s.snapAngle))+L" degrees",L"CROSSHAIR     "+std::wstring(s.hideCrosshair?L"HIDDEN":L"VISIBLE"),L"PHYSICAL STANCE     "+std::wstring(s.physicalStance?L"ON":L"OFF"),L"CALIBRATE STANDING HEIGHT",L"GRIP TO HOLSTER     "+std::wstring(s.toggleWeaponGrip?L"ON":L"OFF"),L"GRENADE AIMING ARC     "+std::wstring(s.grenadeArc?L"ON":L"OFF"),L"3D MENU ROOM     "+std::wstring(s.menuRoom?L"ON":L"OFF"),L"MOVE: "+std::wstring(s.controllerRelativeMovement?L"LEFT CONTROLLER":L"HEAD / HMD")};
    for(int i=0;i<9;++i){float y=.245f+i*.064f;rect(.09f,y,.39f,.0544f,hover==i+1?RGB(32,89,102):RGB(26,45,58));label(.103f,y+.012f,values[i],23,ink);}
    label(.535f,.24f,L"QUEST CONTROLLERS",25,accent,true);
-   const wchar_t* help[]={L"Left stick: move  /  click: sprint",L"Right stick: turn  /  click: recenter",L"Right trigger: fire or throw grenade",L"Right grip: holster / squeeze hand",L"Left grip near gun: support hand",L"Raise sights to your eye: aim",L"Swing the knife: attack",L"A: jump   B: game menu / back",L"X: reload   Y: use / enter vehicle",L"Left trigger + X / Y: cycle equipment",L"Grab body slots to select equipment",L"Duck or lie down to change stance"};
+   const wchar_t* help[]={L"Left stick: move  /  click: sprint",L"Right stick: turn  /  click: recenter",L"Right trigger: fire or throw grenade",L"Right grip: holster / squeeze hand",L"Left grip near gun: support hand",L"Raise sights to your eye: aim",L"Look at left wrist: Deploy button",L"A: jump   B: game menu / back",L"X: reload   Y: use / enter vehicle",L"Left trigger + X / Y: cycle equipment",L"Left trigger + A: pick up fallen kit",L"Duck or lie down to change stance"};
    const wchar_t* vehicleHelp[]={L"Left stick: drive / steer",L"Look toward targets: aim movable guns",L"Right stick: aim / pilot pitch and roll",L"Right trigger: primary fire",L"Right grip: alternate fire / APC pod",L"Y: enter / exit vehicle or launcher",L"Hold left trigger + X: driver (seat 1)",L"Hold left trigger + Y: cycle seats 2-8",L"Press again if a seat is unavailable",L"Titan pod: enter, then right trigger",L"Right stick click: recenter",L"Aircraft pilot weapons stay fixed"};
    for(int i=0;i<12;++i)label(.535f,.292f+i*.038f,vehicle?vehicleHelp[i]:help[i],22,ink);
    label(.535f,.775f,s.controllerRelativeMovement?L"Movement follows left controller aim.":L"Movement follows headset heading.",21,muted);

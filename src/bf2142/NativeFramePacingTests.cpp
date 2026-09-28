@@ -1,0 +1,18 @@
+#include "NativeFramePacing.h"
+#include <vector>
+#include <array>
+#include <cstdio>
+using namespace bfvr::bf2142;
+#define CHECK(x) do{if(!(x)){printf("Frame pacing line %d\n",__LINE__);return 1;}}while(0)
+template<class T>void Put(BYTE* p,size_t at,T v){std::memcpy(p+at,&v,sizeof(v));}
+int main(){
+ std::vector<BYTE> image(0x680000);auto* g=image.data();std::array<BYTE,256> object{};
+ const BYTE getter[]={0x8b,0x81,0x9c,0,0,0,0xc3};const BYTE setter[]={0x55,0x8b,0xec,0x8b,0x45,8,0x85,0xc0,0x56,0x8b,0xf1,0x7e,0x0b,0x89,0x86,0x9c,0,0,0,0x5e,0x5d,0xc2,4,0,0xe8};const BYTE suffix[]={0x84,0xc0,0x75,0x0a,0xc7,0x86,0x9c,0,0,0,0,0,0,0,0x5e,0x5d,0xc2,4,0};
+ std::memcpy(g+0x1afc00,getter,sizeof(getter));std::memcpy(g+0x3030,setter,sizeof(setter));std::memcpy(g+0x304d,suffix,sizeof(suffix));std::memcpy(g+0x519464,"lockFps",8);
+ Put(g,0x3049,LONG(0x2b800-0x304d));Put(g,0x243c2,g+0x519464);Put(g,0x5193e0+0x5c,g+0x2447b);Put(g,0x24492,g+0x60f3b0);Put(g,0x244b4,g+0x60f3b0);g[0x244b9]=0xe8;Put(g,0x244ba,LONG(0x3030-0x244be));Put(g,0x60f3b0,object.data());
+ for(int cap:{0,40,72,100,1000}){Put(object.data(),0x9c,cap);CHECK(ResolveFrameLimiter(g)==object.data());CHECK(*reinterpret_cast<int*>(object.data()+0x9c)==cap);}
+ for(int cap:{-1,1001}){Put(object.data(),0x9c,cap);CHECK(!ResolveFrameLimiter(g));}Put(object.data(),0x9c,100);
+ for(unsigned at:{0x3030u,0x3049u,0x304du,0x1afc00u,0x519464u,0x243c2u,0x24492u,0x244b4u,0x244b9u,0x244bau,0x51943cu}){g[at]^=0xff;CHECK(!ResolveFrameLimiter(g));g[at]^=0xff;}
+ Put(g,0x60f3b0,static_cast<void*>(nullptr));CHECK(!ResolveFrameLimiter(g));CHECK(!ResolveFrameLimiter(nullptr));
+ puts("Native FPS profile: getter, setter restrictions, command linkage, valid cap and unknown-profile rejection passed.");
+}

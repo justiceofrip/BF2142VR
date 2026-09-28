@@ -14,7 +14,7 @@ stereo::Vec3 Transform(const stereo::Pose& p,stereo::Vec3 v){const auto q=p.orie
 struct Screen {float x,y,z,u,v;};
 }
 bool BodyEquipment::Load(const std::wstring& path) noexcept {
-    models.clear();try {
+    ResetGpu();models.clear();try {
         if(path.empty() || std::filesystem::file_size(path)>32*1024*1024)return false;
         std::ifstream f(std::filesystem::path(path),std::ios::binary);char magic[8]{};f.read(magic,8);
         if(std::string_view(magic,8)!="BFHP0001")return false;
@@ -28,7 +28,7 @@ bool BodyEquipment::Load(const std::wstring& path) noexcept {
             stereo::Vec3 low{1.e9f,1.e9f,1.e9f},high{-1.e9f,-1.e9f,-1.e9f};
             for(unsigned j=0;j<nm;++j){
                 Material m;const auto nv=word(),ni=word();m.width=word();m.height=word();
-                if(!nv||nv>65535||!ni||ni>60000||ni%3||m.width!=128||m.height!=128)return false;
+                if(!nv||nv>65535||!ni||ni>60000||ni%3||(m.width!=128&&m.width!=256)||m.height!=m.width)return false;
                 m.vertices.resize(nv);m.indices.resize(ni);m.texture.resize(size_t(m.width)*m.height);
                 f.read(reinterpret_cast<char*>(m.vertices.data()),nv*sizeof(Vertex));f.read(reinterpret_cast<char*>(m.indices.data()),ni*2);
                 f.read(reinterpret_cast<char*>(m.texture.data()),m.texture.size()*4);if(!f)return false;

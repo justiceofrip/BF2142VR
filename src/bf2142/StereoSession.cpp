@@ -13,6 +13,8 @@
 #include "BodyInventory.h"
 #include "EquipmentHaptics.h"
 #include "BodyEquipment.h"
+#include "WristMenu.h"
+#include "NativeFramePacing.h"
 #include "ShoulderRadioGpu.h"
 #include "voice/VoiceClient.h"
 #include "SupportCrates.h"
@@ -57,7 +59,13 @@ HWND desktopWindow=nullptr;
 BodyInventory bodyInventory;WeaponGrip weaponGrip;TraversalControls traversalControls;
 BodyEquipment bodyEquipment;SupportCrates supportCrates;SupportFrame supportFrame;
 BodyInventoryResult bodyFrame;
-ShoulderRadio shoulderRadio;RadioFrame radioFrame;bool radioDrawn=false;
+ShoulderRadio shoulderRadio;RadioFrame radioFrame;bool radioDrawn=false,bodyGpuDrawn=false;
+bool frameLimitAttempted=false;int savedNativeFrameCap=-1;
+void RestoreFramePacing(){
+    if(savedNativeFrameCap>0)SetNativeFrameRate(savedNativeFrameCap,nullptr,true);
+    savedNativeFrameCap=-1;frameLimitAttempted=false;
+}
+WristMenu wristMenu;WristMenuGpu wristGpu;WristFrame wristFrame;
 InventoryNames inventoryNames{};
 int equippedItem=0;bool bodyActive=false;
 EquipmentHaptics rightEquipmentCue,leftEquipmentCue;
@@ -89,6 +97,7 @@ void ProducerLog(void*,const wchar_t* text) {
 LONG ReadCounter(volatile LONG& counter) { return InterlockedCompareExchange(&counter,0,0); }
 void Fail(const char* reason,HRESULT hr=E_FAIL) {
     if (!enabled) return;
+    RestoreFramePacing();
     SetNativeWeaponHeld(true);
     logger("Stereo stopped: %s (0x%08lX). Normal game rendering continues.",reason,static_cast<unsigned long>(hr));
     enabled=false; pairReady=false; ClearNativeSnapTurn();ConfigureNativeMovement(false,0);ConfigureNativeLookPitch(false,{});ResetAutomaticAds();ClearControllerCommand();ClearNativeHands();menuPointer.Reset();
@@ -152,7 +161,7 @@ void Recenter(bool calibrateStanding=false) {
     }
     const auto upright=stereo::MakeYawOnlyUiAnchor(head);
     reference=upright?*upright:head;
-    menuPointer.Reset();shoulderRadio.Reset();radioFrame={};supportCrates.Reset();supportFrame={};PublishNativeSupport({});bodyInventory.Reset();traversalControls.Reset();ResetMotionActions();
+    wristMenu.Reset();wristFrame={};menuPointer.Reset();shoulderRadio.Reset();radioFrame={};supportCrates.Reset();supportFrame={};PublishNativeSupport({});bodyInventory.Reset();traversalControls.Reset();ResetMotionActions();
     recenterSequence=request.recenterForwardSequence;haveReference=true;haveGripReference=false;
     logger("6DoF neutral pose captured; upright reference; position scale=%.3f; height offset=%.3f.",settings.worldScale,settings.heightOffset);
 }
@@ -177,6 +186,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     }
     request=b->renderRequest;
     if (!request.shouldRender || !request.viewsValid || !request.headPoseValid) {
+        RestoreFramePacing();wristMenu.Reset();wristFrame={};
         ClearNativeSnapTurn();ConfigureNativeMovement(false,0);ConfigureNativeLookPitch(false,{});ResetAutomaticAds();homePolicy.Update(false,GetTickCount64());menuPointer.Reset();
         ClearControllerCommand();ClearNativeHands();shoulderRadio.Reset();radioFrame={};controllerPolicy={};pending=0;return false;
     }
@@ -197,6 +207,13 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     controlsMenu.Hotkey(!diagnostic && foregroundPid==GetCurrentProcessId() && (GetAsyncKeyState(VK_INSERT)&0x8000)!=0);
     lastRequestMainMenu=!gameplay;
     const bool showMenu=pausedMenu || !gameplay || controlsMenu.Open() || (!diagnostic && menuPointer.MenuVisible());
+    const bool runtimePacing=accepted && foregroundPid==GetCurrentProcessId() && gameplay && !showMenu && !diagnostic && !desktop;
+    if(!runtimePacing)RestoreFramePacing();
+    if(runtimePacing && !frameLimitAttempted){
+        frameLimitAttempted=true;const int cap=SetNativeFrameRate(0,&savedNativeFrameCap);
+        logger("Runtime frame pacing: native game.lockFps request=0 result=%d (-1=unrecognized; positive=native restriction retained).",cap);
+    }
+    wristFrame=wristMenu.Update(accepted&&gameplay&&!showMenu&&!explicitRecenter,sample,Pose(request.headPose));
     TraversalSample traversal;
     const bool traversalValid=accepted && gameplay && !showMenu && ReadNativeTraversal(&traversal);
     VehicleSample vehicle;const bool vehicleKnown=gameplay&&ReadNativeVehicle(&vehicle);
@@ -281,7 +298,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     }
     PublishNativeHands(accepted && gameplay && !showMenu && !command.recenter && (!mounted||chuteHands) && settings.motionHands?&sample:nullptr,
         reference,Pose(request.headPose),settings.worldScale,settings.heightOffset,radioFrame);
-    if(UpdateNativeMotion(accepted && gameplay && !showMenu && !mounted && settings.motionHands && held && !command.recenter && !body.key && !supportFrame.busy?&sample:nullptr,Pose(request.headPose),command))
+    if(UpdateNativeMotion(accepted && gameplay && !showMenu && !mounted && settings.motionHands && held && !command.recenter && !body.key && !supportFrame.busy && !wristFrame.hovered && !wristMenu.Consuming()?&sample:nullptr,Pose(request.headPose),command))
         InterlockedIncrement(&b->hapticNativeMenuHoverSequence);
     int stance=0;
     const bool physical=accepted && gameplay && !showMenu && settings.physicalStance && inventoryValid && ReadNativeStance(&stance);
@@ -291,6 +308,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     if(physical){command.keys[0x1d]=posture.crouch?0x80:0;command.keys[0x2c]=posture.proneKey?0x80:0;}
     if(traversalValid&&!command.recenter)traversalControls.Update(traversal,sample,Pose(request.headPose),command);
     else traversalControls.Reset();
+    if(vehicleValid&&accepted){command.keys[0x22]=0;command.keys[0x39]=(sample.hands[1].buttons&shared::kControllerHandButtonPrimary)?0x80:0;}
     UpdateNativeVehicle(vehicleValid&&!command.recenter?&vehicle:nullptr,accepted?&sample:nullptr,reference,Pose(request.headPose),settings.worldScale,settings.heightOffset,command);
     menuPointer.Update(showMenu,accepted?&sample:nullptr,request,width,height,
         (diagnostic||desktop)?width:b->requirements.uiWidth,(diagnostic||desktop)?height:b->requirements.uiHeight,command,&controlsMenu,&settings);
@@ -302,6 +320,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     if(fistBumps&1)InterlockedIncrement(&b->hapticFistLeftSequence);
     if(fistBumps&2)InterlockedIncrement(&b->hapticFistRightSequence);
     voice::PublishControls(voice::VoicePreferences(settings),accepted&&gameplay&&!showMenu&&!command.recenter&&runtimeFocus.value_or(false)&&foregroundPid==GetCurrentProcessId(),radioFrame.pressed);
+    wristMenu.Apply(command,showMenu);
     if(desktop)BlockDesktopHotkeys(command);
     if(accepted)PublishControllerCommand(command,true);else {ClearControllerCommand();ClearNativeHands();}
     return true;
@@ -450,7 +469,7 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
         for (int eye=0;eye<2;++eye) {
             activeEye=eye;
             outsideUiReady=false;
-            radioDrawn=false;uiReady=false; // Accumulate HUD and menu batches within this eye only.
+            radioDrawn=false;bodyGpuDrawn=false;uiReady=false; // Accumulate HUD and menu batches within this eye only.
             if (!BeginNativeEye(renderer,reference,request.views[eye])) {
                 Fail("invalid native camera or headset pose");
                 return rendered?result:original(renderer,delta,interpolation);
@@ -503,11 +522,6 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
                 eyeRestore.Draw(gameDevice,pixels[0],width,height,colorFormat);
             }
         }
-        if(bodyActive && !menuPointer.Active()) {
-            auto visibleInventory=inventoryNames;for(int i=1;i<10;++i)if(supportFrame.unavailable[i])visibleInventory[i]={};
-            const bool props=bodyEquipment.Draw(pixels[0],pixels[1],width,height,colorFormat,request,bodyFrame,visibleInventory,NativeWeaponHeld()?equippedItem:0);
-            if(!desktop && props)eyeRestore.Draw(gameDevice,pixels[0],width,height,colorFormat);
-        }
         activeEye=-1;
         pairReady=true;lastRenderResult=result;
         // NativeRender calls Present internally. Both calls were suppressed,
@@ -547,6 +561,16 @@ bool StereoHudBegin(bool standaloneMenu) {
     if(insideRender && activeEye>=0 && activeEye<2 && !radioDrawn && radioFrame.visible && !menuPointer.Active()){
         radioDrawn=true;stereo::Matrix4 projection{};
         if(ReadNativeWeaponProjection(&projection))DrawShoulderRadio(gameDevice,radioFrame,request.views[activeEye],projection,settings.worldScale);
+    }
+    if(insideRender && activeEye>=0 && activeEye<2 && !bodyGpuDrawn && !menuPointer.Active()){
+        bodyGpuDrawn=true;stereo::Matrix4 projection{};
+        if(ReadNativeWeaponProjection(&projection)){
+            if(bodyActive){
+                auto visible=inventoryNames;for(int i=1;i<10;++i)if(supportFrame.unavailable[i])visible[i]={};
+                bodyEquipment.DrawGpu(gameDevice,request.views[activeEye],projection,settings.worldScale,bodyFrame,visible,NativeWeaponHeld()?equippedItem:0);
+            }
+            wristGpu.Draw(gameDevice,wristFrame,request.views[activeEye],projection,settings.worldScale);
+        }
     }
     const bool clear=insideRender?!uiReady:!outsideUiReady;
     const bool captured=uiCapture.Begin(gameDevice,clear);
@@ -600,12 +624,14 @@ void StereoPresent(IDirect3DDevice9* device) {
     } catch (...) { Fail("stereo presentation allocation or runtime exception"); }
 }
 void StereoReset() {
+    RestoreFramePacing();
     RecenterNativeVehicle();traversalControls.Reset();weaponGrip.Reset();SetNativeWeaponHeld(true);controlsMenu.Reset();physicalStance.Reset();ConfigurePhysicalCamera(false);standingHeight.Reset();
     ClearNativeSnapTurn();ConfigureNativeMovement(false,0);ConfigureNativeLookPitch(false,{});ResetAutomaticAds();ClearControllerCommand();ClearNativeHands(); controllerPolicy={}; haveGripReference=false; previousGameplay=false;
     menuPointer.Reset();shoulderRadio.Reset();radioFrame={};supportCrates.Reset();supportFrame={};PublishNativeSupport({});bodyInventory.Reset();ResetMotionActions();rightEquipmentCue.Reset();leftEquipmentCue.Reset();ResetDesktopSimulation();
     uiCapture.Reset(); uiReady=false;outsideUiReady=false;homePolicy={}; warnedUi=false;
     lastMenuCapture=0;
     lastRenderResult=true;
+    bodyEquipment.ResetGpu();wristGpu.Reset();wristMenu.Reset();wristFrame={};
     capture.Reset();eyeRestore.Reset();menuRoomGpu.Reset();scopePixels.clear(); pairReady=false; pending=0; haveReference=false; lastRenderer=nullptr;
 }
 }

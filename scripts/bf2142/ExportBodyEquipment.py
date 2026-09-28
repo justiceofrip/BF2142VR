@@ -18,18 +18,18 @@ def export(source, output, ffmpeg, extra, decode=None):
         if key in textures:return textures[key]
         if key not in texture_lookup:raise ValueError('Missing texture: '+key)
         raw=texture_lookup[key][0].read(texture_lookup[key][1])
-        if decode is not None:pixels=decode(raw,128)
+        if decode is not None:pixels=decode(raw,256)
         else:
             with tempfile.TemporaryDirectory() as folder:
                 dds=Path(folder)/'source.dds';dds.write_bytes(raw)
-                result=subprocess.run([str(ffmpeg),'-hide_banner','-loglevel','error','-i',str(dds),'-vf','scale=128:128','-frames:v','1','-f','rawvideo','-pix_fmt','bgra','pipe:1'],capture_output=True,check=True)
+                result=subprocess.run([str(ffmpeg),'-hide_banner','-loglevel','error','-i',str(dds),'-vf','scale=256:256','-frames:v','1','-f','rawvideo','-pix_fmt','bgra','pipe:1'],capture_output=True,check=True)
             pixels=result.stdout
-        if len(pixels)!=128*128*4:raise ValueError('DDS decode size')
+        if len(pixels)!=256*256*4:raise ValueError('DDS decode size')
         textures[key]=pixels;return pixels
     for key,n in lookup.items():
         if not key.startswith('handheld/') or not key.endswith('.bundledmesh'):continue
         m=Mesh(z.read(n));name=Path(key).stem.encode('ascii')
-        mats=[mat for mat in m.lods[1][-1] if mat['alpha']==0 and mat['indices']]
+        mats=[mat for mat in m.lods[1][0] if mat['alpha']==0 and mat['indices']]
         missing=[mat['maps'][0].decode('latin1').lower().replace('\\','/').removeprefix('objects/weapons/') for mat in mats if mat['maps'][0].decode('latin1').lower().replace('\\','/').removeprefix('objects/weapons/') not in texture_lookup]
         if missing:
             report[name.decode()]={'skipped_missing_texture':missing};continue
@@ -37,7 +37,7 @@ def export(source, output, ffmpeg, extra, decode=None):
         for mat in mats:
             tex=texture(mat['maps'][0]);v=mat['vertices'];ix=mat['indices'];faces+=len(ix)//3
             if len(v)>65535 or len(ix)>60000:raise ValueError('Oversized draw')
-            data+=struct.pack('<4I',len(v),len(ix),128,128)
+            data+=struct.pack('<4I',len(v),len(ix),256,256)
             for vertex in v:data+=struct.pack('<5f',*struct.unpack_from('<3f',vertex),*struct.unpack_from('<2f',vertex,28))
             data+=struct.pack('<'+str(len(ix))+'H',*ix)+tex
         models.append(struct.pack('<I',len(name))+name+struct.pack('<I',len(mats))+data)

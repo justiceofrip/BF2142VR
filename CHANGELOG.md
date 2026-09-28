@@ -1,5 +1,36 @@
 # BFVR Changelog
 
+## BF2142 0.2.0-beta.4-test.1 — experimental wrist / rendering hotfix
+
+- Looking at the left wrist reveals a Deploy button. Right laser/trigger opens
+  the native spawn/loadout panel; held-trigger entry and loss of tracking cancel
+  activation. It does not open settings or change IK.
+- Left trigger + A picks up fallen kits on foot. Vehicle A behavior is retained.
+- Holster models now draw on the GPU in the full-resolution multisampled eye
+  target, with filtered textures and depth, replacing the 640px CPU enlargement.
+  Newly generated packs retain nearer stock model detail and 256px textures;
+  existing 128px packs remain readable. No game assets are distributed.
+- Launcher queries the active OpenXR runtime's recommended view size in the x64
+  presenter before starting BF2142. Source stays widescreen and is capped at
+  3072x1728 for native memory safety; explicit --render-size wins. Missing HMD
+  or unavailable query retains 1600x900. This is not unrestricted native sizing.
+- Real headset sessions request the stock game.lockFps 0 action and immediate
+  desktop presentation so the monitor does not set headset cadence. Native
+  restrictions remain in force; the prior cap is restored on focus/menu/reset
+  transitions if it has not been changed by the player.
+- Suppress known fixed-opacity ADS HUD widgets during hidden-crosshair draws,
+  restoring their native GUI selection afterwards. Settings text is drawn at
+  output resolution. These changes require visual headset acceptance.
+- Both architectures build and 73 deterministic tests pass. The final GPU
+  equipment/wrist check passes, including MSAA, state/target restoration and
+  device reset. Earlier device-creation failures cleared on the repeat.
+  No measured headset FPS improvement or commander-play acceptance is claimed.
+  Knife behavior is unchanged; a reported hit-registration issue remains
+  unconfirmed. Grenade guide availability and intro movie controller input
+  remain open. Full native scope HUD transplantation is
+  not implemented by this change.
+
+
 ## BF2142 0.2.0-beta.3 ladder/input hotfix
 
 - Fix ladders rejecting attachment while the VR view looks level: keep the hidden native look pitch aligned with the headset through stock networked input.

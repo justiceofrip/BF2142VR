@@ -1,5 +1,45 @@
 # BFVR AI and Developer Handoff
 
+## Beta.4-test.1 experimental wrist / rendering candidate
+
+WristMenu is a gaze-revealed, right-ray-selected native Enter shortcut; preserve
+its release-to-arm and fire-consumption guards. Full deployment uses the existing
+MenuPointer anchor and absolute native HUD coordinates. No protocol, IK, aim or
+body collision changes. Commander right-click/control shortcuts are not done.
+
+BodyEquipmentGpu draws at StereoHudBegin, inside the ordinary eye scene and
+before UI target isolation. It restores a full device state block, never changes
+RT/depth surfaces, and shares native MSAA/resolve. Do not also composite the old
+640px CPU raster. ResetGpu releases device textures before reset. Exporter uses
+nearer 3P LOD/256px texture; 128px format-1 packs remain accepted. GPU checks use
+owned private packs, never repository assets.
+
+The launcher runs the same x64 presenter identity for an instance-only OpenXR
+size query before the native game/window is created. Bound widescreen dimensions
+and keep native window/backbuffer/Flash canvas matched. Do not resize only one
+of them. Runtime source recommendation is capped at 3072x1728, overrideable by
+--render-size; query failure retains 1600x900. Higher resolution costs more work.
+The source is not necessarily the runtime's exact aspect or full supersampling.
+
+NativeFramePacing verifies BF2142 console lockFps getter/setter and registration;
+it calls the native setter (including its restriction), never force-writes the
+limiter or patches multiplayer checks. Request 0 only for fresh, focused actual
+headset gameplay. Restore the saved cap on loss/menu/reset only if still zero;
+leave console changes alone. Desktop simulation and observers do not use it.
+The actual headset D3D swapchain uses immediate presentation with native fallback.
+
+Both builds and 73 CTests pass. The final equipment/wrist GPU check passes
+after earlier D3DERR_DEVICELOST device-creation failures cleared; MSAA, stereo,
+state/target preservation and reset are verified. Headset/runtime sizing,
+frame pacing and wrist use are not accepted in-game yet. The owner authorized
+a separate experimental beta.4-test.1 prerelease without another headset gate;
+beta.3 remains the fallback. Tester reports/hardware/screenshots remain private.
+The exact test ZIP passed fresh stock repair/install, repeat setup, installed
+hashes and launcher inspection, equipment GPU checks, rollback tamper guards,
+normal/repeated uninstall and byte-for-byte restoration. The pre-repaired
+archive installation path also passed. Frozen-worker failures retain logs.
+
+
 ## Beta.3 ladder/input hotfix
 
 Native ladder entry checks native pitch even when the headset uses the level comfort camera. A local reproduction showed +81.5 degrees hidden downward look; correcting it enabled attachment and ~5m ascent. The owner also confirmed the permanent desktop build. NativeLookPitch supplies HMD pitch with a native-only 5-degree upward bias to pass the stock bottom-entry gate at level view. NativeComfort writes axis 5 once per generated action batch and clears other pitch values in that batch. The existing stock input adapter also carries snap yaw (axis 4), replacing the custom snap event. Signature checks cover input layout, native axis factors, weapon look scale and signed-short /100 codec. Fresh focused on-foot local VR samples only; menus, stale/lost tracking, death, vehicles and mounted traversal retain native behavior. No IK solver, rendered comfort frame or network protocol change. Tests cover batch wrap, yaw/pitch coexistence, untouched unrelated bytes, owner/focus/death/mount guards and codec convergence. Both builds and 71 tests pass. Headset and remote-server ladder acceptance is pending; release authorized by owner after the desktop climb check. Exact staged install/check/reinstall/rollback checks are recorded in release CHECKS.txt.

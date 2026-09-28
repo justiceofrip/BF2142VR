@@ -1,4 +1,5 @@
 #include "openxr/OpenXRPresentation.h"
+#include "openxr/OpenXRViewSizeQuery.h"
 #include "presenter/DesktopMirror.h"
 #include "diagnostics/PerformanceSummary.h"
 #include "presenter/SharedControlChannel.h"
@@ -1640,6 +1641,10 @@ int RunPresenter(
 
 int wmain(int argc, wchar_t** argv)
 {
+    if(argc==3 && wcscmp(argv[1],L"--query-bf2142-view-size")==0){
+        wchar_t folder[32768]{};if(!GetExecutableDirectory(folder,std::size(folder)))return 2;
+        return bfvr::QueryOpenXRViewSize(folder,argv[2]);
+    }
     const wchar_t* channelName = nullptr;
     bool useCylinderUi = false;
     DWORD durationMs = 60000;

@@ -250,6 +250,11 @@ int main(){
     if(!art[200*640+100]||art[0])return 88;
     std::vector<DWORD> roomLeft(160*100),roomRight(160*100);shared::SharedRenderRequest scene{};
     for(int i=0;i<2;++i){scene.views[i].pose.orientationW=1;scene.views[i].pose.positionX=i?.032f:-.032f;scene.views[i].fov={-.8f,.8f,.6f,-.6f};}
+    // Kit chord must not also jump; releasing the modifier restores jump.
+    {bf2142::ControllerPolicyState kitPolicy;shared::SharedControllerSample kit{};kit.flags=shared::kControllerSampleFlagSessionFocused;
+     kit.hands[0].flags=shared::kControllerHandFlagTriggerActive;kit.hands[0].triggerValue=1;kit.hands[1].buttons=shared::kControllerHandButtonPrimary;
+     auto kc=bf2142::MapControllers(kitPolicy,kit,true,0,600);if(!kc.keys[DIK_G]||kc.keys[DIK_SPACE])return 111;
+     kit.hands[0].triggerValue=0;kc=bf2142::MapControllers(kitPolicy,kit,true,0,600);if(kc.keys[DIK_G]||!kc.keys[DIK_SPACE])return 112;}
     bf2142::DrawMenuRoom(roomLeft,roomRight,160,100,DXGI_FORMAT_B8G8R8A8_UNORM,scene,{});
     unsigned different=0;for(size_t i=0;i<roomLeft.size();++i){if(!(roomLeft[i]>>24))return 89;different+=roomLeft[i]!=roomRight[i];}
     if(different<20)return 90;

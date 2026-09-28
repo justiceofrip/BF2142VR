@@ -23,7 +23,7 @@ SRWLOCK logLock = SRWLOCK_INIT;
 SRWLOCK hookLock = SRWLOCK_INIT;
 std::atomic<bool> started = false;
 bool networkObserver = false;
-unsigned requestedWorldSamples=0;
+unsigned requestedWorldSamples=0;bool runtimePacing=false;
 std::atomic<bool> alternateImplementationLogged = false;
 std::atomic<unsigned long> presentations = 0;
 std::atomic<unsigned long> swapPresentations = 0;
@@ -225,6 +225,7 @@ HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
         if(SUCCEEDED(device->GetDirect3D(&api))){
             if(SUCCEEDED(device->GetCreationParameters(&creation)))changed=bfvr::bf2142::SelectWorldSamples(api,creation.AdapterOrdinal,creation.DeviceType,requestedWorldSamples,*parameters);
             api->Release();}}
+    if(parameters&&runtimePacing&&parameters->PresentationInterval!=D3DPRESENT_INTERVAL_IMMEDIATE){parameters->PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;changed=true;}
     HRESULT result = originalReset(device, parameters);
     if(FAILED(result)&&changed){*parameters=saved;result=originalReset(device,parameters);Log("VR MSAA reset fallback: original native settings retained.");}
     if(SUCCEEDED(result)&&parameters)Log("World AA reset: samples=%u quality=%lu.",unsigned(parameters->MultiSampleType),parameters->MultiSampleQuality);
@@ -240,6 +241,7 @@ HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
     D3DPRESENT_PARAMETERS* parameters, IDirect3DDevice9** output) {
     D3DPRESENT_PARAMETERS saved{};bool changed=false;
     if(parameters){saved=*parameters;changed=bfvr::bf2142::SelectWorldSamples(factory,adapter,type,requestedWorldSamples,*parameters);}
+    if(parameters&&runtimePacing&&parameters->PresentationInterval!=D3DPRESENT_INTERVAL_IMMEDIATE){parameters->PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;changed=true;}
     HRESULT result = originalCreateDevice(factory, adapter, type, window, behavior, parameters, output);
     if(FAILED(result)&&changed){*parameters=saved;result=originalCreateDevice(factory,adapter,type,window,behavior,parameters,output);Log("VR MSAA creation fallback: original native settings retained.");}
     if(SUCCEEDED(result)&&parameters)Log("World AA creation: samples=%u quality=%lu; autoDepth=%d depthFormat=%u swap=%u; nativeSamples=%u requested=%u.",unsigned(parameters->MultiSampleType),parameters->MultiSampleQuality,parameters->EnableAutoDepthStencil,unsigned(parameters->AutoDepthStencilFormat),unsigned(parameters->SwapEffect),unsigned(saved.MultiSampleType),requestedWorldSamples);
@@ -316,6 +318,7 @@ extern "C" DWORD WINAPI BF2142VRInitialize(void* parameter) {
         reinterpret_cast<void**>(&originalCreate9), create9Target)) return 0;
     Log("Direct3DCreate9 connection installed.");
     networkObserver=presenter==L"@observer";
+    runtimePacing=!presenter.empty()&&presenter.front()!=L'@';
     if(!presenter.empty()&&!networkObserver)requestedWorldSamples=bfvr::bf2142::LoadVrSettings(logPath).worldSamples;
     if (networkObserver) Log("Flat network observer requested: receive-only poses, native camera/input; no OpenXR.");
     if (!presenter.empty() && !networkObserver && !bfvr::bf2142::StartStereo(presenter,logPath,Log)) {

@@ -1,8 +1,8 @@
-BATTLEFIELD 2142 VR - ALPHA TROUBLESHOOTING
+BATTLEFIELD 2142 VR - TEST BUILD TROUBLESHOOTING
 
 SETUP STOPS
 Extract the whole ZIP first, close the game, and select BF2142.exe.
-This alpha recognizes stock v1.51 weapons and the accepted BFVR repair. It
+This package recognizes stock v1.51 weapons and the accepted BFVR repair. It
 stops on other weapon packs instead of overwriting them. Use a clean stock
 installation for Remaster/HD-mod conflicts.
 If the message says access denied, run Setup.cmd as administrator.
@@ -10,7 +10,7 @@ If setup was interrupted, keep the BF2142VR folder and backups. Run its
 Uninstall.cmd to restore any completed changes before retrying.
 
 GAME OPENS FLAT
-Use the Alpha shortcut or installed Play VR.cmd. Desktop Preview.cmd is a
+Use the Beta shortcut or installed Play VR.cmd. Desktop Preview.cmd is a
 simulator; the ordinary game/Hub shortcut does not inject the VR mod.
 Connect Steam Link first and make SteamVR the active OpenXR runtime, then launch.
 Do not launch two copies of the game. Close the existing session normally.
@@ -19,7 +19,8 @@ LOGIN / SERVERS
 The old EA backend is closed. Use the current Reclamation Hub/OpenSpy setup:
 https://www.battlefield2142.co/help/
 This package does not include the Hub or copy anyone's account/profile data.
-Online VR gameplay is not yet advertised as working. Initial testing is bots.
+Custom remote gestures/voice require the matching server bridge and client
+addon. The separate signed community helper still uses its previous runtime.
 
 TRACKING / POSTURE
 Right-stick click or Home recenters. For stance, stand comfortably and select
@@ -29,12 +30,12 @@ session. Avoid treating missing tracking as a new standing-height reference.
 
 CRASH OR BAD RENDERING
 Save the exact error and what you were doing. Reports should include version
-0.2.0-beta.1, headset/runtime, GPU, game mod, map and the failed action.
+0.2.0-beta.4-test.1, headset/runtime, GPU, game mod, map and the failed action.
 Client/presenter logs are under BF2142VR/runtime/x86/logs. Optional branding
 messages are under BF2142VR/logs. Check logs before sharing them for any personal
 paths or account information. Do not post credentials, original game archives,
 install.json or the backups/generated folders.
-Keep the native game AA option off; the VR menu room supplies its own AA.
+The VR client requests native geometry MSAA; see BLUR / JAGGIES below.
 Recording software is not included. The developer's OBS profile is separate.
 
 RESTORE THE GAME
@@ -55,8 +56,10 @@ Python traceback. Share that log when reporting failures; review paths first.
 A differing error on each attempt is not proof that reinstalling will fix it.
 
 BLUR / JAGGIES
-The updated launcher uses a 1600x900 source per eye; its size overrides the
-in-game resolution at startup. The VR runtime requests actual 8x geometry AA.
+This test queries OpenXR for source sizing, bounded to 3072x1728 and falling
+back to 1600x900 if unavailable. It overrides the in-game resolution at startup.
+More pixels cost more performance; this is not a guaranteed FPS improvement.
+The VR client requests actual 8x geometry AA with supported fallback.
 For lower GPU cost, set WorldMSAASamples=4 or 2 in BF2142VR.ini, then restart.
 0 preserves native AA behavior. Texture detail and wireless streaming blur
 are separate. No texture pack is included.

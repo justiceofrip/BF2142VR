@@ -1,20 +1,39 @@
-BF2142 VR 0.2.0-beta.3 - Ladder/input hotfix
+BF2142 VR 0.2.0-beta.4-test.1 - Experimental wrist / rendering hotfix
 
-- Fix ladder attachment blocked by an invisible downward native look angle.
-- Held grips no longer cancel deliberate ladder thumbstick movement.
-- Snap turning now uses the game's stock network input; no custom snap event.
-- Includes beta.2: 1600x900 source, actual native MSAA, accessible menu Exit,
-  and persistent installer errors/logs.
+Separate optional test build. Beta.3 remains the previous fallback.
+- Look at the left wrist, then use the right laser/trigger on DEPLOY to open
+  the native spawn/loadout panel. This does not open the settings menu.
+- Holstered equipment uses full-resolution GPU rendering and filtered textures,
+  replacing its low-resolution CPU image. Setup regenerates nearer model LODs.
+- OpenXR-recommended source sizing, bounded to 3072x1728 for the native renderer;
+  explicit --render-size wins, unavailable query falls back to 1600x900.
+- Request the game's native FPS unlock in focused headset gameplay, respecting
+  its restrictions; remove desktop VSync from actual headset presentation.
+- Suppress known stray ADS HUD widgets when the crosshair is hidden.
+- Render VR settings text at output resolution; left trigger + A picks up kits.
+- Includes beta.3 ladder/snap and beta.2 installer diagnostics/AA/menu fixes.
 
-Use your own BF2142 v1.51 installation. Close the game before setup.
-Updating: run the old installed Uninstall.cmd, move its BF2142VR folder aside
-with backups intact, then run this package's Setup.cmd. Do not merge ZIPs.
-The separate community helper and flat addon remain at beta.1.
+Performance changes are attempts to address bottlenecks, not measured FPS
+improvements on every PC. Higher resolution increases rendering/transfer cost.
+Try WorldMSAASamples=4 or 2 in installed BF2142VR.ini for lower AA cost.
+Both architectures build and 73 tests pass. Final packaged headset testing is
+pending. The final equipment/wrist GPU check passes, including MSAA, stereo,
+state/target restoration and reset. See release CHECKS.txt for package checks.
 
-Ladder ascent was confirmed in desktop VR simulation. Both native builds and
-71 tests pass; this is not new headset or remote-server ladder acceptance.
-Installer failures reported on another PC remain under investigation. If setup
-fails, retain the log from LocalAppData/BF2142VR/SetupLogs. A successful local
-install does not establish that the reported intermittent failure is solved.
-Experimental optics, weapon grip changes and texture upscaling are not included.
-Crosshair VISIBLE still means the native flat HUD; leave it hidden in VR.
+Knife behavior is unchanged; the reported failure remains unconfirmed.
+Grenade guide, full native scope HUD placement, intro movie controller input
+and commander-specific commands remain unfinished. Intermittent installer
+failures remain under investigation; persistent setup logs are retained.
+
+INSTALL / ROLLBACK
+Use your own stock BF2142 v1.51. For easiest rollback use a separate game copy.
+For an existing VR install: close the game, run installed Uninstall.cmd, then
+move its BF2142VR folder aside with backups intact. Extract this ZIP into a new
+folder, run Setup.cmd and select BF2142.exe. Do not merge installer folders.
+Connect your headset/runtime before running the installed Play VR.cmd.
+To return to beta.3, uninstall this test, preserve its folder and reinstall
+beta.3 from its original ZIP. No game assets are included.
+
+VR already includes the observer receiver; do not install the flat addon too.
+The separate community helper and flat addon remain at beta.1. No protocol
+change, new IK solver changes, texture upscaling or commander UI are included.

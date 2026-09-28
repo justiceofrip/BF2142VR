@@ -88,6 +88,13 @@ int main() {
     check(bfvr::bf2142::GameCommand(L"BF2142.exe",options).find(L"+szx 2064 +szy 2208")!=std::wstring::npos,"custom source applied");
     for(const auto& size:{L"",L"1x1",L"8192x8192",L"1920x",L"1920x1080 +foo",L"-1x1080",L"9999999999x720"})
         check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--render-size",size},options,error),"invalid or oversized source rejected");
+    options={};options.presenter=L"presenter.exe";
+    check(RuntimeSourceSize(2064,2208,options)&&options.renderWidth==3072&&options.renderHeight==1728,"runtime density bounded to native memory budget");
+    check(!RuntimeSourceSize(3000,3000,options)&&options.renderWidth==3072,"explicit dimensions never overwritten");
+    options={};options.presenter=L"presenter.exe";
+    check(RuntimeSourceSize(1280,720,options)&&options.renderWidth==1280&&options.renderHeight==720,"runtime lower resolution respected");
+    options={};check(!RuntimeSourceSize(2000,2000,options),"flat mode never probes/changes resolution");
+    options.presenter=L"presenter.exe";check(!RuntimeSourceSize(0,0,options)&&!RuntimeSourceSize(20000,20000,options),"invalid runtime sizes retain fallback");
     if (!failed) puts("BF2142 launcher option and quoting checks passed.");
     return failed ? 1 : 0;
 }

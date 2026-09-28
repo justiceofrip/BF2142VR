@@ -1,4 +1,4 @@
-BATTLEFIELD 2142 VR 0.2.0-beta.2
+BATTLEFIELD 2142 VR 0.2.0-beta.4-test.1 - EXPERIMENTAL TEST BUILD
 
 Requires your own working stock BF2142 v1.51 on Windows x64.
 Set up Reclamation/OpenSpy separately and confirm you can log in.
@@ -6,7 +6,10 @@ VR already includes the remote IK receiver. Do not also install the flat addon.
 Remaster/other weapon packs are not supported by this installer.
 
 INSTALL / UPDATE
-1. Close BF2142. Updating alpha/beta.1? Run its installed Uninstall.cmd first.
+For easiest rollback, install this test into a separate copy of your game.
+Beta.3 remains available as the previous build.
+
+1. Close BF2142. Updating any earlier version? Run its installed Uninstall.cmd first.
    Rename that game's BF2142VR folder to preserve backups/settings.
    Do not overwrite the old installer folder with this ZIP.
 2. Extract the entire beta ZIP into a new folder.
@@ -23,7 +26,9 @@ Normal servers can be selected in-game; custom gestures/voice need the matching
 server adapter and bridge. The community test server may be offline.
 
 CONTROLS
-Right-stick click recenters. B opens the game menu; VR CONTROLS opens settings.
+Look at your left wrist, then point/click DEPLOY with the right controller
+to open spawn/loadout. Right-stick click recenters. B opens the game menu;
+VR CONTROLS opens settings.
 Read CONTROLS.txt for body slots, aiming, vehicles and menus.
 Voice worked with the second vrtester client; wider device testing remains.
 

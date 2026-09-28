@@ -15,6 +15,7 @@ Right stick: turn. Click: recenter. Keyboard Home also recenters.
 A: jump / native parachute action. B: menu/back.
 X: reload. Y: interact / enter / exit a vehicle.
 Left trigger + X/Y while on foot: equipment cycling.
+Left trigger + A while on foot: pick up a fallen kit (stock G action).
 
 BODY SLOTS
 Main weapon: behind right shoulder. Pistol: right hip. Knife: chest.
@@ -43,6 +44,10 @@ pilot guns stay fixed to aircraft direction; looking does not steer flight.
 Nekomata main gun follows head pitch; steer its hull for horizontal aim.
 
 MENUS
+Look at your left wrist to reveal DEPLOY; point the right-hand laser at it and
+pull the trigger. The native spawn/loadout screen opens on the larger panel.
+Release trigger before selecting a spawn point. This button does not open VR
+settings. Commander-specific shortcuts and right-click orders are future work.
 Point your right controller at the menu and pull right trigger to select.
 B opens/backtracks the game menu. VR CONTROLS opens the mod's settings panel.
 Keyboard Insert can open/close VR CONTROLS if needed.

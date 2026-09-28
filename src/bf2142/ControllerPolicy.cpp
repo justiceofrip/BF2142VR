@@ -55,7 +55,9 @@ ControllerCommand MapControllers(ControllerPolicyState& state,const shared::Shar
     }
     if((r.flags&shared::kControllerHandFlagTriggerActive) && std::isfinite(r.triggerValue) && r.triggerValue>.55f)out.buttons[0]=0x80;
     if(gameplay) {
-        out.keys[DIK_SPACE]=pressed(r,shared::kControllerHandButtonPrimary)?0x80:0;
+        const bool a=pressed(r,shared::kControllerHandButtonPrimary);
+        out.keys[DIK_SPACE]=a&&!modifier?0x80:0;
+        out.keys[DIK_G]=a&&modifier?0x80:0;
         const bool leftPrimary=pressed(l,shared::kControllerHandButtonPrimary);
         const bool leftSecondary=pressed(l,shared::kControllerHandButtonSecondary);
         out.keys[DIK_R]=leftPrimary && !modifier?0x80:0;
