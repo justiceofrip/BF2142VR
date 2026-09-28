@@ -1,38 +1,30 @@
-BF2142 VR 0.2.0-beta.4-test.3 - Interaction / timing hotfix
+BF2142 VR 0.2.0-beta.4-test.4 - Equipment input hotfix
 
-Optional follow-up to test.2. The 1600x900 native menu fix is retained.
-- Preserve elapsed renderer time across skipped VR frames, so weather and
-  impact effects advance normally with the unlocked game loop. Eye/scope
-  replays still advance animation only once per presented stereo pair.
-- Easier left-hand medical/ammo release: a relaxed release makes a gentle
-  toss; early release waits for native equipment readiness. Leave empty hands
-  afterward, without automatically drawing the last gun or grenade.
-- Holstered equipment uses independent depth and explicit viewport/sample
-  state, preventing native world/weapon depth from cutting through the models.
-- Knife accepts shorter/slower deliberate strokes while retaining tracking-jump,
-  draw, head-motion, rest/rearm and repeat-attack guards.
-- Smaller wrist DEPLOY button: centered gaze for 0.4 seconds, with a narrow
-  reveal cone. Right laser/trigger opens the same readable native spawn panel.
-- Native supported scope HUD widgets are captured separately and placed within
-  the sight aperture, including rangefinder/stabilizer widgets. The main HUD
-  suppresses known ADS widget roots. Unknown HUDs retain a fallback reticle.
-- Setup backs up and skips the five stock startup movies in the selected game
-  copy; uninstall restores them. Other movie files are untouched.
+Fixes the test.3 equipment regression:
+- Crate completion leaves empty hands immediately without a timed cleanup
+  lockout. Grabbing a gun cancels any remaining crate input right away.
+- Publish the final held state once, preventing crate/weapon state changes
+  from repeatedly resetting firing readiness.
+- Each body-slot grab sends one equipment selection across both native input
+  APIs. Check the equipped item again at input consumption, so picking up an
+  already selected assault rifle does not cycle automatic/semi-auto mode.
+- Preserve easy crate throws, empty hands, native weapon cadence/reload and
+  cooldowns. Physical keyboard number keys keep their normal fire-mode behavior.
 
-Both architectures and all 73 tests pass. Hidden GPU checks cover belt MSAA,
-parallax, hostile depth/viewport state, reset, and isolated native scope/menu
-capture. Exact package checks are in release CHECKS.txt. This hotfix has NOT
-received a new headset acceptance test. Performance varies by runtime/device.
-The faint black HUD outline report remains unconfirmed; no blanket HUD removal
-is applied. Commander-specific controls and texture upscaling remain future work.
+Includes test.3 effect timing, belt depth, wrist/knife tuning, scope HUD and
+reversible startup-movie skipping. Keeps the 1600x900 main-menu correction.
+No IK solver, rendering or network protocol changes in this hotfix.
+
+Both architectures and all 73 tests pass. Added regression scenarios cover
+crate-to-gun transitions at 72/90/144/240 Hz, repeated selection, state/buffer
+API order, peeks and buffer pressure. Exact ZIP installer/rollback checks are
+listed in CHECKS.txt. No new headset acceptance claim. Prior unconfirmed visual
+issues, including the faint black HUD outline, remain under investigation.
 
 INSTALL / ROLLBACK
-Use your own stock BF2142 v1.51. For easiest rollback use a separate game copy.
-Close the game, run the old installed Uninstall.cmd, then move that BF2142VR
-folder aside with backups intact. Extract this ZIP into a NEW folder and run
-Setup.cmd. Do not merge installer folders. Connect your headset/runtime before
-running the installed Play VR.cmd. Keep your previous ZIP for rollback.
-
-VR includes the observer receiver; do not install the flat addon too.
-The community helper/flat addon stays at beta.1. No IK solver or network
-protocol changes. No game assets are included in this download.
+Use your own working stock BF2142 v1.51. Close BF2142, run the OLD installed
+Uninstall.cmd, then move its BF2142VR folder aside with backups intact. Extract
+this ZIP into a NEW folder, run Setup.cmd, and use the NEW installed Play VR.cmd.
+A separate game copy makes rollback easiest. Keep your previous ZIP.
+VR includes the observer receiver; do not install the flat addon alongside it.
+Community helper/flat addon remains beta.1. No game assets are included.

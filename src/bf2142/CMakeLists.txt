@@ -278,7 +278,7 @@ endif()
 
 target_compile_definitions(BF2142VRStereoIntegrationSmoke PRIVATE BF2142_GPU_FIXTURE)
 target_sources(BF2142VRNativeMotionTests PRIVATE multiplayer/PoseProtocol.cpp)
-add_executable(BF2142VRSupportCratesTests SupportCratesTests.cpp SupportCrates.cpp BodyInventory.cpp)
+add_executable(BF2142VRSupportCratesTests SupportCratesTests.cpp SupportCrates.cpp BodyInventory.cpp WeaponGrip.cpp)
 target_link_libraries(BF2142VRSupportCratesTests PRIVATE BFVRStereoMath)
 target_include_directories(BF2142VRSupportCratesTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_compile_definitions(BF2142VRSupportCratesTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)

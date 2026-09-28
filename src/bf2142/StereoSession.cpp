@@ -256,7 +256,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     bodyActive=bodyActive && body.anchorValid;
     if(bodyActive){
         if(body.hovered>=0 || body.key)command.buttons[1]=0; // A body grab consumes grip; unsupported native alt-fire remains available elsewhere.
-        if(body.key<command.keys.size() && body.key)command.keys[body.key]=0x80;
+        if(body.key>=2&&body.key<=10)command.selection={inventoryOwner,body.selectionTime,body.key-1,false};
     }
     bodyFrame=body;
     constexpr DWORD gripFlags=shared::kControllerHandFlagGripActive|shared::kControllerHandFlagGripPositionValid|shared::kControllerHandFlagGripOrientationValid|
@@ -264,14 +264,8 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     const auto& right=sample.hands[1];
     const bool gripTracked=(right.flags&gripFlags)==gripFlags;
     if(!settings.toggleWeaponGrip || (accepted && gameplay && !showMenu && !mounted && !inventoryValid))weaponGrip.Reset();
-    const bool held=weaponGrip.Update({settings.toggleWeaponGrip && inventoryValid && gripTracked && !command.recenter,
+    bool held=weaponGrip.Update({settings.toggleWeaponGrip && inventoryValid && gripTracked && !command.recenter,
         std::isfinite(right.squeezeValue)&&right.squeezeValue>.65f,body.selected>=0,inventoryOwner,sample.predictedDisplayTime,equippedItem});
-    SetNativeWeaponHeld(held);
-    if(accepted && gameplay && !showMenu && settings.toggleWeaponGrip && inventoryValid){
-        command.buttons[1]=0;
-        if(!NativeWeaponInputReady()){command.buttons[0]=0;command.blockedPhysicalButtons[0]=command.blockedPhysicalButtons[1]=1;}
-    }
-    RequestAutomaticAds(accepted && gameplay && !showMenu && !mounted && settings.motionHands && held);
     RadioObservation radioObs;radioObs.active=inventoryValid&&body.anchorValid&&!command.recenter&&foregroundPid==GetCurrentProcessId();
     radioObs.leftAvailable=!supportFrame.busy;radioObs.owner=inventoryOwner;radioObs.anchor=body.anchor;radioObs.sample=sample;
     radioFrame=shoulderRadio.Update(radioObs);
@@ -279,13 +273,20 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     if(radioFrame.held)command.keys[0x1d]=0; // left squeeze belongs to the radio
     if(radioFrame.click)InterlockedIncrement(&b->hapticRadioLeftSequence);
     SupportObservation obs;obs.active=inventoryValid&&body.anchorValid&&!command.recenter;
-    obs.leftCrates=settings.leftSupportCrates;obs.owner=inventoryOwner;obs.time=sample.predictedDisplayTime;
+    obs.rightGrab=body.selected>=0;obs.leftCrates=settings.leftSupportCrates;obs.owner=inventoryOwner;obs.time=sample.predictedDisplayTime;
     obs.equipped=equippedItem;obs.names=inventoryNames;obs.anchor=body.anchor;obs.left=Pose(sample.hands[0].gripPose);
     obs.leftTracked=!radioFrame.held&&(sample.hands[0].flags&gripFlags)==gripFlags;
     obs.leftGrip=std::isfinite(sample.hands[0].squeezeValue)&&sample.hands[0].squeezeValue>.65f;
     if(obs.active&&obs.leftCrates)for(int i=1;i<10;++i)if(SupportCrateWeapon(obs.names[i].data()))ReadSupportAmmo(obs.owner,i,&obs.ammo[i]);
     const bool wasCrateBusy=supportFrame.busy;
     supportFrame=supportCrates.Update(obs);PublishNativeSupport(supportFrame);
+    const bool effectiveHeld=weaponGrip.ResolveSupport(supportFrame,sample.predictedDisplayTime);
+    held=weaponGrip.Held();SetNativeWeaponHeld(effectiveHeld);
+    if(accepted && gameplay && !showMenu && settings.toggleWeaponGrip && inventoryValid){
+        command.buttons[1]=0;
+        if(!NativeWeaponInputReady()){command.buttons[0]=0;command.blockedPhysicalButtons[0]=command.blockedPhysicalButtons[1]=1;}
+    }
+    RequestAutomaticAds(accepted && gameplay && !showMenu && !mounted && settings.motionHands && held&&!supportFrame.busy);
     const bool equipmentFocused=accepted&&gameplay&&!showMenu&&!mounted&&!command.recenter&&foregroundPid==GetCurrentProcessId();
     const bool rightTarget=body.hovered>=0&&(!held||BodySlots()[body.hovered].item!=unsigned(equippedItem));
     if(rightEquipmentCue.Update(equipmentFocused&&bodyActive,rightTarget?body.hovered:-1,body.selected>=0,sample.predictedDisplayTime))
@@ -295,9 +296,8 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     if(supportFrame.busy){
         command.buttons[0]=supportFrame.fire?0x80:0;command.buttons[1]=0;
         command.blockedPhysicalButtons[0]=command.blockedPhysicalButtons[1]=1;
-        if(supportFrame.select>0&&supportFrame.select<10)command.keys[supportFrame.select+1]=0x80;
-        if(supportFrame.holster){weaponGrip.Holster(sample.predictedDisplayTime);SetNativeWeaponHeld(false);}
-        else if(supportFrame.leftCrate)SetNativeWeaponHeld(true);
+        if(supportFrame.select>0&&supportFrame.select<10)
+            command.selection={inventoryOwner,supportFrame.selectionTime,unsigned(supportFrame.select),false};
         RequestAutomaticAds(false);
     }
     PublishNativeHands(accepted && gameplay && !showMenu && !command.recenter && (!mounted||chuteHands) && settings.motionHands?&sample:nullptr,

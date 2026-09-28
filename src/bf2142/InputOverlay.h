@@ -8,7 +8,7 @@ namespace bfvr::bf2142 {
 struct InputOverlayState {
     std::array<BYTE,256> virtualKeys{},physicalKeys{};
     std::array<BYTE,8> virtualButtons{},physicalButtons{},blockedButtons{};
-    DWORD seenMotion=0;
+    DWORD seenMotion=0,selectionRelease=0;EquipmentSelection consumedSelection{};
 };
 void OverlayDeviceState(InputOverlayState&,bool keyboard,DWORD bytes,void* data,const ControllerCommand&,DWORD serial) noexcept;
 void OverlayDeviceEvents(InputOverlayState&,bool keyboard,DWORD stride,DIDEVICEOBJECTDATA* data,DWORD& count,DWORD capacity,bool peek,

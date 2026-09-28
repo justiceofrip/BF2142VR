@@ -12,7 +12,7 @@ SupportFrame SupportCrates::Update(const SupportObservation& s){
     const auto hand=s.leftTracked?stereo::MakeRelativePose(s.anchor,s.left):std::nullopt;
     const bool leftAvailable=hand.has_value();
     const bool gap=last && (s.time<last||s.time-last>250000000);
-    if(!s.active||!leftAvailable||!s.owner||s.equipped<=0||s.equipped>=10||gap||owner!=s.owner){
+    if(s.rightGrab||!s.active||!leftAvailable||!s.owner||s.equipped<=0||s.equipped>=10||gap||owner!=s.owner){
         Reset();owner=s.owner;last=s.time;pressed=s.leftGrip;leftObserved=leftAvailable;return out;
     }
     const bool rising=leftAvailable&&leftObserved&&s.leftGrip&&!pressed,falling=leftAvailable&&leftObserved&&!s.leftGrip&&pressed;
@@ -34,7 +34,7 @@ SupportFrame SupportCrates::Update(const SupportObservation& s){
             const float d=Distance(hand->position,slot.offset)/slot.radius;
             if(d<nearest){nearest=d;out.hovered=int(slot.item);}
         }
-        if(rising&&out.hovered>0){crate=out.hovered;released=false;phase=1;deadline=s.time+1800000000;}
+        if(rising&&out.hovered>0){crate=out.hovered;grabTime=s.time;released=false;phase=1;deadline=s.time+1800000000;}
     }
     if(crate){
         out.busy=out.consumeLeft=true;out.crateItem=crate;
@@ -48,7 +48,7 @@ SupportFrame SupportCrates::Update(const SupportObservation& s){
         }
         if(phase==1){
             if(s.equipped==crate){phase=2;deadline=s.time+(released?1200000000LL:30000000000LL);}
-            else if(s.time<deadline)out.select=crate;
+            else if(s.time<deadline){out.select=crate;out.selectionTime=grabTime;}
             else {out.holster=released;crate=0;phase=0;return out;}
         }
         if(phase==2){
@@ -56,16 +56,17 @@ SupportFrame SupportCrates::Update(const SupportObservation& s){
             out.leftCrate=true;
             if(released&&s.ammo[crate].rounds>0){
                 out.throwNow=true;phase=3;pulseUntil=s.time+120000000;deadline=s.time+900000000;
-            }else if(s.time>deadline){phase=4;deadline=s.time+1200000000;}
+            }else if(s.time>deadline){phase=4;}
 
         }
         if(phase==3){
             out.leftCrate=true;out.throwVelocity=throwVelocity;out.fire=s.time<pulseUntil;
-            if(s.ammo[crate].rounds<1||s.time>deadline){phase=4;deadline=s.time+1200000000;}
+            if(s.ammo[crate].rounds<1||s.time>deadline){phase=4;}
         }
         if(phase==4){
-            out.leftCrate=false;out.fire=false;out.holster=true;
-            if(s.time>deadline){crate=0;phase=0;}
+            // Completion is a one-shot holster, not a timed owner of all gun input.
+            out.busy=out.consumeLeft=out.leftCrate=out.fire=false;out.holster=true;
+            crate=0;phase=0;
         }
     }
     return out;

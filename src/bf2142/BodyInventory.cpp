@@ -81,7 +81,7 @@ BodyInventoryResult BodyInventory::Update(bool enabled,const shared::SharedContr
     gripHeld=pressed;
     // End the selection pulse as soon as the game acknowledges the new item.
     if(pendingItem==unsigned(equippedItem))pendingKey=0;
-    if(now<keyUntil)result.key=pendingKey;else pendingKey=0;
+    if(now<keyUntil){result.key=pendingKey;if(result.key)result.selectionTime=keyUntil-120000000;}else pendingKey=0;
     return result;
 }
 }

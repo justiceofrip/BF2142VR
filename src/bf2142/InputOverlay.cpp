@@ -4,6 +4,11 @@
 #include <algorithm>
 namespace bfvr::bf2142 {
 namespace {
+bool NewSelection(const InputOverlayState& s,const EquipmentSelection& c){
+    const auto& old=s.consumedSelection;
+    return c.owner&&c.gesture>0&&c.item>=1&&c.item<=9&&
+        (old.owner!=c.owner||old.gesture!=c.gesture||old.item!=c.item);
+}
 LONG AddMotion(LONG a,LONG b) {return static_cast<LONG>(std::clamp<LONGLONG>(LONGLONG(a)+b,LONG_MIN,LONG_MAX));}
 }
 void OverlayDeviceState(InputOverlayState& s,bool keyboard,DWORD bytes,void* data,const ControllerCommand& c,DWORD serial) noexcept {
@@ -11,6 +16,10 @@ void OverlayDeviceState(InputOverlayState& s,bool keyboard,DWORD bytes,void* dat
     if(keyboard && bytes==256) {
         auto* keys=static_cast<BYTE*>(data);
         for(size_t i=0;i<c.keys.size();++i){s.physicalKeys[i]=c.blockedPhysicalKeys[i]?0:keys[i];keys[i]=s.physicalKeys[i]|c.keys[i];}
+        if(NewSelection(s,c.selection)){
+            if(c.selection.allowed)keys[c.selection.item+1]|=0x80;
+            s.consumedSelection=c.selection;
+        }
     }
     if(!keyboard && (bytes==sizeof(DIMOUSESTATE) || bytes==sizeof(DIMOUSESTATE2))) {
         auto* mouse=static_cast<DIMOUSESTATE2*>(data);const size_t n=bytes==sizeof(DIMOUSESTATE)?4:8;
@@ -44,6 +53,20 @@ void OverlayDeviceEvents(InputOverlayState& s,bool keyboard,DWORD stride,DIDEVIC
     };
     if(keyboard) {
         for(DWORD i=0;i<256;++i)if(c.keys[i]!=s.virtualKeys[i] && append(i,c.keys[i]|physicalKeys[i]) && !peek)s.virtualKeys[i]=c.keys[i];
+        // State and buffered input share selection ownership. Never re-send a
+        // held slot key as fresh samples/polls arrive: selecting the active
+        // weapon cycles fire mode in the native game.
+        bool released=!s.selectionRelease;
+        if(s.selectionRelease&&append(s.selectionRelease,c.keys[s.selectionRelease]|physicalKeys[s.selectionRelease])){
+            released=true;if(!peek)s.selectionRelease=0;
+        }
+        if(NewSelection(s,c.selection)){
+            const DWORD scan=c.selection.item+1;
+            if(!c.selection.allowed){if(!peek)s.consumedSelection=c.selection;}
+            else if(released&&append(scan,0x80|physicalKeys[scan])){
+                if(!peek){s.consumedSelection=c.selection;s.selectionRelease=scan;}
+            }
+        }
     } else {
         for(DWORD i=0;i<8;++i)if((c.buttons[i]!=s.virtualButtons[i] || c.blockedPhysicalButtons[i]!=s.blockedButtons[i]) &&
             append(DIMOFS_BUTTON0+i,c.buttons[i]|(c.blockedPhysicalButtons[i]?0:physicalButtons[i])) && !peek){

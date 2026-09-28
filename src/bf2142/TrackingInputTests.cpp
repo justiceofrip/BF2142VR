@@ -259,6 +259,35 @@ int main(){
     unsigned different=0;for(size_t i=0;i<roomLeft.size();++i){if(!(roomLeft[i]>>24))return 89;different+=roomLeft[i]!=roomRight[i];}
     if(different<20)return 90;
     if(!options.Interact(-1,-1,false,true,values,1.7f)||options.Open()||!options.FilterBack(true)||options.FilterBack(false))return 91;
+    // A body grab is a single selection across state/event API ordering,
+    // frequent XR republication, stale inventory snapshots and buffer pressure.
+    for(bool stateFirst:{false,true}){
+        bf2142::InputOverlayState input{};bf2142::ControllerCommand select{};
+        select.selection={17,1000000000,3,true};std::array<BYTE,256> physicalKeys{};
+        DIDEVICEOBJECTDATA selectionEvents[4]{};DWORD selected=0;unsigned edges=0;bool automatic=true;
+        const auto press=[&](DWORD offset,DWORD value){if(offset==DIK_3&&(value&0x80)){++edges;if(selected==3)automatic=!automatic;else selected=3;}};
+        for(DWORD sample=1;sample<=200;++sample){
+            const auto state=[&](){physicalKeys={};bf2142::OverlayDeviceState(input,true,256,physicalKeys.data(),select,sample);press(DIK_3,physicalKeys[DIK_3]);};
+            const auto buffered=[&](){DWORD count=0;bf2142::OverlayDeviceEvents(input,true,sizeof(selectionEvents[0]),selectionEvents,count,4,false,select,sample,sample);for(DWORD j=0;j<count;++j)press(selectionEvents[j].dwOfs,selectionEvents[j].dwData);};
+            if(stateFirst){state();buffered();}else{buffered();state();}
+        }
+        if(edges!=1||selected!=3||!automatic)return 113;
+        // A fresh grab of the already equipped rifle is consumed as a no-op.
+        select.selection.gesture+=1000000000;select.selection.allowed=false;physicalKeys={};
+        bf2142::OverlayDeviceState(input,true,256,physicalKeys.data(),select,201);if(physicalKeys[DIK_3])return 114;
+        select.selection.allowed=true;physicalKeys={};bf2142::OverlayDeviceState(input,true,256,physicalKeys.data(),select,202);if(physicalKeys[DIK_3])return 115;
+        // New deliberate intent is accepted, physical number keys stay native.
+        select.selection.gesture+=1000000000;physicalKeys={};bf2142::OverlayDeviceState(input,true,256,physicalKeys.data(),select,203);if(!physicalKeys[DIK_3])return 116;
+        select={};physicalKeys={};physicalKeys[DIK_3]=0x80;bf2142::OverlayDeviceState(input,true,256,physicalKeys.data(),select,204);if(!physicalKeys[DIK_3])return 117;
+    }
+    {
+        bf2142::InputOverlayState input{};bf2142::ControllerCommand select{};select.selection={17,1000000000,3,true};DIDEVICEOBJECTDATA e[2]{};DWORD count=0;
+        for(int peek=0;peek<3;++peek){count=0;bf2142::OverlayDeviceEvents(input,true,sizeof(e[0]),e,count,2,true,select,1,1);if(count!=1||!(e[0].dwData&0x80)||input.consumedSelection.gesture)return 118;}
+        e[0]={};e[0].dwOfs=DIK_W;e[0].dwData=0x80;count=1;bf2142::OverlayDeviceEvents(input,true,sizeof(e[0]),e,count,1,false,select,1,1);if(input.consumedSelection.gesture)return 119;
+        count=0;bf2142::OverlayDeviceEvents(input,true,sizeof(e[0]),e,count,1,false,select,1,1);if(count!=1||!(e[0].dwData&0x80)||!input.selectionRelease)return 120;
+        count=0;bf2142::OverlayDeviceEvents(input,true,sizeof(e[0]),e,count,1,false,select,2,2);if(count!=1||e[0].dwData||input.selectionRelease)return 121;
+        count=0;bf2142::OverlayDeviceEvents(input,true,sizeof(e[0]),e,count,1,false,select,3,3);if(count)return 122;
+    }
     puts("Controller focus/freshness, button release, head-relative movement, recenter, 6DoF scale and grip transforms passed.");
 }
 

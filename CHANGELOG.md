@@ -1,5 +1,16 @@
 # BFVR Changelog
 
+## BF2142 0.2.0-beta.4-test.4 — equipment input hotfix
+
+- End crate cleanup immediately; a new right-hand grab cancels pending crate input.
+- Resolve the final hand/equipment state once per controller update, preventing
+  false/true transitions from repeatedly blocking firing readiness.
+- Consume each VR holster selection once across DirectInput state/buffer reads.
+  Recheck the live local inventory before delivery; an already equipped item
+  is a no-op instead of a fire-mode change. Physical number keys stay native.
+- Preserve easy crate throws, empty hands, native cadence/reload/cooldown,
+  rendering, IK and multiplayer protocols. Headset confirmation pending.
+
 ## BF2142 0.2.0-beta.4-test.3 — interaction / timing hotfix
 
 - Accumulate skipped native renderer delta; only the first eye advances effects.

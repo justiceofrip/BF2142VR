@@ -1,6 +1,7 @@
 #include "ControllerInput.h"
 #include "InputOverlay.h"
 #include "DesktopSimulation.h"
+#include "NativeHands.h"
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
 #include <MinHook.h>
@@ -25,7 +26,13 @@ bool Snapshot(ControllerCommand& out,DWORD& serial) {
     if(!TryAcquireSRWLockShared(&commandLock))return false;
     const bool valid=active && GetTickCount64()-publishedAt<=150;
     if(valid){out=desired;serial=generation;}
-    ReleaseSRWLockShared(&commandLock);return valid;
+    ReleaseSRWLockShared(&commandLock);
+    if(valid&&out.selection.item){
+        std::array<bool,10> present{};int equipped=0;std::uint64_t owner=0;
+        out.selection.allowed=ReadNativeInventory(&present,&equipped,nullptr,&owner)&&owner==out.selection.owner&&
+            out.selection.item<present.size()&&present[out.selection.item]&&int(out.selection.item)!=equipped;
+    }
+    return valid;
 }
 Device* Find(void* object) {for(auto& d:devices)if(d.object==object)return &d;return nullptr;}
 // Each DInput device implementation has a separate trampoline when needed.

@@ -1,6 +1,6 @@
 # BF2142 VR render quality
 
-## Separate beta.4-test.3 experimental build
+## Separate beta.4-test.4 experimental build
 
 Test.2 restores the verified **1600x900 native source**. Test.1 automatically
 raised that source using the runtime recommendation and broke the native menu

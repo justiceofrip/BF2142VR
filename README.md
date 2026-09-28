@@ -1,6 +1,6 @@
-# Battlefield 2142 VR — beta.4-test.3 experimental branch
+# Battlefield 2142 VR — beta.4-test.4 experimental branch
 
-**[Optional wrist / rendering test download](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-test.3)**. Adds effect timing, crate release, wrist/knife tuning, belt depth, native scope HUD and reversible intro skipping. Retains the 1600x900 menu correction. Performance changes are unbenchmarked on other PCs; final packaged headset acceptance is pending. The beta.3 download below remains the fallback.
+**[Optional wrist / rendering test download](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-test.4)**. Fixes the post-crate equipment lockout and duplicate weapon selection that could toggle fire mode. Retains test.3 crate throws, rendering changes and the 1600x900 menu correction. Performance changes are unbenchmarked on other PCs; final packaged headset acceptance is pending. The beta.3 download below remains the fallback.
 
 A PC VR port based on [BFVR by JayBiggsGMG and the BFVR contributors](https://github.com/JayBiggsGMG/BFVR-Battlefield-1942-VR-Mod). Play bot matches or join compatible multiplayer servers alongside desktop players.
 

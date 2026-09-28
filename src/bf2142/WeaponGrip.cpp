@@ -1,5 +1,12 @@
 #include "WeaponGrip.h"
+#include "SupportCrates.h"
 namespace bfvr::bf2142 {
+bool WeaponGrip::ResolveSupport(const SupportFrame& support,std::int64_t time) noexcept {
+    if(support.holster)Holster(time);
+    // Publish only this final state. Toggling false/true in the same XR update
+    // repeatedly arms the native fire-transition guard while holding a crate.
+    return support.leftCrate||held;
+}
 bool WeaponGrip::Update(const WeaponGripInput& in) noexcept {
     if(!in.active||!in.owner||in.equipped<=0||in.time<=0){observed=false;previousTime=0;return held;}
     if(owner!=in.owner){Reset();owner=in.owner;equipped=in.equipped;}

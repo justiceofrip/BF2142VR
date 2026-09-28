@@ -1,5 +1,29 @@
 # BFVR AI and Developer Handoff
 
+## Beta.4-test.4 equipment input hotfix
+
+SupportCrates no longer owns a 1.2-second cleanup interval after completion.
+It emits one holster result; right-hand body grabs cancel any pending crate
+transaction. WeaponGrip::ResolveSupport determines the effective held state
+before the sole SetNativeWeaponHeld call per XR update. Do not publish a
+transient right-hand-only state before applying a left-crate override: that
+repeatedly rearms gripTransition and suppresses native fire.
+
+ControllerCommand equipment selections carry local owner, gesture time and
+item. BodyInventory/SupportCrates keep the gesture identity while awaiting
+equip. ControllerInput checks the live signature-backed inventory again at
+consumption; already-selected or invalid-owner requests become no-ops.
+InputOverlay shares selection ownership between state and buffered APIs,
+keeps peek non-consuming and defers release/press edges if the buffer is full.
+Do not convert these gestures back to held number keys or one pulse per XR
+publication. Physical keyboard selections are unaffected. This is process-local
+input state, not a shared IPC/network protocol change.
+
+Regression coverage exercises immediate post-throw draws at 72/90/144/240 Hz,
+empty-hand retention, right-grab cancellation, both input API orderings, stale
+selection requests, repeated publications, peeks and full buffers. Headset
+acceptance of this hotfix remains pending.
+
 ## Beta.4-test.3 interaction/timing hotfix
 
 RenderTimeBudget accumulates skipped native renderer delta (seconds) and consumes
