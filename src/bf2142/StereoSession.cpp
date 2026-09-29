@@ -22,6 +22,7 @@
 #include "EyeRestore.h"
 #include "WeaponGrip.h"
 #include "RenderTimeBudget.h"
+#include "RenderRequestWait.h"
 #include "GrenadeArc.h"
 #include "NativeComfort.h"
 #include "NativeVehicle.h"
@@ -455,9 +456,11 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
     if(!enabled || !NativeViewsAvailable(renderer)){renderTime.Reset();return original(renderer,delta,interpolation);}
     if(lastRenderer!=renderer)renderTime.Reset();
     lastRenderer=renderer;
-    if (pairReady || !GetRequest(true)) {
-        // A request/consumer wait is not a switch back to the flat ADS camera.
-        // Simulation/input still run in the outer game loop.
+    if (pairReady || !AwaitRenderRequest([]{return GetRequest(true);},[]{return enabled;},
+            []{return GetTickCount64();},[]{(void)channel.WaitForPresenterUpdate(1);})) {
+        // Timeout/disconnect retains the last stereo scene. Normal consumer
+        // waits stay inside this engine frame, so native equip/reload clocks
+        // cannot race ahead of the animation evaluation that makes guns ready.
         if(enabled){renderTime.Skip(delta);return lastRenderResult;}
         renderTime.Reset();return original(renderer,delta,interpolation);
     }

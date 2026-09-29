@@ -1,5 +1,24 @@
 # BFVR AI and Developer Handoff
 
+## Beta.4-test.5 native draw timing
+
+Do not return immediately from RenderStereo just because GetRequest cannot yet
+acquire the consumer texture fence or next pose. That creates outer game frames
+without the corresponding native animation evaluation. Accumulating renderer
+delta (RenderTimeBudget) fixes effects but does not repair all draw/readiness
+transitions. AwaitRenderRequest retries inside the same engine frame, using the
+presenter event and a 100 ms retry budget. An individual existing request wait
+may take another 12 ms; this is not an unbounded wait. Failure/disconnect still
+retains the stereo scene. Never bypass native ammunition, draw or reload timers.
+
+Private desktop reproduction: a 90 ms consumer interval extended EU handgun and
+rifle selection-to-shot delays to about 3.4 seconds. Waiting in the same engine
+frame restored roughly 0.9–1.0 seconds including the 450 ms input/settle phase.
+This used ordinary game ammo counters and a private consumer-delay probe, not
+weapon-state writes. The probe is not part of the release. Tests cover consumer
+ownership/pose delays, immediate readiness, timeout, shutdown and recovery.
+Headset acceptance remains pending; the IK solver and wire protocols are unchanged.
+
 ## Beta.4-test.4 equipment input hotfix
 
 SupportCrates no longer owns a 1.2-second cleanup interval after completion.

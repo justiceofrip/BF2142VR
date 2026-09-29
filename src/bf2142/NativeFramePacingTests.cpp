@@ -1,5 +1,6 @@
 #include "NativeFramePacing.h"
 #include "RenderTimeBudget.h"
+#include "RenderRequestWait.h"
 #include <vector>
 #include <array>
 #include <cstdio>
@@ -7,6 +8,29 @@ using namespace bfvr::bf2142;
 #define CHECK(x) do{if(!(x)){printf("Frame pacing line %d\n",__LINE__);return 1;}}while(0)
 template<class T>void Put(BYTE* p,size_t at,T v){std::memcpy(p+at,&v,sizeof(v));}
 int main(){
+ // Each outer engine iteration publishes one animation timestep. Waiting
+ // for ownership and then a pose must not create discarded engine iterations.
+ for(std::uint64_t interval:{7u,11u,14u,22u,50u,90u}){
+  std::uint64_t now=0;unsigned engineFrames=0,drawFrames=0,waits=0;
+  for(unsigned frame=0;frame<60;++frame){
+   ++engineFrames;const auto release=now+interval/2,pose=now+interval;
+   CHECK(AwaitRenderRequest([&]{if(now<release||now<pose)return false;++drawFrames;return true;},
+       []{return true;},[&]{return now;},[&]{++now;++waits;}));
+  }
+  CHECK(engineFrames==60&&drawFrames==60&&now==60*interval&&waits==60*interval);
+ }
+ {
+  std::uint64_t now=0;unsigned waits=0,attempts=0;
+  CHECK(AwaitRenderRequest([&]{++attempts;return true;},[]{return true;},[&]{return now;},[&]{++waits;}));
+  CHECK(attempts==1&&waits==0);
+  CHECK(!AwaitRenderRequest([]{return false;},[]{return true;},[&]{return now;},[&]{++now;++waits;}));
+  CHECK(now==100&&waits==100); // suspended or dead consumer is bounded
+  CHECK(!AwaitRenderRequest([]{return false;},[]{return false;},[&]{return now;},[&]{++waits;}));
+  CHECK(waits==100);
+  CHECK(AwaitRenderRequest([]{return true;},[]{return true;},[&]{return now;},[&]{++waits;})); // recovery
+  CHECK(!AwaitRenderRequest([]{return false;},[]{return true;},[&]{return now--;},[&]{++waits;}));
+  CHECK(waits==100); // discontinuous clock cannot extend a wait
+ }
  RenderTimeBudget time;double advanced=0;
  for(int i=1;i<=1000;++i){if(i%14)time.Skip(.001);else advanced+=time.Take(.001);}advanced+=time.Take(0);
  CHECK(std::abs(advanced-1)<1.e-9);CHECK(time.Take(0)==0);

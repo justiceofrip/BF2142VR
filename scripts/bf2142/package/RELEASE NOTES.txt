@@ -1,30 +1,16 @@
-BF2142 VR 0.2.0-beta.4-test.4 - Equipment input hotfix
+BF2142 VR 0.2.0-beta.4-test.5 - Equip-to-fire timing hotfix
 
-Fixes the test.3 equipment regression:
-- Crate completion leaves empty hands immediately without a timed cleanup
-  lockout. Grabbing a gun cancels any remaining crate input right away.
-- Publish the final held state once, preventing crate/weapon state changes
-  from repeatedly resetting firing readiness.
-- Each body-slot grab sends one equipment selection across both native input
-  APIs. Check the equipped item again at input consumption, so picking up an
-  already selected assault rifle does not cycle automatic/semi-auto mode.
-- Preserve easy crate throws, empty hands, native weapon cadence/reload and
-  cooldowns. Physical keyboard number keys keep their normal fire-mode behavior.
+Fixes a second cause of delayed firing after drawing equipment. The native game
+loop could run ahead while waiting for the VR consumer, leaving render-dependent
+draw/reload animation transitions behind. The client now waits within the current
+engine frame for texture ownership and the next pose, with a 100 ms retry budget.
+A stalled/disconnected presenter still yields control; no weapon timers are reset.
 
-Includes test.3 effect timing, belt depth, wrist/knife tuning, scope HUD and
-reversible startup-movie skipping. Keeps the 1600x900 main-menu correction.
-No IK solver, rendering or network protocol changes in this hotfix.
+Keeps test.4 easy left-hand crate throws, empty hands after release and duplicate
+selection/fire-mode fixes. Keeps the 1600x900 native menu correction and prior
+wrist, scope HUD, effect timing and body-equipment rendering changes.
 
-Both architectures and all 73 tests pass. Added regression scenarios cover
-crate-to-gun transitions at 72/90/144/240 Hz, repeated selection, state/buffer
-API order, peeks and buffer pressure. Exact ZIP installer/rollback checks are
-listed in CHECKS.txt. No new headset acceptance claim. Prior unconfirmed visual
-issues, including the faint black HUD outline, remain under investigation.
-
-INSTALL / ROLLBACK
-Use your own working stock BF2142 v1.51. Close BF2142, run the OLD installed
-Uninstall.cmd, then move its BF2142VR folder aside with backups intact. Extract
-this ZIP into a NEW folder, run Setup.cmd, and use the NEW installed Play VR.cmd.
-A separate game copy makes rollback easiest. Keep your previous ZIP.
-VR includes the observer receiver; do not install the flat addon alongside it.
-Community helper/flat addon remains beta.1. No game assets are included.
+No weapon-data, firing cadence, reload duration, IK solver, network or flat addon
+changes. Desktop pacing reproduction checked; no new headset acceptance claim.
+Install this ZIP with Setup.cmd against your own BF2142 1.51 installation.
+Older test releases and beta.3 remain available for rollback.

@@ -1,5 +1,13 @@
 # BFVR Changelog
 
+## BF2142 0.2.0-beta.4-test.5 — equip-to-fire timing hotfix
+
+- Wait for the XR consumer inside the current engine frame instead of spinning
+  unrendered game frames that prolong native draw/reload animation transitions.
+- Bound retries to 100 ms so suspended or disconnected presenters yield control.
+- Preserve native weapon timings, test.4 crate/fire-mode fixes and the IK/network paths.
+- Verified in a desktop pacing reproduction; packaged headset acceptance pending.
+
 ## BF2142 0.2.0-beta.4-test.4 — equipment input hotfix
 
 - End crate cleanup immediately; a new right-hand grab cancels pending crate input.
