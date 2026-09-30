@@ -1,16 +1,18 @@
-BF2142 VR 0.2.0-beta.4-test.5 - Equip-to-fire timing hotfix
+BF2142 VR 0.2.0-beta.4-test.6 - Installer and updater
 
-Fixes a second cause of delayed firing after drawing equipment. The native game
-loop could run ahead while waiting for the VR consumer, leaving render-dependent
-draw/reload animation transitions behind. The client now waits within the current
-engine frame for texture ownership and the next pose, with a 100 ms retry budget.
-A stalled/disconnected presenter still yields control; no weapon timers are reset.
+New BF2142VRSetup.exe: folder picker, Install / Update, Repair, progress, logs
+and Play VR. Signed update feed, verified downloads and a content cache fetch
+only missing/changed mod files. Updates preserve VR settings and first-install
+stock backups. The previous runtime is retained; interrupted swaps recover.
+Game must be closed before updating. Original game files are never downloaded.
 
-Keeps test.4 easy left-hand crate throws, empty hands after release and duplicate
-selection/fire-mode fixes. Keeps the 1600x900 native menu correction and prior
-wrist, scope HUD, effect timing and body-equipment rendering changes.
+Bundled setup runtime updated from Python 3.12.0 to 3.13.15. Weapon coverage
+queries use iterative traversal. Each weapon repair runs in a fresh worker;
+accepted model hashes are checked before caching, and the full archive must
+still match the accepted build. Failed repairs retry once, then stop with logs.
+Completed verified repairs survive a later retry. No repeated full-setup loop.
 
-No weapon-data, firing cadence, reload duration, IK solver, network or flat addon
-changes. Desktop pacing reproduction checked; no new headset acceptance claim.
-Install this ZIP with Setup.cmd against your own BF2142 1.51 installation.
-Older test releases and beta.3 remain available for rollback.
+All gameplay binaries are identical to test.5: draw timing, crate behavior,
+fire modes, menus, IK and network protocols are unchanged. This is an installer
+update, not another gameplay/visual hotfix. The reported machine's intermittent
+native crash has not been reproduced locally; reporter confirmation is needed.

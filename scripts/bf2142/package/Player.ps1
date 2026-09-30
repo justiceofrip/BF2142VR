@@ -39,7 +39,7 @@ try {
   if(-not $GameDir){Write-Host 'Setup cancelled.';exit 0}
   $GameDir=(Resolve-Path -LiteralPath $GameDir).Path
   Write-Host 'Building Battlefield 2142 VR from your installed game. This can take a few minutes.'
-  Run-Worker @('install','--game',$GameDir,'--payload',$root)
+  Run-Worker @('apply','--game',$GameDir,'--payload',$root)
   $installed=Join-Path $GameDir 'BF2142VR'
   if(-not $NoShortcut){
    try {

@@ -1,15 +1,16 @@
 """BF2142 VR player setup. Builds owned assets locally and records reversible changes."""
 from pathlib import Path
-import argparse,ctypes,hashlib,io,json,os,shutil,struct,sys,uuid,zipfile
+import argparse,contextlib,ctypes,hashlib,io,json,os,shutil,struct,sys,uuid,zipfile
 from ctypes import wintypes as w
 import RepairWeaponMeshes as weapons
+import WeaponRepairWorker as repair_worker
 import RemoveInteriorBackfaces as interiors
 import ExportBodyEquipment as equipment
 import ExportLobbyScene as lobby
 from PIL import Image
 
 APP='BF2142VR'
-VERSION='0.2.0-beta.4-test.5'
+VERSION='0.2.0-beta.4-test.6'
 INTRO_MOVIES=tuple('mods/bf2142/Movies/'+name+'.bik' for name in ('Dice','EA','Intro','Legal','Legal_na'))
 STOCK='1a9903113df3fa5b24282ce8d2adbf54ddb58160155b28dea09f26fe85b782f9'
 COMPLETE='e5d605ed915adac29c57840835d900bbc68a3c3ea4a2c7f7077000f6db8c144d'
@@ -113,7 +114,11 @@ def build_assets(game,stage,original):
             for item in src.infolist():
                 data=src.read(item);name=Path(item.filename).stem.lower()
                 if name in weapons.NAMES and item.filename.lower().endswith('.bundledmesh'):
-                    data,_=weapons.repair(data,name);data,_=interiors.repair(data);found.add(name)
+                    print('Preparing weapon',len(found)+1,'/',len(weapons.NAMES),name,flush=True)
+                    cache_root=Path(os.environ.get('LOCALAPPDATA',Path.home()/'AppData/Local'))/'BF2142VR/WeaponCache'
+                    cache_root.mkdir(parents=True,exist_ok=True)
+                    cache=child(cache_root,COMPLETE)
+                    data=repair_worker.repair_cached(data,name,cache,repair_worker.worker_command());found.add(name)
                     print('Repairing weapon',len(found),'/',len(weapons.NAMES),name,flush=True)
                 out.writestr(item,data)
         if found!=weapons.NAMES:raise ValueError('Incomplete weapon repair')
@@ -210,7 +215,7 @@ def install(game,payload):
             child(stage,backup).parent.mkdir(parents=True,exist_ok=True)
             shutil.copy2(source,child(stage,backup))
             changes.append({'target':movie,'backup':backup,'original':sha(source),'installed':None})
-        m={'app':APP,'version':VERSION,'build':'render-wait-beta4-test5','game':str(game),'status':'prepared','changes':changes}
+        m={'app':APP,'version':VERSION,'build':'installer-beta4-test6','game':str(game),'status':'prepared','changes':changes}
         write_json(stage/'install.json',m);running(game)
         for row in changes:
             if sha(child(game,row['target']))!=row['original']:raise ValueError('Game files changed during setup')
@@ -231,6 +236,99 @@ def install(game,payload):
             if stage.resolve().parent!=game or not stage.name.startswith('.BF2142VR-setup-') or stage.is_symlink() or stage.is_junction():raise ValueError('Unsafe temporary directory')
             shutil.rmtree(stage)
 
+@contextlib.contextmanager
+def install_lock(game):
+    kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+    kernel.CreateMutexW.argtypes=[ctypes.c_void_p,w.BOOL,w.LPCWSTR];kernel.CreateMutexW.restype=w.HANDLE
+    kernel.WaitForSingleObject.argtypes=[w.HANDLE,w.DWORD];kernel.WaitForSingleObject.restype=w.DWORD
+    kernel.ReleaseMutex.argtypes=[w.HANDLE];kernel.CloseHandle.argtypes=[w.HANDLE]
+    name='Local\\BF2142VR-GameSetup-'+hashlib.sha256(str(game.resolve()).casefold().encode()).hexdigest()
+    handle=kernel.CreateMutexW(None,False,name)
+    if not handle:raise OSError('Cannot acquire installer lock')
+    acquired=False
+    try:
+        acquired=kernel.WaitForSingleObject(handle,0) in (0,0x80)
+        if not acquired:raise RuntimeError('Another setup/update is already using this game folder')
+        yield
+    finally:
+        if acquired:kernel.ReleaseMutex(handle)
+        kernel.CloseHandle(handle)
+
+
+def recover_update(game):
+    journal=child(game,'.BF2142VR-update.json')
+    if not journal.exists():return
+    state=json.loads(journal.read_text(encoding='utf-8'));token=state.get('transaction','')
+    if state.get('app')!=APP or len(token)!=32 or uuid.UUID(hex=token).hex!=token:raise ValueError('Invalid interrupted-update journal; keep it and the backups')
+    final=child(game,APP);previous=child(game,'.BF2142VR-previous-'+token)
+    # The previous directory name is derived locally, never read as a free path.
+    if final.exists():
+        m=json.loads((final/'install.json').read_text(encoding='utf-8'))
+        if m.get('transaction')==token:
+            if m.get('status')=='installed':
+                mutations(final,m);journal.unlink();return
+            if not previous.exists():raise ValueError('Interrupted update is missing its rollback runtime')
+            failed=child(game,'.BF2142VR-interrupted-'+token)
+            final.rename(failed)
+        elif previous.exists():raise ValueError('Conflicting interrupted update; preserve both installation folders')
+    if previous.exists():
+        if final.exists():raise ValueError('Cannot recover over an existing installation')
+        previous.rename(final)
+        print('Recovered the previous installation after an interrupted update.',flush=True)
+    elif not final.exists():raise ValueError('Interrupted update has no recoverable installation; retain backups')
+    journal.unlink()
+
+
+def update(game,payload):
+    game=game.resolve();payload=payload.resolve();final=child(game,APP)
+    if not final.exists():return install(game,payload)
+    manifest=payload_files(payload);original,_,_=validate_game(game)
+    m=json.loads((final/'install.json').read_text(encoding='utf-8'))
+    if m.get('status')!='installed':raise ValueError('The previous installation is not complete. Use its Uninstall.cmd to restore it first; keep its backups.')
+    rows=mutations(final,m)
+    if not all(current==row['installed'] for row,_,_,current in rows):raise ValueError('Game files changed since installation. Restore/uninstall the previous version first; backups are retained.')
+    stage=child(game,'.BF2142VR-setup-'+uuid.uuid4().hex);stage.mkdir()
+    token=uuid.uuid4().hex
+    previous=child(game,'.BF2142VR-previous-'+token)
+    journal=child(game,'.BF2142VR-update.json')
+    moved=False;activated=False
+    try:
+        for rel in manifest['files']:
+            dest=child(stage,rel);dest.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(child(payload,rel),dest)
+        shutil.copy2(payload/'payload.json',stage/'payload.json')
+        build_assets(game,stage,original)
+        # Keep the first stock backup, not a backup of an already patched game.
+        for row,_,backup,_ in rows:
+            dest=child(stage,row['backup']);dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(backup,dest)
+        settings=child(final,'BF2142VR.ini')
+        if settings.exists():shutil.copy2(settings,stage/'BF2142VR.ini')
+        updated=dict(m,version=VERSION,build='installer-beta4-test6',status='prepared',transaction=token)
+        write_json(stage/'install.json',updated)
+        running(game)
+        if not all(current==row['installed'] for row,_,_,current in mutations(final,m)):
+            raise ValueError('Game files changed during update')
+        write_json(journal,{'app':APP,'transaction':token})
+        final.rename(previous);moved=True
+        stage.rename(final);activated=True
+        refresh_settings(final);payload_files(final);mutations(final,updated)
+        updated['status']='installed';write_json(final/'install.json',updated)
+        journal.unlink()
+        print('Updated Battlefield 2142 VR: '+str(final),flush=True)
+        print('Previous runtime/settings retained at: '+str(previous),flush=True)
+        return final
+    except BaseException:
+        if moved:
+            if activated:final.rename(stage)
+            previous.rename(final)
+        if journal.exists():journal.unlink()
+        raise
+    finally:
+        if stage.exists():
+            if stage.resolve().parent!=game or stage.is_symlink() or stage.is_junction():raise ValueError('Unsafe update stage')
+            shutil.rmtree(stage)
+
+
 def check(root):
     root=root.resolve();m=json.loads((root/'install.json').read_text(encoding='utf-8'))
     if m.get('status')!='installed':raise ValueError('VR is not installed. Run Setup.cmd.')
@@ -240,23 +338,34 @@ def check(root):
     print('Installation verified:',VERSION)
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('action',choices=['install','check','uninstall','assets']);p.add_argument('--game',type=Path);p.add_argument('--payload',type=Path);p.add_argument('--root',type=Path);p.add_argument('--output',type=Path);a=p.parse_args()
-    if a.action=='install':
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('action',choices=['install','check','uninstall','assets','repair-weapon','apply']);p.add_argument('--game',type=Path);p.add_argument('--payload',type=Path);p.add_argument('--root',type=Path);p.add_argument('--output',type=Path);p.add_argument('--name',choices=sorted(weapons.NAMES));p.add_argument('--input',type=Path);a=p.parse_args()
+    if a.action=='repair-weapon':
+        if not a.name or not a.input or not a.output:p.error('repair-weapon requires --name, --input and --output')
+        repair_worker.repair_one(a.name,a.input,a.output)
+    elif a.action=='apply':
+        if not a.game or not a.payload:p.error('apply requires --game and --payload')
+        with install_lock(a.game):
+            recover_update(a.game.resolve());update(a.game,a.payload)
+    elif a.action=='install':
         if not a.game or not a.payload:p.error('install requires --game and --payload')
-        install(a.game,a.payload)
+        with install_lock(a.game):
+            recover_update(a.game.resolve());install(a.game,a.payload)
     elif a.action=='assets':
         if not a.game or not a.output:p.error('assets requires --game and --output')
         original,_,_=validate_game(a.game);a.output.mkdir(exist_ok=False);build_assets(a.game,a.output,original)
     else:
         if not a.root:p.error('requires --root')
         root=a.root.resolve()
-        if a.action=='check':check(root)
-        else:
-            m=json.loads((root/'install.json').read_text(encoding='utf-8'));restore(root,m)
-            print('Original game files restored. VR is disabled. This BF2142VR folder retains your backups and settings; you may remove it after closing setup.')
+        with install_lock(root.parent):
+            recover_update(root.parent)
+            if a.action=='check':check(root)
+            else:
+                m=json.loads((root/'install.json').read_text(encoding='utf-8'));restore(root,m)
+                print('Original game files restored. VR is disabled. This BF2142VR folder retains your backups and settings; you may remove it after closing setup.')
 if __name__=='__main__':
     import faulthandler,traceback
     faulthandler.enable()
+    print('BF2142 VR setup '+VERSION+' / Python '+sys.version.split()[0]+' / '+str(struct.calcsize('P')*8)+'-bit',flush=True)
     try:main()
     except Exception as error:
         print('\nSETUP STOPPED:',error,flush=True)

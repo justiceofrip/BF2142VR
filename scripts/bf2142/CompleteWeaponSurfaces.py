@@ -42,16 +42,26 @@ class Tree:
             ordered=sorted(triangles,key=lambda t:t.low[axis]+t.high[axis]);half=len(ordered)//2
             self.children=(Tree(ordered[:half]),Tree(ordered[half:]));self.triangles=None
     def hits(self,origin,direction,limit,outward):
-        low=0.;high=limit
-        for i in range(3):
-            if abs(direction[i])<1e-10:
-                if origin[i]<self.low[i]-1e-7 or origin[i]>self.high[i]+1e-7:return False
+        # Avoid nested recursive any()/generator frames in the installer hot
+        # loop. Preserve left-before-right traversal and all geometric tests.
+        pending=[self]
+        while pending:
+            node=pending.pop();low=0.;high=limit;overlaps=True
+            for i in range(3):
+                if abs(direction[i])<1e-10:
+                    if origin[i]<node.low[i]-1e-7 or origin[i]>node.high[i]+1e-7:
+                        overlaps=False;break
+                else:
+                    a=(node.low[i]-origin[i])/direction[i];b=(node.high[i]-origin[i])/direction[i]
+                    low=max(low,min(a,b));high=min(high,max(a,b))
+                    if low>high+1e-7:overlaps=False;break
+            if not overlaps:continue
+            if node.children:
+                pending.extend(reversed(node.children))
             else:
-                a=(self.low[i]-origin[i])/direction[i];b=(self.high[i]-origin[i])/direction[i]
-                low=max(low,min(a,b));high=min(high,max(a,b))
-                if low>high+1e-7:return False
-        if self.children:return any(c.hits(origin,direction,limit,outward) for c in self.children)
-        return any(t.hits(origin,direction,limit,outward) for t in self.triangles)
+                for triangle in node.triangles:
+                    if triangle.hits(origin,direction,limit,outward):return True
+        return False
 
 def donor_vertex(v,name):
     out=bytearray(v)

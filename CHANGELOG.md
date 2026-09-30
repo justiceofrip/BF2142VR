@@ -1,5 +1,14 @@
 # BFVR Changelog
 
+## BF2142 0.2.0-beta.4-test.6 — installer / updater
+
+- Add a standalone Windows installer with Install / Update, Repair and Play VR.
+- Verify signed update descriptors and download only changed or damaged mod files.
+- Preserve settings, original rollback backups and the previous runtime; recover interrupted update swaps.
+- Update bundled Python to 3.13.15 and avoid recursive generator traversal in weapon repair.
+- Isolate each weapon repair, verify accepted hashes, retain completed work and bound retries.
+- Keep test.5 gameplay binaries unchanged. Reporter-specific native crash resolution remains unconfirmed.
+
 ## BF2142 0.2.0-beta.4-test.5 — equip-to-fire timing hotfix
 
 - Wait for the XR consumer inside the current engine frame instead of spinning

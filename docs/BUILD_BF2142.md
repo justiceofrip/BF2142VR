@@ -22,7 +22,7 @@ Do not combine client/presenter binaries from different revisions. Protocol and 
 
 ## Asset policy tests
 
-Python 3.12 is used for player packaging. The mesh tests use standard Python and synthetic fixtures:
+Python 3.13 is used for player packaging. The mesh tests use standard Python and synthetic fixtures:
 
 ```powershell
 Push-Location .\scripts\bf2142
@@ -34,7 +34,7 @@ GPU smoke executables are separate from CTest; see BF2142_PORT.md and the releva
 
 ## Build a player candidate
 
-The portable packaging helper builds the standalone setup utility with Python 3.12.0, Pillow 12.3.0 and PyInstaller 6.22.3, then stages the already-built native outputs. It does not download any game content. Python must be installed for the developer; players receive the bundled utility and do not need Python.
+The portable packaging helper builds the standalone setup utility with Python 3.13.15, Pillow 12.3.0 and PyInstaller 6.22.3, then stages the already-built native outputs. It does not download any game content. Python must be installed for the developer; players receive the bundled utility and do not need Python.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Build-PlayerPackage.ps1
@@ -65,3 +65,12 @@ Flat payload needs `runtime/x86/BF2142VRLauncher.exe` and `BF2142VRClient.dll` p
 Publish only reviewed payload files. Keep the publisher private key, server host state, native shared secrets, credentials, generated game assets and debug fixtures outside the repository/downloads. A public key in a helper must be chosen by its publisher; do not trust keys received from arbitrary servers.
 
 The online join EXE is produced after its signed payload ZIPs, avoiding a self-referencing hash. In the VR user ZIP, this EXE and `Join Community Server.cmd` are distribution extras used from the extracted folder; the reversible asset installer copies only its `payload.json` file set.
+
+## Installer / live updater
+
+See [INSTALLER_UPDATER.md](INSTALLER_UPDATER.md). Build the standalone Windows
+UI with .NET 10 using Build-Installer.ps1 after the player payload is staged.
+Players need neither .NET nor Python. The update channel serves a signed
+file manifest, with content-addressed release assets. Keep the ECDSA private
+publishing key outside source and release folders. No game assets belong in
+the feed, cache uploads, or release. Tests use synthetic payloads.

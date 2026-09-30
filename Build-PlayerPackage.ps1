@@ -20,12 +20,12 @@ foreach ($file in @((Join-Path $X86Build 'bf2142\BF2142VRLauncher.exe'), (Join-P
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Build both architectures first. Missing: $file" }
 }
 if (-not $Python) {
-    $Python = & py -3.12 -c 'import sys; print(sys.executable)'
-    if ($LASTEXITCODE -ne 0) { throw 'Install Python 3.12.0 or supply -Python with its executable path.' }
+    $Python = & py -3.13 -c 'import sys; print(sys.executable)'
+    if ($LASTEXITCODE -ne 0) { throw 'Install Python 3.13.15 or supply -Python with its executable path.' }
 }
 $version = & $Python -c 'import platform; print(platform.python_version())'
-if ($LASTEXITCODE -ne 0 -or $version -ne '3.12.0') {
-    throw 'The beta packaging license set is pinned to Python 3.12.0. Supply that interpreter; review component versions/licenses before changing it.'
+if ($LASTEXITCODE -ne 0 -or $version -ne '3.13.15') {
+    throw 'The beta packaging license set is pinned to Python 3.13.15. Supply that interpreter; review component versions/licenses before changing it.'
 }
 function Invoke-Native {
     param([string]$Executable, [string[]]$Arguments)

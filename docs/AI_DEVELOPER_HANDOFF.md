@@ -1,5 +1,26 @@
 # BFVR AI and Developer Handoff
 
+## Test.6 installer / updater invariants
+
+The setup interpreter is pinned to Python 3.13.15; update matching licenses with
+future pins. CompleteWeaponSurfaces queries traverse an explicit stack.
+WeaponRepairWorker isolates each repair, validates input/output hashes,
+publishes verified cache entries and retries a failed worker once. The complete
+archive must still match COMPLETE. Never skip a model or publish generated assets.
+The report showed varying native exception codes during pure-Python repair;
+it does not prove one specific interpreter defect or hardware fault.
+
+The standalone UI is src/installer. Its public key verifies the preview-channel
+feed. File hashes/sizes and HTTPS bounds are enforced before execution. Cached
+and installed files are rehashed; only changed files download. SetupAssets apply
+stages a complete replacement before moving the previous runtime aside. First
+stock backups and INI settings retain their ownership. A game-specific mutex
+excludes concurrent setup; a journal recovers interrupted swaps. Do not write
+live game modules or terminate a match. Gameplay DLL/EXEs are unchanged from
+test.5. See INSTALLER_UPDATER.md.
+
+
+
 ## Beta.4-test.5 native draw timing
 
 Do not return immediately from RenderStereo just because GetRequest cannot yet

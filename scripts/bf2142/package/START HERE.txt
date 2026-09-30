@@ -1,4 +1,4 @@
-BATTLEFIELD 2142 VR 0.2.0-beta.4-test.5 - EXPERIMENTAL TEST BUILD
+BATTLEFIELD 2142 VR 0.2.0-beta.4-test.6 - EXPERIMENTAL TEST BUILD
 
 Requires your own working stock BF2142 v1.51 on Windows x64.
 Set up Reclamation/OpenSpy separately and confirm you can log in.
@@ -6,18 +6,27 @@ VR already includes the remote IK receiver. Do not also install the flat addon.
 Remaster/other weapon packs are not supported by this installer.
 
 INSTALL / UPDATE
-For easiest rollback, install this test into a separate copy of your game.
-Beta.3 remains available as the previous build.
+Recommended: download BF2142VRSetup.exe from this release, open it, choose
+BF2142.exe once, and click Install / Update. Keep the BF2142 VR Installer
+shortcut for later updates. Repair checks/downloads damaged mod files and
+rebuilds locally generated assets. No separate Python or .NET install needed.
 
-1. Close BF2142. Updating any earlier version? Run its installed Uninstall.cmd first.
-   Rename that game's BF2142VR folder to preserve backups/settings.
-   Do not overwrite the old installer folder with this ZIP.
-2. Extract the entire beta ZIP into a new folder.
-3. Run Setup.cmd, select BF2142.exe, and wait for local weapon/body/lobby setup.
-   Original files are backed up for rollback. No game content is downloaded.
-   Startup movies are skipped in this game copy; uninstall restores them.
-4. Connect through Steam Link/SteamVR. Use Battlefield 2142 VR Beta on the
-   desktop or installed Play VR.cmd for singleplayer/bot matches.
+The updater checks a signed preview-channel feed. It downloads changed mod
+files only, preserves VR settings and original backups, and keeps the previous
+runtime alongside the game. Close BF2142 before updating. It does not install
+or download Battlefield itself, Reclamation, maps, or account information.
+
+Offline alternative: extract the entire ZIP to a new folder, close BF2142,
+run Setup.cmd and select BF2142.exe. Updating a healthy existing VR installation
+no longer requires a manual uninstall. Do not overwrite an old extracted ZIP.
+If the old install metadata/backups are damaged or another mod changed game
+files, setup stops and retains them rather than guessing what to overwrite.
+
+Weapon repairs are isolated and verified. Completed repairs are cached locally
+so an interrupted attempt can resume. A failing weapon is retried once; setup
+never silently skips it. Previous releases remain available on GitHub.
+
+Connect your headset through SteamVR, then use Play VR or the game shortcut.
 
 COMMUNITY MULTIPLAYER
 This hotfix updates the installed Play VR runtime. The separate community

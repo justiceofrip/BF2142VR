@@ -1,7 +1,8 @@
 BATTLEFIELD 2142 VR - TEST BUILD TROUBLESHOOTING
 
 SETUP STOPS
-Extract the whole ZIP first, close the game, and select BF2142.exe.
+Use BF2142VRSetup.exe and select BF2142.exe, or extract the whole ZIP first.
+Close the game before Install / Update or Repair.
 This package recognizes stock v1.51 weapons and the accepted BFVR repair. It
 stops on other weapon packs instead of overwriting them. Use a clean stock
 installation for Remaster/HD-mod conflicts.
@@ -30,7 +31,7 @@ session. Avoid treating missing tracking as a new standing-height reference.
 
 CRASH OR BAD RENDERING
 Save the exact error and what you were doing. Reports should include version
-0.2.0-beta.4-test.5, headset/runtime, GPU, game mod, map and the failed action.
+0.2.0-beta.4-test.6, headset/runtime, GPU, game mod, map and the failed action.
 Client/presenter logs are under BF2142VR/runtime/x86/logs. Optional branding
 messages are under BF2142VR/logs. Check logs before sharing them for any personal
 paths or account information. Do not post credentials, original game archives,
@@ -46,14 +47,26 @@ Do not delete backups before uninstalling. The original EXE is backed up only
 when setup needed to enable its large-address-aware memory flag.
 
 REINSTALL / MOVING THE GAME
-Uninstall before moving the game or installing another weapon pack. After
-uninstall, move the old BF2142VR folder aside and run a fresh Setup.cmd.
+For a normal update, use Install / Update; do not uninstall first. Repair
+restores mod files while retaining settings and verified original backups.
+Uninstall before moving the game or installing a different weapon pack.
 
 SETUP STOPS WITHOUT A USEFUL MESSAGE
 Use beta.2 or newer. Setup prints and retains a log under
 %LOCALAPPDATA%\BF2142VR\SetupLogs, including the worker exit code and
 Python traceback. Share that log when reporting failures; review paths first.
 A differing error on each attempt is not proof that reinstalling will fix it.
+Test.6 replaces the bundled interpreter and isolates each weapon repair.
+Verified repairs remain under %LOCALAPPDATA%\BF2142VR\WeaponCache. These are
+locally generated game assets: do not share that cache. A failure retries once;
+if it still fails, send the log rather than repeatedly reinstalling the game.
+The updater download cache is separate from this owned-asset cache.
+
+UPDATER CANNOT CONNECT
+The installed Play VR shortcut still works offline. Check for updates later
+or use the full release ZIP. An invalid signature/hash stops the update; do
+not bypass verification. If access is denied in a protected game folder, close
+the updater and run BF2142VRSetup.exe as administrator.
 
 BLUR / JAGGIES
 Test.2 restores the verified 1600x900 native source. Test.1 auto-sizing caused
