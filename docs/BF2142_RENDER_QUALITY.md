@@ -1,5 +1,25 @@
 # BF2142 VR render quality
 
+## Optional image-filter comparison
+
+The presenter normally loads `runtime/x64/UserConfig.txt` (or an explicit
+`BFVR_USER_CONFIG_PATH`) and applies its saved FXAA and bloom settings. The
+seeded settings enable both. BF2142 also requests native geometry MSAA. An
+extra smoothing/glow pass can contribute to softness independently of source
+resolution; this is not proof of the cause on any particular headset.
+
+The optional `BF2142-VR-Image-Filter-Comparison.zip` asset on the test.7 release
+has four launchers: normal filters, FXAA off, bloom off, and both off. Extract
+it anywhere, close the game, connect the headset and select your BF2142.exe.
+Each run uses a temporary presenter-config copy. Normal Play VR retains the
+original settings; source size, native MSAA, game effects and gameplay remain
+unchanged. Compare the same view. No headset/FPS improvement is claimed yet.
+The helper source is `scripts/bf2142/Compare-ImageFilters.ps1`; validation uses
+`Test-ImageFilters.ps1` and the actual presenter settings reader.
+
+The installer-only test.7 does not enable this experiment automatically.
+
+
 ## Separate beta.4-test.4 experimental build
 
 Test.2 restores the verified **1600x900 native source**. Test.1 automatically

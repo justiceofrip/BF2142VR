@@ -1,5 +1,12 @@
 # BFVR Changelog
 
+## Optional image-filter comparison helper
+
+- Separate test.7 release download compares added FXAA and bloom, independently
+  or together, using temporary settings. Installed preferences and gameplay
+  stay unchanged. This is a diagnostic aid, not a confirmed clarity/FPS fix.
+
+
 ## BF2142 v0.2.0-beta.4-test.7
 
 - Installer uses verified repair instructions instead of repeating expensive geometry searches. All 28 generated weapons remain byte-identical; stock assets are still required.
