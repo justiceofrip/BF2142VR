@@ -99,3 +99,67 @@ composition from about 29 to 4.5 ms; single-source readback from 9.5 to 7 ms.
 These are individual-operation measurements, not game FPS or headset results.
 Synchronous GPU/CPU transport remains a material cost. Gameplay acceptance and
 performance validation after this optimization are still pending.
+
+
+## Comparison with BF1942 / BF2 and GPU-only feasibility (unreleased)
+
+The optimized native-game desktop profile still measured about 26-28 FPS at
+2528x2704 / 8x MSAA: roughly 18-19 ms eye readback, 6 ms UI readback and 7-8 ms
+desktop publication. Scene differences prevent a controlled FPS comparison
+with the earlier rejection. These are CPU wall times, not GPU draw timestamps.
+
+BF1942's D3D8-to-9 translator creates shared D3D9Ex textures and implements
+managed-pool compatibility. BF2142 currently uses ordinary D3D9, reads images
+into CPU vectors and uploads them through SharedTextureProducer. Ordinary D3D9
+rejected the tested shared-render-target allocation on the development GPU;
+D3D9Ex BGRA sharing succeeded. Replacing the factory with Ex alone is unsafe
+because its managed-pool semantics differ. Do not make that blind substitution.
+
+BF2's reviewed source at 5614c0b5936705da44fa1e432ad5e26c6ff2bd77 still transfers
+pixels through CPU memory, but batches eyes and HUD into an atlas, uploads the
+mapped data directly, and flushes once. It also has a driver-checked UMA path.
+See [DirectAtlasCapture.inl](https://github.com/Gawkyorange5/BF2-VR/blob/5614c0b5936705da44fa1e432ad5e26c6ff2bd77/src/RFX/DirectAtlasCapture.inl)
+and [XrSessionClient.cpp](https://github.com/Gawkyorange5/BF2-VR/blob/5614c0b5936705da44fa1e432ad5e26c6ff2bd77/src/RFX/XrSessionClient.cpp).
+This code comparison does not establish BF2's achieved FPS at matching settings.
+
+An isolated RX 9070 XT benchmark with three full-sized 8x-MSAA color images and
+current-frame pixel checks measured:
+
+| Transfer at 2528x2704 | Milliseconds |
+| --- | ---: |
+| Ordinary D3D9, separate readbacks plus vector copies | 19.6 |
+| Ordinary D3D9, packed atlas readback plus vector copies | 18.4 |
+| Ordinary D3D9, lockable atlas plus vector copies | 30.1 |
+| D3D9On12 resolve / unwrap / GPU copy / completion wait | 1.6-1.8 |
+
+The GPU case copies to D3D12 shared textures opened by a matching-adapter D3D11
+device. Source ownership is returned with a completion fence after the copy;
+resources return to COMMON state. A separate untimed D3D11 staging read checks
+every pixel of each current frame, including HUD alpha. Managed textures, vertex
+buffers and index buffers can be created and locked using ordinary D3D9 semantics.
+This is a feasibility result, not a full rendering benchmark or a 144-FPS claim.
+
+Manual developer probes (hidden windows, no game or headset):
+
+```powershell
+.\BF2142VRGpuTransferSmoke.exe
+.\BF2142VRStereoIntegrationSmoke.exe --on12 --msaa
+.\BF2142VRStereoIntegrationSmoke.exe --on12 --desktop --msaa --scope
+.\BF2142VRStereoIntegrationSmoke.exe --on12 --desktop --msaa --reflex
+```
+
+The --on12 switch selects the system factory only inside this standalone fixture.
+Native HUD isolation, distinct stereo eyes, animation time ownership, paused UI,
+scope restore and reflex desktop composition pass on that backend. Both builds
+and all 75 Win32 CTests pass. No player backend selection or runtime GPU transport
+has been implemented in this checkpoint. The accepted launcher and release are
+unchanged; do not distribute this as a performance fix.
+
+Remaining integration work must preserve CPU-composited scopes, grenade guides,
+menu pointers and custom panels, or move them to equivalent GPU composition.
+Producer/consumer ownership must cover actual GPU completion in both directions;
+an enqueued copy or Flush alone does not establish safe resource reuse. Exercise
+device reset, native shader compatibility, adapter matching, map transitions and
+failure fallback before a headset playtest. Keep engine timing and IK unchanged.
+144 FPS requires the entire frame, including native rendering and presentation,
+to fit within about 6.94 ms; this experiment measures only one part of that work.

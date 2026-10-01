@@ -403,3 +403,10 @@ set_property(TARGET BF2142VRFramePixelsTests PROPERTY MSVC_RUNTIME_LIBRARY "Mult
 if(BUILD_TESTING)
  add_test(NAME BF2142VRFramePixelsTests COMMAND BF2142VRFramePixelsTests)
 endif()
+
+# Manual hardware probe: no game, headset, production backend or CTest dependency.
+add_executable(BF2142VRGpuTransferSmoke GpuTransferSmoke.cpp)
+target_compile_definitions(BF2142VRGpuTransferSmoke PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+target_compile_options(BF2142VRGpuTransferSmoke PRIVATE /W4 /permissive-)
+set_property(TARGET BF2142VRGpuTransferSmoke PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+target_link_libraries(BF2142VRGpuTransferSmoke PRIVATE d3d9 d3d11 d3d12 dxgi user32)

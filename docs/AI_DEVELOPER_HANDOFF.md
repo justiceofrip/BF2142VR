@@ -1,5 +1,13 @@
 # BFVR AI and Developer Handoff
 
+## GPU transport investigation (unreleased)
+
+The larger canvas is still too slow after pixel-loop optimization. Hidden
+D3D9On12/D3D11 sharing and existing HUD/scope fixtures passed; no player runtime
+backend has changed. See the comparison and feasibility section of
+HEADSET_RENDER_CANVAS.md. Do not confuse the 1.6-1.8 ms synthetic GPU transfer
+with measured BF2142 frame time. Production integration and headset checks remain.
+
 ## Opt-in headset canvas experiment (unreleased)
 
 The first high-resolution desktop playtest was rejected for severe slowness.
