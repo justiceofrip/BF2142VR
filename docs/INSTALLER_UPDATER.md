@@ -1,6 +1,6 @@
 # Installer and incremental updater
 
-Download `BF2142VRSetup.exe` from the test.6 release. Choose the installed
+Download `BF2142VRSetup.exe` from the test.7 release. Choose the installed
 `BF2142.exe` once and click **Install / Update**. **Repair** verifies and restores
 mod files and regenerates the local body/lobby assets. **Play VR** launches the
 installed game. The app retains the game path and creates an installer shortcut
@@ -106,3 +106,14 @@ dotnet run --project src/installer-tools/BF2142InstallerTools.csproj -c Release 
 
 Keep the public failure report anonymized. Raw setup logs and separate private
 playtest notes are not part of source or release artifacts.
+
+## Test.7 repair plans
+
+`BuildRepairPlans.py` compiles only branch decisions (skip/append/subdivide and
+keep/remove) from an owned, hash-identified stock archive. `WeaponRepairPlans.py`
+contains compressed opcodes, not coordinates, indices, materials or textures.
+`RepairDecisionPlan` bounds decompression and requires exact stream consumption.
+The installer derives the same meshes locally and checks the original accepted
+output hashes. Missing, truncated or altered plans fail closed; no silent slow
+search fallback. Existing verified mesh caches remain valid. Full search stays
+in the developer compiler and geometry tests. Gameplay is unchanged.

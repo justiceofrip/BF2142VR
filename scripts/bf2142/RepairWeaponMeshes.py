@@ -144,7 +144,7 @@ def clip_rear(vertices,z):
         if ain!=bin:result.append(interpolate(a,b,(z-az)/(bz-az)))
     return result
 
-def repair(data,name):
+def repair(data,name,surface_plan=None,record=None):
     if name not in NAMES:raise ValueError("Weapon has no reviewed repair profile")
     mesh=Mesh(data);old=copy.deepcopy(mesh.lods);stats={"backfaces":0,"backfaces_by_lod":[],"stock_faces":0}
     # PAC assault rifle has no first-person rear stock at all. Its complete
@@ -167,7 +167,7 @@ def repair(data,name):
         if not stats["stock_faces"]:raise ValueError("No compatible stock surfaces")
         verts=[position(v) for m in mesh.lods[0][0] for v in m["vertices"]]
         mesh.bounds[0]=tuple(min(v[j] for v in verts) for j in range(3))+tuple(max(v[j] for v in verts) for j in range(3))+(5,)
-    stats.update(complete(mesh,name,interpolate))
+    stats.update(complete(mesh,name,interpolate,surface_plan,record))
     # Group 0 includes both the ordinary model and its alternate native ADS
     # mesh. Leaving the latter untouched makes missing surfaces return on ADS.
     for lod in mesh.lods[0]:

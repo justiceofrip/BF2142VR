@@ -22,7 +22,7 @@ def halves(material):
     if ix[k:]!=reversed_indices:raise ValueError('Inner face provenance differs')
     return n,k
 
-def repair(data):
+def repair(data,plan=None,record=None):
     mesh=Mesh(data);before=copy.deepcopy(mesh.lods);removed=0;retained=0
     for lod in mesh.lods[0]:
         solids=[]
@@ -36,20 +36,24 @@ def repair(data):
                 t=Triangle(vs)
                 if dot(t.normal,t.normal)>.5:solids.append(t)
         if not solids:continue
-        tree=Tree(solids)
+        tree=Tree(solids) if plan is None else None
         for m in lod:
             split=halves(m)
             if split is None:continue
             n,k=split;keep=m['indices'][:k]
             for i in range(0,k,3):
-                vs=[m['vertices'][j] for j in m['indices'][i:i+3]];ps=[position(v) for v in vs]
-                normal=unit(cross(sub(ps[1],ps[0]),sub(ps[2],ps[0])))
-                center=mul(add(add(ps[0],ps[1]),ps[2]),1/3)
-                # A matching opposing skin within 20 cm establishes a solid
-                # shell. Thin rails, sights and disconnected details retain
-                # their reverse faces; only rigid root part 0 is considered.
-                inward=mul(normal,-1)
-                solid=all(v[24]==0 for v in vs) and tree.hits(add(center,mul(inward,.001)),inward,.20,inward)
+                if plan is not None:
+                    solid=bool(plan.take(1))
+                else:
+                    vs=[m['vertices'][j] for j in m['indices'][i:i+3]];ps=[position(v) for v in vs]
+                    normal=unit(cross(sub(ps[1],ps[0]),sub(ps[2],ps[0])))
+                    center=mul(add(add(ps[0],ps[1]),ps[2]),1/3)
+                    # A matching opposing skin within 20 cm establishes a solid
+                    # shell. Thin rails, sights and disconnected details retain
+                    # their reverse faces; only rigid root part 0 is considered.
+                    inward=mul(normal,-1)
+                    solid=all(v[24]==0 for v in vs) and tree.hits(add(center,mul(inward,.001)),inward,.20,inward)
+                    if record is not None:record.append(int(solid))
                 if solid:removed+=1
                 else:keep.extend(m['indices'][k+i:k+i+3]);retained+=1
             m['indices']=keep
@@ -65,6 +69,7 @@ def repair(data):
             if new['indices'][:k]!=old['indices'][:k]:raise ValueError('An exterior triangle changed')
             for key in old:
                 if key!='indices' and old[key]!=new[key]:raise ValueError('Non-index material data changed')
+    if plan is not None:plan.finish()
     return encoded,{'removed_inner_faces':removed,'retained_thin_reverse_faces':retained}
 
 def main():

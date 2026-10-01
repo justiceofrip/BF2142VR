@@ -1,8 +1,8 @@
-# Battlefield 2142 VR — beta.4-test.6 experimental branch
+# Battlefield 2142 VR — beta.4-test.7 experimental branch
 
-**[Download the installer / updater](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.4-test.6/BF2142VRSetup.exe)** — select BF2142.exe and click **Install / Update**. Later updates and repairs preserve your settings and original backups. [Full ZIP and checks](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-test.6) are also available.
+**[Download the installer / updater](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.4-test.7/BF2142VRSetup.exe)** — select BF2142.exe and click **Install / Update**. Later updates and repairs preserve your settings and original backups. [Full ZIP and checks](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-test.7) are also available.
 
-Test.6 updates installation and patch delivery; gameplay binaries are unchanged from test.5. Setup uses a newer bundled interpreter, isolated verified weapon repairs, and saved progress. This addresses installer resilience; the reporting machine's intermittent crash still needs confirmation. Beta.3 remains the older gameplay fallback.
+Test.7 replaces expensive per-install geometry searches with verified repair instructions. Models still come from your own game and must match the same accepted hashes. Gameplay binaries are unchanged from test.5; this does not change resolution or FPS. Reporter confirmation of the remaining native installer crash is pending. Beta.3 remains the older gameplay fallback.
 
 A PC VR port based on [BFVR by JayBiggsGMG and the BFVR contributors](https://github.com/JayBiggsGMG/BFVR-Battlefield-1942-VR-Mod). Play bot matches or join compatible multiplayer servers alongside desktop players.
 
@@ -19,11 +19,11 @@ VR players do **not** install the flat addon too. Unmodified desktop clients can
 
 You need your own working **BF2142 v1.51** installation on Windows x64. Set up Reclamation/OpenSpy separately and confirm you can log in. VR has primarily been tested with Quest 3 controllers through Steam Link/SteamVR. Remaster and other weapon packs are not supported by this installer.
 
-1. Close BF2142, open the test.6 installer EXE, select `BF2142.exe`, and click **Install / Update**. The full ZIP and `Setup.cmd` remain an offline alternative.
+1. Close BF2142, open the test.7 installer EXE, select `BF2142.exe`, and click **Install / Update**. The full ZIP and `Setup.cmd` remain an offline alternative.
 2. Connect your headset to SteamVR. Use **Battlefield 2142 VR Beta** / installed `Play VR.cmd` for singleplayer.
 3. The separate [community helper](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.1) still selects its beta.1 runtime. Normal servers are selectable in-game from the updated Play VR launcher.
 
-**Updating from alpha or an earlier beta:** use the test.6 installer’s **Install / Update** button. Healthy installations retain settings and original backups without a manual uninstall. If another mod changed game files or a backup is damaged, setup stops and preserves them. For a flat-addon update, use the new EXE instead of an older playtest EXE.
+**Updating from alpha or an earlier beta:** use the test.7 installer’s **Install / Update** button. Healthy installations retain settings and original backups without a manual uninstall. If another mod changed game files or a backup is damaged, setup stops and preserves them. For a flat-addon update, use the new EXE instead of an older playtest EXE.
 
 - [Full installation instructions](scripts/bf2142/package/START%20HERE.txt) / [controls](scripts/bf2142/package/CONTROLS.txt) / [troubleshooting](scripts/bf2142/package/TROUBLESHOOTING.txt)
 - [Flat addon and Reclamation Hub integration](docs/FLAT_ADDON.md)

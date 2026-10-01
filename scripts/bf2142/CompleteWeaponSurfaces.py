@@ -77,11 +77,12 @@ def donor_vertex(v,name):
     if name=='as_handgun' and out[24]==2:out[24]=3
     return bytes(out)
 
-def complete(mesh,name,interpolate):
+def complete(mesh,name,interpolate,plan=None,record=None):
     native=mesh.lods[0][0];parts={};allowed=set()
     for mat in native:
         if mat['alpha']!=0:continue
         allowed.update(v[24] for v in mat['vertices'])
+        if plan is not None:continue  # Decisions already verified for this exact source hash.
         for i in range(0,len(mat['indices']),3):
             vs=[mat['vertices'][j] for j in mat['indices'][i:i+3]]
             if len({v[24] for v in vs})!=1:continue
@@ -117,13 +118,20 @@ def complete(mesh,name,interpolate):
                 cache[key]=bool(tree and tree.hits(add(p,mul(n,radius)),mul(n,-1),radius*2,n))
             return cache[key]
         def fill(vs,n,part,depth=0):
-            center=interpolate(interpolate(vs[0],vs[1],.5),vs[2],1/3)
-            flags=[covered(v,n,part) for v in (*vs,center)]
-            if all(flags):return
-            if not any(flags):append_triangle(vs);return
-            if depth>=4 or max(dot(sub(xyz(a),xyz(b)),sub(xyz(a),xyz(b))) for a,b in zip(vs,vs[1:]+vs[:1]))<.006**2:
-                if not flags[-1]:append_triangle(vs)
-                return
+            if plan is not None:
+                decision=plan.take(2)
+            else:
+                center=interpolate(interpolate(vs[0],vs[1],.5),vs[2],1/3)
+                flags=[covered(v,n,part) for v in (*vs,center)]
+                if all(flags):decision=0
+                elif not any(flags):decision=1
+                elif depth>=4 or max(dot(sub(xyz(a),xyz(b)),sub(xyz(a),xyz(b))) for a,b in zip(vs,vs[1:]+vs[:1]))<.006**2:
+                    decision=0 if flags[-1] else 1
+                else:decision=2
+                if record is not None:record.append(decision)
+            if decision==0:return
+            if decision==1:append_triangle(vs);return
+            if depth>=4:raise ValueError('Invalid surface plan depth')
             ab=interpolate(vs[0],vs[1],.5);bc=interpolate(vs[1],vs[2],.5);ca=interpolate(vs[2],vs[0],.5)
             for child in ([vs[0],ab,ca],[ab,vs[1],bc],[ca,bc,vs[2]],[ab,bc,ca]):fill(child,n,part,depth+1)
         for i in range(0,len(source['indices']),3):
@@ -138,4 +146,5 @@ def complete(mesh,name,interpolate):
     positions=[xyz(v) for material in native for v in material['vertices']]
     prior=mesh.bounds[0]
     mesh.bounds[0]=tuple(min(v[i] for v in positions) for i in range(3))+tuple(max(v[i] for v in positions) for i in range(3))+(prior[-1],)
+    if plan is not None:plan.finish()
     return result

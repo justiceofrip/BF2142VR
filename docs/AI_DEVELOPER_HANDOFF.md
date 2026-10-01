@@ -1,5 +1,15 @@
 # BFVR AI and Developer Handoff
 
+## Test.7 repair plans
+
+WeaponRepairWorker now replays bounded decision-only programs compiled by
+BuildRepairPlans from the exact stock hashes. Geometry is always reconstructed
+from owned inputs; the 28 expected output hashes and complete archive hash are
+unchanged. Both search and replay paths remain regression checked. Never bypass
+source/output checks, silently fall back to expensive searches, or ship meshes.
+This reduces the workload where native worker crashes were reported; it does
+not establish their root cause. No gameplay binaries changed.
+
 ## Test.6 installer / updater invariants
 
 The setup interpreter is pinned to Python 3.13.15; update matching licenses with

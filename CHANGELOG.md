@@ -1,5 +1,11 @@
 # BFVR Changelog
 
+## BF2142 v0.2.0-beta.4-test.7
+
+- Installer uses verified repair instructions instead of repeating expensive geometry searches. All 28 generated weapons remain byte-identical; stock assets are still required.
+- Retains resumable caches, original backups, isolated workers and bounded retry. Native crash confirmation on the reporting system is pending.
+- Gameplay, resolution and frame pacing are unchanged from test.5/test.6.
+
 ## BF2142 0.2.0-beta.4-test.6 — installer / updater
 
 - Add a standalone Windows installer with Install / Update, Repair and Play VR.
