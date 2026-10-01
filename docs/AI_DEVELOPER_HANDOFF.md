@@ -1,5 +1,61 @@
 # BFVR AI and Developer Handoff
 
+## Native D3D9Ex candidate: readable menus, ground rendering blocker (unreleased)
+
+The old `BF2142VR_GPU_TRANSFER=1` On12 experiment below remains rejected. A
+separate exact `dx9ex` value now creates the system D3D9Ex factory/device and
+uses legacy D3D9 shared render targets opened by the matching D3D11 adapter.
+Do not close these non-NT sharing handles. A D3D9 EVENT query completes writes
+before D3D11 reads, and the producer's D3D11 query completes copies before reuse.
+ResetEx releases our transient resources and retains native managed substitutes.
+
+NativeExResources translates managed creations on the selected device only to
+DEFAULT+DYNAMIC, preserving reported pool/usage through resource private tags.
+The approach follows the BF1942 translator's managed compatibility policy; it
+is not complete generic managed-resource emulation. Font alpha, mip/subrect,
+compressed textures, buffers, cube/volume textures and ResetEx fixtures pass.
+Full-size shared publication with an independent receiver and scope/reflex CPU
+fallback fixtures also pass. Win32 75/75 CTests and x64 presenter builds passed.
+
+Actual BF2142: user confirmed map labels/menus work. Desktop world frames at
+2528x2704/8x MSAA reached about 100 pairs/sec with eye/HUD readbacks removed.
+No native headset result or 144 FPS result exists. User subsequently reported
+solid black strips across the ground which change with view direction. This
+is a release blocker, not an accepted visual result. Do not replace the normal
+shortcut or publish this candidate. Keep current sessions undisturbed while
+preparing the isolated diagnostic build.
+
+Further native checks: black strips persisted at 1600x900 and with the process
+event selecting CPU transfer on the same Ex device. Returning to ordinary D3D9
+at 1600x900 removed them; the user confirmed the improvement. This narrows the
+regression to backend/device/resource differences, not GPU publication alone.
+It does not establish shadows as the cause. The native dynamic-shadow flag and
+the active Video.con were already disabled. Console shadow-property guesses
+were rejected; a private guarded flag comparison made no write because the
+existing flag was zero. Capability/texture-format checks matched across D3D9
+and Ex on the tested adapter. No managed lock failure/discard/nonzero-LOD warning
+was observed in the bounded diagnostic log. NOOVERWRITE and surface-level locks
+were not instrumented; these checks do not prove full resource compatibility.
+
+A diagnostic high-canvas restart also regressed menu sizing: CreateDevice logged
+2528x2704, then the capture saw 1600x900 without an intercepted Reset. The menu
+was enlarged/cropped. Resizing the outer window did not fix it; restarting with
+the established --render-size 1600x900 restored all menu buttons. Trace native
+reset/swapchain ownership before another high-canvas run. Do not silently claim
+the larger requested dimensions always reach the actual source.
+
+Current playable comparison uses ordinary D3D9 and 1600x900. Keep it running
+when the user is playing. No normal shortcut, public package, server or gameplay
+setting was changed. This is a diagnostic rollback, not a fast-path fix.
+
+For a same-map comparison only, `BF2142VR_GPU_DEBUG=1` enables bounded managed
+lock/LOD logging and the process-local manual-reset event
+`Local\BF2142VR.CpuTransfer.<game-pid>`. Setting it selects existing CPU frame
+transfer on the same renderer; resetting returns to GPU transfer. This adds no
+player binding and is inactive without explicit diagnostics. Compare the ground
+artifact before changing resources, shadows or camera logic.
+
+
 ## GPU transport integration: blocked native compatibility (unreleased)
 
 Explicit `BF2142VR_GPU_TRANSFER=1` now selects the system D3D9On12 factory and

@@ -6,9 +6,11 @@
 
 namespace bfvr::bf2142 {
 bool GpuTransferRequested();
+bool NativeExTransferRequested();
 using GpuDiagnosticLog=void(*)(const char*,...);
 void ConfigureGpuDiagnostics(GpuDiagnosticLog);
 void ReportGpuDrawFailure(IDirect3DDevice9*);
+bool DiagnosticCpuTransfer();
 IDirect3D9* CreateGpuTransferFactory(UINT version);
 
 // Captures stay on the GPU. The caller owns each complete frame until its
@@ -26,6 +28,9 @@ public:
     std::array<ID3D11Texture2D*,3> Exported() const{return {opened[0].Get(),opened[1].Get(),opened[2].Get()};}
 private:
     HRESULT Wait();
+    HRESULT InitializeNativeEx(IDirect3DDevice9*,UINT,UINT,ID3D11Device*);
+    Microsoft::WRL::ComPtr<IDirect3DDevice9Ex> nativeEx;
+    Microsoft::WRL::ComPtr<IDirect3DQuery9> completion9;
     IDirect3DDevice9* device=nullptr; // borrowed, released by owner after Reset
     std::array<Microsoft::WRL::ComPtr<IDirect3DTexture9>,3> textures;
     std::array<Microsoft::WRL::ComPtr<IDirect3DSurface9>,3> surfaces;

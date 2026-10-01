@@ -1,5 +1,6 @@
 #include "StereoSession.h"
 #include "GpuFrameTransfer.h"
+#include "NativeExResources.h"
 #include "NativeAntialiasing.h"
 #include "NativeRenderCanvas.h"
 #include "VrSettings.h"
@@ -231,8 +232,12 @@ HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
             if(SUCCEEDED(device->GetCreationParameters(&creation)))changed=bfvr::bf2142::SelectWorldSamples(api,creation.AdapterOrdinal,creation.DeviceType,requestedWorldSamples,*parameters);
             api->Release();}}
     if(parameters&&runtimePacing&&parameters->PresentationInterval!=D3DPRESENT_INTERVAL_IMMEDIATE){parameters->PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;changed=true;}
-    HRESULT result = originalReset(device, parameters);
-    if(FAILED(result)&&changed){*parameters=saved;result=originalReset(device,parameters);Log("VR MSAA reset fallback: original native settings retained.");}
+    IDirect3DDevice9Ex* resetEx=nullptr;
+    if(gpuBackend&&bfvr::bf2142::NativeExTransferRequested())device->QueryInterface(IID_PPV_ARGS(&resetEx));
+    const auto reset=[&](){return resetEx?resetEx->ResetEx(parameters,nullptr):originalReset(device,parameters);};
+    HRESULT result=reset();
+    if(FAILED(result)&&changed){*parameters=saved;result=reset();Log("VR MSAA reset fallback: original native settings retained.");}
+    if(resetEx)resetEx->Release();
     if(SUCCEEDED(result)&&parameters)Log("World AA reset: samples=%u quality=%lu.",unsigned(parameters->MultiSampleType),parameters->MultiSampleQuality);
     const auto count = resets.fetch_add(1, std::memory_order_relaxed) + 1;
     if (count <= 16) Log("Reset result=0x%08lX size=%ux%u windowed=%d",
@@ -250,8 +255,20 @@ HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
     D3DPRESENT_PARAMETERS saved{};bool changed=false;
     if(parameters){saved=*parameters;changed=bfvr::bf2142::SelectWorldSamples(factory,adapter,type,requestedWorldSamples,*parameters);}
     if(parameters&&runtimePacing&&parameters->PresentationInterval!=D3DPRESENT_INTERVAL_IMMEDIATE){parameters->PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;changed=true;}
-    HRESULT result = originalCreateDevice(factory, adapter, type, window, behavior, parameters, output);
-    if(FAILED(result)&&changed){*parameters=saved;result=originalCreateDevice(factory,adapter,type,window,behavior,parameters,output);Log("VR MSAA creation fallback: original native settings retained.");}
+    IDirect3D9Ex* factoryEx=nullptr;
+    if(gpuBackend&&bfvr::bf2142::NativeExTransferRequested())factory->QueryInterface(IID_PPV_ARGS(&factoryEx));
+    const auto create=[&](){
+        if(!factoryEx)return originalCreateDevice(factory,adapter,type,window,behavior,parameters,output);
+        IDirect3DDevice9Ex* deviceEx=nullptr;
+        const HRESULT hr=factoryEx->CreateDeviceEx(adapter,type,window,behavior,parameters,nullptr,output?&deviceEx:nullptr);
+        if(output)*output=deviceEx;return hr;
+    };
+    HRESULT result=create();
+    if(FAILED(result)&&changed){*parameters=saved;result=create();Log("VR MSAA creation fallback: original native settings retained.");}
+    if(factoryEx){
+        if(SUCCEEDED(result)&&output&&*output&&!bfvr::bf2142::InstallNativeExResources(*output,Log)){(*output)->Release();*output=nullptr;result=E_FAIL;}
+        factoryEx->Release();
+    }
     if(SUCCEEDED(result)&&parameters)Log("World AA creation: samples=%u quality=%lu; autoDepth=%d depthFormat=%u swap=%u; nativeSamples=%u requested=%u.",unsigned(parameters->MultiSampleType),parameters->MultiSampleQuality,parameters->EnableAutoDepthStencil,unsigned(parameters->AutoDepthStencilFormat),unsigned(parameters->SwapEffect),unsigned(saved.MultiSampleType),requestedWorldSamples);
     Log("CreateDevice result=0x%08lX adapter=%u size=%ux%u windowed=%d flags=0x%08lX",
         static_cast<unsigned long>(result), adapter, parameters ? parameters->BackBufferWidth : 0,
@@ -286,7 +303,7 @@ HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
 }
 IDirect3D9* WINAPI Create9Hook(UINT version) {
     IDirect3D9* factory = gpuBackend ? bfvr::bf2142::CreateGpuTransferFactory(version) : nullptr;
-    if(gpuBackend)Log("Experimental D3D9On12 factory: %s",factory?"active":"unavailable; ordinary D3D9 retained");
+    if(gpuBackend)Log("Experimental GPU factory %s: %s",bfvr::bf2142::NativeExTransferRequested()?"native D3D9Ex":"D3D9On12",factory?"active":"unavailable; ordinary D3D9 retained");
     if(!factory)factory=originalCreate9(version);
     Log("Direct3DCreate9 sdk=%u success=%d", version, factory != nullptr);
     if (factory) {

@@ -351,7 +351,7 @@ bool ReadFrame(std::vector<DWORD>& output) {
     return true;
 }
 bool BeginGpuPair(){
-    if(!gpuRequested||diagnostic||menuPointer.Active())return false;
+    if(!gpuRequested||diagnostic||menuPointer.Active()||DiagnosticCpuTransfer())return false;
     if(!gpuAttempted){
         gpuAttempted=true;
         const auto hr=gpuFrames.Initialize(gameDevice,width,height,desktop?nullptr:producer.Device());

@@ -1,5 +1,23 @@
 # BFVR Changelog
 
+## Unreleased: native D3D9Ex GPU transfer experiment
+
+- Add a separate opt-in `BF2142VR_GPU_TRANSFER=dx9ex` path using native D3D9Ex
+  shared textures, with compatibility for the game's managed resources.
+- Native map labels and menus passed a desktop playtest. Ordinary stereo world
+  frames avoided eye/HUD readbacks and sustained approximately 100 desktop
+  frames/sec at 2528x2704, 8x MSAA on the tested machine. This is not a headset
+  result or a controlled same-scene comparison with the earlier CPU path.
+- The same playtest found black ground strips that change with camera movement.
+  The candidate remains private and unaccepted while that regression is traced.
+  Normal player launches and the accepted shortcut are unchanged.
+
+
+- Follow-up A/B: strips persist with CPU transfer on Ex, and disappear with
+  ordinary D3D9 at the same desktop size. The original-renderer comparison is
+  restored. High-canvas startup also needs a reset/swapchain sizing fix after a
+  cropped-menu relapse. Neither experimental backend is accepted for release.
+
 ## Unreleased: GPU transport compatibility experiment
 
 - Add an explicitly opt-in GPU transport candidate with CPU fallbacks for scopes,

@@ -1,4 +1,6 @@
 #include "GpuFrameTransfer.h"
+#include "NativeExResources.h"
+#include <MinHook.h>
 #include "presenter/SharedTextureProducer.h"
 #include <dxgi1_2.h>
 #include <cstdio>
@@ -10,17 +12,26 @@ void Check(HRESULT hr,const char* name){if(FAILED(hr)){printf("FAIL %s: %08lx\n"
 void Require(bool value,const char* name){if(!value){printf("FAIL %s\n",name);exit(1);}}
 void Log(void*,const wchar_t* text){wprintf(L"%ls\n",text);}
 int wmain(int argc,wchar_t** argv){
-    const bool full=argc==2&&wcscmp(argv[1],L"--full-size")==0;
+    bool full=false,nativeEx=false;for(int i=1;i<argc;++i){full|=wcscmp(argv[i],L"--full-size")==0;nativeEx|=wcscmp(argv[i],L"--native-ex")==0;}
+    if(nativeEx)SetEnvironmentVariableW(L"BF2142VR_GPU_TRANSFER",L"dx9ex");
     const UINT w=full?2528:320,h=full?2704:240;
     HWND window=CreateWindowExW(0,L"STATIC",L"Hidden GPU publication check",WS_OVERLAPPED,0,0,320,240,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
     Require(window!=nullptr,"window");
     ComPtr<IDirect3D9> api;api.Attach(bf2142::CreateGpuTransferFactory(D3D_SDK_VERSION));Require(bool(api),"9on12 factory");
     D3DPRESENT_PARAMETERS p{};p.Windowed=TRUE;p.hDeviceWindow=window;p.BackBufferWidth=w;p.BackBufferHeight=h;p.BackBufferFormat=D3DFMT_X8R8G8B8;p.SwapEffect=D3DSWAPEFFECT_DISCARD;p.MultiSampleType=D3DMULTISAMPLE_8_SAMPLES;p.PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;
-    ComPtr<IDirect3DDevice9> d;Check(api->CreateDevice(0,D3DDEVTYPE_HAL,window,D3DCREATE_HARDWARE_VERTEXPROCESSING,&p,&d),"device");
-    ComPtr<IDirect3DDevice9On12> interop;Check(d.As(&interop),"interop");
-    ComPtr<ID3D12Device> d12;Check(interop->GetD3D12Device(IID_PPV_ARGS(&d12)),"underlying device");
+    ComPtr<IDirect3DDevice9> d;ComPtr<IDirect3DDevice9Ex> deviceEx;LUID adapterLuid{};
+    if(nativeEx){
+        ComPtr<IDirect3D9Ex> apiEx;Check(api.As(&apiEx),"Ex factory");
+        Check(apiEx->CreateDeviceEx(0,D3DDEVTYPE_HAL,window,D3DCREATE_HARDWARE_VERTEXPROCESSING,&p,nullptr,&deviceEx),"native Ex device");d=deviceEx;
+        Check(apiEx->GetAdapterLUID(0,&adapterLuid),"native adapter");
+        Require(MH_Initialize()==MH_OK&&bf2142::InstallNativeExResources(d.Get(),nullptr),"managed compatibility");
+    }else{
+        Check(api->CreateDevice(0,D3DDEVTYPE_HAL,window,D3DCREATE_HARDWARE_VERTEXPROCESSING,&p,&d),"device");
+        ComPtr<IDirect3DDevice9On12> interop;Check(d.As(&interop),"interop");
+        ComPtr<ID3D12Device> d12;Check(interop->GetD3D12Device(IID_PPV_ARGS(&d12)),"underlying device");adapterLuid=d12->GetAdapterLuid();
+    }
     shared::SharedTextureRequirements requirements{};
-    requirements.adapterLuid=d12->GetAdapterLuid();requirements.format=DXGI_FORMAT_B8G8R8A8_UNORM;
+    requirements.adapterLuid=adapterLuid;requirements.format=DXGI_FORMAT_B8G8R8A8_UNORM;
     requirements.leftWorldWidth=requirements.rightWorldWidth=requirements.uiWidth=w;
     requirements.leftWorldHeight=requirements.rightWorldHeight=requirements.uiHeight=h;
     shared::SharedTextureProducer producer;
@@ -78,7 +89,7 @@ int wmain(int argc,wchar_t** argv){
             }
         }
         Check(d->SetRenderTarget(0,back.Get()),"restore backbuffer");hud.Reset();back.Reset();gpu.Reset();
-        Check(d->Reset(&p),"D3D9 reset after shared resources released");
+        Check(deviceEx?deviceEx->ResetEx(&p,nullptr):d->Reset(&p),"D3D9 reset after shared resources released");
         Check(managed->LockRect(0,&lock,nullptr,D3DLOCK_READONLY),"managed lock after reset");
         Require(*static_cast<DWORD*>(lock.pBits)==0xabcdef01,"managed content survived reset");Check(managed->UnlockRect(0),"unlock");
     }

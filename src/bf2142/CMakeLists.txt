@@ -412,12 +412,17 @@ set_property(TARGET BF2142VRGpuTransferSmoke PROPERTY MSVC_RUNTIME_LIBRARY "Mult
 target_link_libraries(BF2142VRGpuTransferSmoke PRIVATE d3d9 d3d11 d3d12 dxgi user32)
 
 foreach(target BF2142VRClient BF2142VRStereoIntegrationSmoke)
- target_sources(${target} PRIVATE GpuFrameTransfer.cpp ../presenter/SharedTextureProducerGpu.cpp)
+ target_sources(${target} PRIVATE GpuFrameTransfer.cpp NativeExResources.cpp ../presenter/SharedTextureProducerGpu.cpp)
 endforeach()
 
-add_executable(BF2142VRGpuPublicationSmoke GpuPublicationSmoke.cpp GpuFrameTransfer.cpp ../presenter/SharedTextureProducer.cpp ../presenter/SharedTextureProducerGpu.cpp ../presenter/D3DSystemRuntime.cpp)
+add_executable(BF2142VRGpuPublicationSmoke GpuPublicationSmoke.cpp NativeExResources.cpp GpuFrameTransfer.cpp ../presenter/SharedTextureProducer.cpp ../presenter/SharedTextureProducerGpu.cpp ../presenter/D3DSystemRuntime.cpp)
 target_include_directories(BF2142VRGpuPublicationSmoke PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_compile_definitions(BF2142VRGpuPublicationSmoke PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
 target_compile_options(BF2142VRGpuPublicationSmoke PRIVATE /W4 /permissive-)
 set_property(TARGET BF2142VRGpuPublicationSmoke PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-target_link_libraries(BF2142VRGpuPublicationSmoke PRIVATE d3d9 d3d11 dxgi user32)
+target_link_libraries(BF2142VRGpuPublicationSmoke PRIVATE minhook d3d9 d3d11 dxgi user32)
+
+add_executable(BF2142VRNativeExSmoke NativeExSmoke.cpp NativeExResources.cpp)
+target_link_libraries(BF2142VRNativeExSmoke PRIVATE minhook d3d9 user32)
+target_compile_definitions(BF2142VRNativeExSmoke PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+target_compile_options(BF2142VRNativeExSmoke PRIVATE /W4 /permissive-)

@@ -9,6 +9,8 @@
 #include "NativeOptics.h"
 #include "FrameCapture.h"
 #include "GrenadeArc.h"
+#include "GpuFrameTransfer.h"
+#include "NativeExResources.h"
 #include <MinHook.h>
 #include <wrl/client.h>
 #include <d3d9on12.h>
@@ -152,8 +154,10 @@ void ClearControllerCommand(){}
 }
 int wmain(int argc,wchar_t** argv) {
     bool gpuFixture=false;for(int i=1;i<argc;++i)gpuFixture|=wcscmp(argv[i],L"--gpu-transfer")==0;
-    if(gpuFixture)SetEnvironmentVariableW(L"BF2142VR_GPU_TRANSFER",L"1");
-    bool on12=gpuFixture;for(int i=1;i<argc;++i)on12|=wcscmp(argv[i],L"--on12")==0;
+    bool nativeEx=false;for(int i=1;i<argc;++i)nativeEx|=wcscmp(argv[i],L"--native-ex")==0;
+    gpuFixture|=nativeEx;
+    if(gpuFixture)SetEnvironmentVariableW(L"BF2142VR_GPU_TRANSFER",nativeEx?L"dx9ex":L"1");
+    bool on12=gpuFixture&&!nativeEx;for(int i=1;i<argc;++i)on12|=wcscmp(argv[i],L"--on12")==0;
     bool msaa=false;for(int i=1;i<argc;++i){msaa|=wcscmp(argv[i],L"--msaa")==0;scopeFixture|=wcscmp(argv[i],L"--scope")==0;reflexFixture|=wcscmp(argv[i],L"--reflex")==0;desktopFixture|=wcscmp(argv[i],L"--desktop")==0;solidFixture|=wcscmp(argv[i],L"--solid")==0;}
     bool msaa8=false;for(int i=1;i<argc;++i){nativeAaOff|=wcscmp(argv[i],L"--native-aa-off")==0;msaa8|=wcscmp(argv[i],L"--msaa8")==0;}
     const unsigned passes=scopeFixture?3u:2u;
@@ -174,8 +178,9 @@ int wmain(int argc,wchar_t** argv) {
     }
     HWND window=CreateWindowExW(0,L"STATIC",L"Hidden stereo integration check",WS_OVERLAPPED,0,0,320,240,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
     Microsoft::WRL::ComPtr<IDirect3D9> factory;
-    if(on12){
-        // Developer-only backend compatibility probe. No production selection.
+    if(nativeEx)factory.Attach(bf2142::CreateGpuTransferFactory(D3D_SDK_VERSION));
+    else if(on12){
+        // Developer-only backend compatibility probe.
         const auto runtime=LoadLibraryExW(L"d3d9.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
         const auto create=runtime?reinterpret_cast<PFN_Direct3DCreate9On12>(GetProcAddress(runtime,"Direct3DCreate9On12")):nullptr;
         if(!create){puts("D3D9On12 factory unavailable.");return 77;}
@@ -188,12 +193,18 @@ int wmain(int argc,wchar_t** argv) {
     if(msaa){p.MultiSampleType=D3DMULTISAMPLE_4_SAMPLES;p.EnableAutoDepthStencil=TRUE;p.AutoDepthStencilFormat=D3DFMT_D24S8;}
     bool hardware=false;for(int i=1;i<argc;++i)hardware|=wcscmp(argv[i],L"--hardware")==0;
     if(msaa8)p.MultiSampleType=D3DMULTISAMPLE_8_SAMPLES;
-    if(!factory || FAILED(factory->CreateDevice(0,D3DDEVTYPE_HAL,window,hardware?D3DCREATE_HARDWARE_VERTEXPROCESSING:D3DCREATE_SOFTWARE_VERTEXPROCESSING,&p,&device)))return 77;
+    if(!factory)return 77;
+    const DWORD creation=hardware?D3DCREATE_HARDWARE_VERTEXPROCESSING:D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+    if(nativeEx){
+        Microsoft::WRL::ComPtr<IDirect3D9Ex> apiEx;IDirect3DDevice9Ex* d=nullptr;
+        if(FAILED(factory.As(&apiEx))||FAILED(apiEx->CreateDeviceEx(0,D3DDEVTYPE_HAL,window,creation,&p,nullptr,&d)))return 77;device=d;
+    }else if(FAILED(factory->CreateDevice(0,D3DDEVTYPE_HAL,window,creation,&p,&device)))return 77;
     if(on12){
         Microsoft::WRL::ComPtr<IDirect3DDevice9On12> interop;
         if(FAILED(device->QueryInterface(IID_PPV_ARGS(&interop)))){puts("Requested backend was not activated.");return 1;}
     }
     if(MH_Initialize()!=MH_OK)return 1;
+    if(nativeEx&&!bf2142::InstallNativeExResources(device,Log))return 1;
     auto** table=*reinterpret_cast<void***>(device);
     if(MH_CreateHook(table[17],reinterpret_cast<void*>(&PresentHook),reinterpret_cast<void**>(&nativePresent))!=MH_OK || MH_EnableHook(table[17])!=MH_OK)return 2;
     if(!bf2142::StartStereo(desktopFixture?L"@desktop":L"@diagnostic",prefix,Log))return 3;
