@@ -1,6 +1,7 @@
 #include "StereoSession.h"
 #include "RenderProfile.h"
 #include "FramePixels.h"
+#include "GpuFrameTransfer.h"
 #include "LaunchOptions.h"
 #include "FrameCapture.h"
 #include "NativeUiCapture.h"
@@ -47,6 +48,9 @@ using Microsoft::WRL::ComPtr;
 shared::SharedControlChannel channel;
 shared::SharedTextureProducer producer;
 FrameCapture capture;
+GpuFrameTransfer gpuFrames;
+bool gpuRequested=false,gpuAttempted=false,gpuReady=false,gpuPair=false;
+unsigned gpuPublished=0;
 EyeRestore eyeRestore;MenuRoomGpu menuRoomGpu;
 std::vector<DWORD> scopePixels;
 bool opticsReady=false;
@@ -140,6 +144,9 @@ bool PrepareTransport() {
         colorFormat!=DXGI_FORMAT_R8G8B8A8_UNORM && colorFormat!=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB) {
         Fail("unsupported OpenXR color format"); return false;
     }
+    // Source transport can be BGRA even when the XR destination is RGBA.
+    // The established presenter already converts supported color formats.
+    if(gpuRequested)colorFormat=DXGI_FORMAT_B8G8R8A8_UNORM;
     shared::SharedTextureRequirements r{};
     r.adapterLuid={b->requirements.adapterLuidLow,b->requirements.adapterLuidHigh};
     r.minimumFeatureLevel=static_cast<D3D_FEATURE_LEVEL>(b->requirements.minimumFeatureLevel);
@@ -343,28 +350,65 @@ bool ReadFrame(std::vector<DWORD>& output) {
     }
     return true;
 }
+bool BeginGpuPair(){
+    if(!gpuRequested||diagnostic||menuPointer.Active())return false;
+    if(!gpuAttempted){
+        gpuAttempted=true;
+        const auto hr=gpuFrames.Initialize(gameDevice,width,height,desktop?nullptr:producer.Device());
+        gpuReady=SUCCEEDED(hr);
+        logger("Experimental GPU frame transport: ready=%d hr=0x%08lX; %ux%u; CPU scope/menu fallback retained.",gpuReady,hr,width,height);
+    }
+    return gpuReady;
+}
+bool ReadGpuEyes(){
+    if(!gpuPair)return true;
+    auto timing=renderProfile.Measure(RenderProfile::EyeReadback);
+    for(unsigned eye=0;eye<2;++eye){
+        const auto hr=capture.ReadSurface(gameDevice,gpuFrames.Surface(eye),colorFormat,pixels[eye]);
+        if(FAILED(hr)){Fail("GPU snapshot read for native optic/guide",hr);return false;}
+    }
+    gpuPair=false;return true;
+}
 void Publish(bool world) {
     auto profile=renderProfile.Measure(RenderProfile::Publish);
     auto* b=channel.Get();
+    const bool gpu=world&&gpuPair;
     if(!world && lastRequestMainMenu && settings.menuRoom && !diagnostic){
         // A failed optional backdrop retains the native background; no slow
         // CPU fallback is inserted into the user's VR frame loop.
         (void)menuRoomGpu.Draw(gameDevice,pixels[0],pixels[1],width,height,colorFormat,request,menuPointer.Anchor());
     }
-    if(menuPointer.Active() && !diagnostic)controlsMenu.Draw(pixels[2],width,height,colorFormat,settings,widescreenUi);
-    menuPointer.Draw(pixels[0],pixels[1],pixels[2],colorFormat,request);
-    std::array<shared::SharedTexturePixels,shared::kTextureCount> frame{};
-    for (size_t i=0;i<frame.size();++i) frame[i]={pixels[i].data(),width*4,width,height,colorFormat};
-    if (!diagnostic && !desktop && !producer.PublishFrame(frame)) { Fail("shared stereo texture upload"); return; }
-    if(desktop){
+    if(gpu){
+        if(desktop){
+            if(!eyeRestore.DrawTexture(gameDevice,gpuFrames.Texture(0)) || (uiReady&&!uiCapture.CompositeDesktop())){
+                Fail("GPU desktop eye/HUD composite");return;
+            }
+        }else{
+            const auto hr=gpuFrames.Export();
+            if(FAILED(hr)||!producer.PublishGpuFrame(gpuFrames.Exported())){Fail("GPU stereo export/publication",FAILED(hr)?hr:E_FAIL);return;}
+        }
+        ++gpuPublished;
+        if(gpuPublished==1)logger("GPU stereo publication active: no world/UI pixel readback on this frame.");
+    }else{
+        if(menuPointer.Active() && !diagnostic)controlsMenu.Draw(pixels[2],width,height,colorFormat,settings,widescreenUi);
+        menuPointer.Draw(pixels[0],pixels[1],pixels[2],colorFormat,request);
+        std::array<shared::SharedTexturePixels,shared::kTextureCount> frame{};
+        for (size_t i=0;i<frame.size();++i) frame[i]={pixels[i].data(),width*4,width,height,colorFormat};
+        if (!diagnostic && !desktop && !producer.PublishFrame(frame)) { Fail("shared stereo texture upload"); return; }
+    }
+    if(desktop&&!gpu){
         if(world)desktopPixels=pixels[0];else desktopPixels.assign(size_t(width)*height,0xff000000);
         BlendDesktopHud(desktopPixels.data(),pixels[2].data(),desktopPixels.size());
-        if(!eyeRestore.Draw(gameDevice,desktopPixels,width,height,colorFormat)){Fail("desktop VR composite");return;}
+        if(!eyeRestore.Draw(gameDevice,desktopPixels,width,height,colorFormat)){logger("Desktop composite failed at %s hr=0x%08lX.",eyeRestore.LastStage(),eyeRestore.LastResult());Fail("desktop VR composite",eyeRestore.LastResult());return;}
     }
     if(desktop){
         DWORD focused=0;GetWindowThreadProcessId(GetForegroundWindow(),&focused);
         const bool captureNow=focused==GetCurrentProcessId() && (GetAsyncKeyState(VK_F12)&0x8000);
         if(captureNow && !desktopCaptureHeld){
+            if(gpu){
+                if(!ReadGpuEyes())return;
+                if(FAILED(capture.ReadSurface(gameDevice,gpuFrames.Surface(2),colorFormat,pixels[2],true)))return;
+            }
             SaveDiagnosticFrame(diagnosticPrefix+L"-desktop-left.bmp",width,height,pixels[0]);
             SaveDiagnosticFrame(diagnosticPrefix+L"-desktop-right.bmp",width,height,pixels[1]);
             SaveDiagnosticFrame(diagnosticPrefix+L"-desktop-ui.bmp",width,height,pixels[2]);
@@ -398,7 +442,7 @@ void Publish(bool world) {
             for(size_t i=0;i<pixels.size();++i) SaveDiagnosticFrame(diagnosticPrefix+L"-"+std::to_wstring(pairs)+L"-"+std::to_wstring(i)+L".bmp",width,height,pixels[i]);
             logger("Diagnostic eye/UI images saved at pair %lu.",pairs);
         }
-        if (pairs==1 || pairs==120) {
+        if (!gpu && (pairs==1 || pairs==120)) {
             size_t different=0;
             for (size_t i=0;i<pixels[0].size();++i) different+=pixels[0][i]!=pixels[1][i];
             logger("Stereo pair=%lu sequence=%ld differing-eye-pixels=%zu; head=(%.3f,%.3f,%.3f).",
@@ -410,7 +454,7 @@ void Publish(bool world) {
 struct CameraScope { ~CameraScope() { EndNativeEye(); } };
 }
 bool StartStereo(const std::wstring& presenter,const std::wstring& log,LogFunction logCallback) {
-    logger=logCallback;renderProfile.Initialize(logger);
+    logger=logCallback;renderProfile.Initialize(logger);gpuRequested=GpuTransferRequested();
     settings=LoadVrSettings(log);
     wchar_t canvasRequest[64]{};widescreenUi=GetEnvironmentVariableW(L"BF2142VR_RENDER_CANVAS",canvasRequest,64)>0;
     if(!settings.lobbySceneFile.empty())logger("Private walker lobby assets: %s.",menuRoomGpu.LoadScene(settings.lobbySceneFile)?"loaded":"unavailable; basic room retained");
@@ -474,6 +518,7 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
     delta=renderTime.Take(delta);
     if(pairs==1)logger("Native renderer time argument retained: %.6f, interpolation=%.6f.",delta,double(interpolation));
     opticHudReady=false;opticHudPixels.clear();
+    gpuPair=BeginGpuPair();
     insideRender=true;
     struct RenderScope { ~RenderScope() { insideRender=false; activeEye=-1; } } rendering;
     bool result=false, rendered=false;
@@ -501,19 +546,25 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
                 rendered=true;
                 if(!ReadNativeEyeCamera(&eyeCameras[eye]))return result;
             }
-            if (!ReadFrame(pixels[eye])) return result;
+            if(gpuPair){
+                auto timing=renderProfile.Measure(RenderProfile::EyeReadback);
+                const auto hr=gpuFrames.StageBackbuffer(unsigned(eye));
+                if(FAILED(hr)){Fail("GPU eye snapshot",hr);return result;}
+            }else if (!ReadFrame(pixels[eye])) return result;
         }
         if(!diagnostic && opticsReady)UpdateAutomaticAds(eyeCameras);
-        {auto timing=renderProfile.Measure(RenderProfile::OpticHud);
-            if(opticHudReady&&uiCapture.Read(colorFormat,opticHudBaseline)&&uiCapture.ReadOptic(colorFormat,opticHudPixels))
-                IsolateOpticHud(opticHudPixels,opticHudBaseline,width,height);
-            else opticHudPixels.clear();
-        }
         GunOptic optic;
         // Diagnostic fixtures can supply a synthetic native optic. Ordinary
         // diagnostic game runs have no hand adapter and always return false.
         if((opticsReady || diagnostic) && !menuPointer.Active() && ReadNativeOptic(&optic)){
             const auto scope=MakeOpticView(optic,eyeCameras);
+            if(scope){
+                if(!ReadGpuEyes())return result;
+                auto timing=renderProfile.Measure(RenderProfile::OpticHud);
+                if(opticHudReady&&uiCapture.Read(colorFormat,opticHudBaseline)&&uiCapture.ReadOptic(colorFormat,opticHudPixels))
+                    IsolateOpticHud(opticHudPixels,opticHudBaseline,width,height);
+                else opticHudPixels.clear();
+            }
             if(scope && optic.magnification<=1.01f){
                 // Reflex glass retains the normal stereo world. Only draw the
                 // sight's collimated dot; never re-render or magnify this eye.
@@ -544,6 +595,7 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
         if(settings.grenadeArc && !menuPointer.Active()){
             GrenadeTrajectory arc;
             if(ReadNativeGrenadeTrajectory(&arc)){
+                if(!ReadGpuEyes())return result;
                 for(unsigned eye=0;eye<2;++eye)DrawGrenadeArc(pixels[eye],width,height,colorFormat,eyeCameras[eye],arc);
                 eyeRestore.Draw(gameDevice,pixels[0],width,height,colorFormat);
             }
@@ -623,8 +675,14 @@ void StereoPresent(IDirect3DDevice9* device) {
         if (pairReady) {
             pairReady=false;
             if (!Healthy()) return;
-            if (uiReady) {auto timing=renderProfile.Measure(RenderProfile::UiReadback);uiReady=uiCapture.Read(colorFormat,pixels[2]) && pixels[2].size()==size_t(width)*height;}
-            if (!uiReady) pixels[2].assign(size_t(width)*height,0);
+            if(gpuPair){
+                auto timing=renderProfile.Measure(RenderProfile::UiReadback);
+                const auto hr=gpuFrames.Stage(2,uiReady?uiCapture.Surface():nullptr);
+                if(FAILED(hr)){Fail("GPU UI snapshot",hr);return;}
+            }else{
+                if (uiReady) {auto timing=renderProfile.Measure(RenderProfile::UiReadback);uiReady=uiCapture.Read(colorFormat,pixels[2]) && pixels[2].size()==size_t(width)*height;}
+                if (!uiReady) pixels[2].assign(size_t(width)*height,0);
+            }
             if (pairs==0 || pairs==119) logger("Stereo boundary: suppressed presents=%u, HUD isolated=%d.",suppressedPresents,uiReady);
             Publish(true);
             if (uiReady && !desktop) uiCapture.CompositeDesktop();
@@ -656,6 +714,7 @@ void StereoPresent(IDirect3DDevice9* device) {
     } catch (...) { Fail("stereo presentation allocation or runtime exception"); }
 }
 void StereoReset() {
+    gpuFrames.Reset();gpuReady=false;gpuAttempted=false;gpuPair=false;
     renderTime.Reset();opticHudReady=false;opticHudPixels.clear();opticHudBaseline.clear();
     RestoreFramePacing();
     RecenterNativeVehicle();traversalControls.Reset();weaponGrip.Reset();SetNativeWeaponHeld(true);controlsMenu.Reset();physicalStance.Reset();ConfigurePhysicalCamera(false);standingHeight.Reset();
@@ -671,7 +730,8 @@ void StereoReset() {
 
 
 #ifdef BF2142_GPU_FIXTURE
-namespace bfvr::bf2142 {void TestHoldStereoConsumer(bool hold){
+namespace bfvr::bf2142 {unsigned TestGpuPublished(){return gpuPublished;}
+void TestHoldStereoConsumer(bool hold){
  if(auto* b=channel.Get())InterlockedExchange(&b->consumedFrameSequence,ReadCounter(b->frameSequence)-(hold?1:0));
 }}
 #endif

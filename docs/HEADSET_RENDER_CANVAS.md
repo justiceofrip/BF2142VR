@@ -151,8 +151,8 @@ Manual developer probes (hidden windows, no game or headset):
 The --on12 switch selects the system factory only inside this standalone fixture.
 Native HUD isolation, distinct stereo eyes, animation time ownership, paused UI,
 scope restore and reflex desktop composition pass on that backend. Both builds
-and all 75 Win32 CTests pass. No player backend selection or runtime GPU transport
-has been implemented in this checkpoint. The accepted launcher and release are
+and all 75 Win32 CTests pass. At that feasibility checkpoint no player backend selection or runtime GPU
+transport had been implemented; the next section records the later integration. The accepted launcher and release are
 unchanged; do not distribute this as a performance fix.
 
 Remaining integration work must preserve CPU-composited scopes, grenade guides,
@@ -163,3 +163,54 @@ device reset, native shader compatibility, adapter matching, map transitions and
 failure fallback before a headset playtest. Keep engine timing and IK unchanged.
 144 FPS requires the entire frame, including native rendering and presentation,
 to fit within about 6.94 ms; this experiment measures only one part of that work.
+
+
+## Integrated candidate: native compatibility failure (not release ready)
+
+`BF2142VR_GPU_TRANSFER=1` is now an explicit developer-only opt-in. No launcher
+or installer enables it. It loads the system Direct3DCreate9On12 factory;
+ordinary launches retain their original D3D9 factory. The experimental device
+omits PUREDEVICE because overlays query and restore render state.
+
+GpuFrameTransfer snapshots both eyes and HUD on the GPU, resolves multisampling,
+and unwraps into a matching-adapter D3D12 queue. Separate shared exports return
+to COMMON; the D3D9 owner receives the completion fence. Export waits before
+D3D11 reads. SharedTextureProducerGpu validates all sources before acquiring
+the existing keyed mutexes, copies, and waits for a D3D11 event query before
+publishing key 1. Flush alone is insufficient. Reset releases these resources
+before the game device reset. Shared layouts and networking are unchanged.
+
+Menus/custom pointers, magnified scopes/reflex composition and grenade guides
+retain their CPU path. A desktop GPU frame displays the captured eye and native
+HUD without CPU pixel readback. Failed export/publication stops stereo; it does
+not hand over stale textures. Failed initialization retains the CPU transfer
+path on the selected device; it cannot switch the live game's backend.
+
+Additional hidden probes passed:
+
+```powershell
+.\BF2142VRGpuPublicationSmoke.exe --full-size
+.\BF2142VRStereoIntegrationSmoke.exe --gpu-transfer --desktop --msaa --hardware
+.\BF2142VRStereoIntegrationSmoke.exe --gpu-transfer --desktop --msaa --msaa8 --hardware --native-aa-off
+.\BF2142VRStereoIntegrationSmoke.exe --gpu-transfer --desktop --msaa --scope
+.\BF2142VRStereoIntegrationSmoke.exe --gpu-transfer --desktop --msaa --reflex
+```
+
+Publication coverage uses an independent D3D11 receiver and checks every current
+pixel/alpha, blank HUD, incomplete-frame rejection, alternating CPU/GPU frames,
+reset and preserved managed-texture data. Scope/reflex fixtures verify CPU
+fallback. Win32 builds and all 75 CTests pass; the x64 presenter builds.
+
+Actual game checks did **not** pass. At 2528x2704 / 8x MSAA, the experimental
+backend produces white rectangular dynamic map-name glyphs and EyeRestore's
+DrawPrimitiveUP returns E_FAIL after login. Same settings with ordinary D3D9
+produce readable map names, retaining roughly 26 FPS. This isolates a backend
+compatibility regression but does not identify its cause. Removing PUREDEVICE
+did not help; native ValidateDevice passed and secondary render targets were
+unbound. Hardware vertex processing and a disabled MULTISAMPLEANTIALIAS state
+alone do not reproduce it in the hidden fixture. Native menu text proportions
+are a separate outstanding canvas issue.
+
+Optional `BF2142VR_GPU_DEBUG=1` records the failing draw's bounded state dump.
+Keep the candidate private and opt-in. Fix native font/draw compatibility before
+requesting a headset test. No native-game GPU-path speedup or 144 FPS is verified.

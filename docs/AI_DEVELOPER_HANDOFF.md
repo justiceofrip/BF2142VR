@@ -1,12 +1,27 @@
 # BFVR AI and Developer Handoff
 
-## GPU transport investigation (unreleased)
+## GPU transport integration: blocked native compatibility (unreleased)
 
-The larger canvas is still too slow after pixel-loop optimization. Hidden
-D3D9On12/D3D11 sharing and existing HUD/scope fixtures passed; no player runtime
-backend has changed. See the comparison and feasibility section of
-HEADSET_RENDER_CANVAS.md. Do not confuse the 1.6-1.8 ms synthetic GPU transfer
-with measured BF2142 frame time. Production integration and headset checks remain.
+Explicit `BF2142VR_GPU_TRANSFER=1` now selects the system D3D9On12 factory and
+GPU snapshot/export/publication path. It is OFF by default. The accepted normal
+launcher and release payload remain unchanged. Do not enable it for players.
+
+Hidden hardware fixtures pass including 2528x2704, 8x MSAA, independent D3D11
+receiver pixel checks, CPU/GPU publication transitions and device reset. Actual
+BF2142 fails EyeRestore's DrawPrimitiveUP with E_FAIL after login, stopping the
+desktop stereo path. Dynamic map names also become white rectangles. An A/B at
+the identical canvas and AA with ordinary D3D9 rendered those names correctly.
+The experimental backend, rather than the map files, is implicated; root cause
+is unresolved. Removing PUREDEVICE did not fix either symptom. Native ValidateDevice
+returns S_OK; no secondary render targets are bound. Matching hardware vertex
+processing and disabled MSAA render state in the hidden fixture still passes.
+
+`BF2142VR_GPU_DEBUG=1` enables bounded failure-state logging only. No expensive
+diagnostics, backend selection, or source-size change is enabled in normal play.
+The last diagnostic game was closed normally. No headset acceptance or native
+GPU-path FPS result exists. See HEADSET_RENDER_CANVAS.md for ownership details.
+Next: resolve native draw/font compatibility before a headset test. Do not
+claim the synthetic 1.6-1.8 ms transfer measurement is BF2142 frame time.
 
 ## Opt-in headset canvas experiment (unreleased)
 

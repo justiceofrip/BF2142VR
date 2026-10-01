@@ -47,6 +47,8 @@ public:
         void* logContext);
     bool PublishSyntheticFrame(DWORD frameIndex, bool brightWorld = false);
     bool PublishFrame(const std::array<SharedTexturePixels, kTextureCount>& frame);
+    bool PublishGpuFrame(const std::array<ID3D11Texture2D*, kTextureCount>& frame);
+    ID3D11Device* Device() const noexcept { return device_; } // borrowed
     void CopyDescriptions(SharedTextureDescription* destination, std::size_t count) const;
     void Shutdown();
 
@@ -72,6 +74,7 @@ private:
     void WriteLog(const wchar_t* format, ...) const;
     void ReleaseTexture(Texture& texture);
 
+    ID3D11Query* gpuCompletion_ = nullptr;
     ID3D11Device* device_ = nullptr;
     ID3D11DeviceContext* context_ = nullptr;
     D3D_FEATURE_LEVEL featureLevel_ = D3D_FEATURE_LEVEL_9_1;

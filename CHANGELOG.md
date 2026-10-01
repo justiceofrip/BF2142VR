@@ -1,5 +1,13 @@
 # BFVR Changelog
 
+## Unreleased: GPU transport compatibility experiment
+
+- Add an explicitly opt-in GPU transport candidate with CPU fallbacks for scopes,
+  menu composition and grenade guides. Normal launches keep the accepted backend.
+- Hidden publication/reset checks pass, but native-game testing found white-block
+  map labels and a failed desktop composite. Original-backend A/B restores the
+  labels at identical resolution. This candidate is not ready for distribution.
+
 ## Unreleased: opt-in headset source canvas
 
 - Initial larger-canvas playtest was rejected for severe slowdown; keep it opt-in.

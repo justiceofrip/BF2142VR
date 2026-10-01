@@ -1,4 +1,5 @@
 #include "StereoSession.h"
+#include "GpuFrameTransfer.h"
 #include "NativeAntialiasing.h"
 #include "NativeRenderCanvas.h"
 #include "VrSettings.h"
@@ -24,6 +25,7 @@ SRWLOCK logLock = SRWLOCK_INIT;
 SRWLOCK hookLock = SRWLOCK_INIT;
 std::atomic<bool> started = false;
 bool networkObserver = false;
+bool gpuBackend = false;
 unsigned requestedWorldSamples=0;bool runtimePacing=false;
 std::atomic<bool> alternateImplementationLogged = false;
 std::atomic<unsigned long> presentations = 0;
@@ -242,6 +244,8 @@ HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
 HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
     D3DDEVTYPE type, HWND window, DWORD behavior,
     D3DPRESENT_PARAMETERS* parameters, IDirect3DDevice9** output) {
+    // The interop overlays query and restore state; pure devices cannot do that.
+    if(gpuBackend){behavior&=~D3DCREATE_PUREDEVICE;bfvr::bf2142::ConfigureGpuDiagnostics(Log);}
     bfvr::bf2142::ConfigureRenderCanvas(parameters,window);
     D3DPRESENT_PARAMETERS saved{};bool changed=false;
     if(parameters){saved=*parameters;changed=bfvr::bf2142::SelectWorldSamples(factory,adapter,type,requestedWorldSamples,*parameters);}
@@ -281,7 +285,9 @@ HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
     return result;
 }
 IDirect3D9* WINAPI Create9Hook(UINT version) {
-    IDirect3D9* factory = originalCreate9(version);
+    IDirect3D9* factory = gpuBackend ? bfvr::bf2142::CreateGpuTransferFactory(version) : nullptr;
+    if(gpuBackend)Log("Experimental D3D9On12 factory: %s",factory?"active":"unavailable; ordinary D3D9 retained");
+    if(!factory)factory=originalCreate9(version);
     Log("Direct3DCreate9 sdk=%u success=%d", version, factory != nullptr);
     if (factory) {
         void** table = *reinterpret_cast<void***>(factory);
@@ -323,6 +329,7 @@ extern "C" DWORD WINAPI BF2142VRInitialize(void* parameter) {
         reinterpret_cast<void**>(&originalCreate9), create9Target)) return 0;
     Log("Direct3DCreate9 connection installed.");
     networkObserver=presenter==L"@observer";
+    gpuBackend=!presenter.empty()&&!networkObserver&&bfvr::bf2142::GpuTransferRequested();
     if(!networkObserver&&!bfvr::bf2142::InstallRenderCanvas(Log))return 0;
     runtimePacing=!presenter.empty()&&presenter.front()!=L'@';
     if(!presenter.empty()&&!networkObserver)requestedWorldSamples=bfvr::bf2142::LoadVrSettings(logPath).worldSamples;

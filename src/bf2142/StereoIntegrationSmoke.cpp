@@ -19,12 +19,12 @@
 #include <fstream>
 #include <vector>
 using namespace bfvr;
-namespace bfvr::bf2142 {void TestHoldStereoConsumer(bool);}
+namespace bfvr::bf2142 {void TestHoldStereoConsumer(bool);unsigned TestGpuPublished();}
 namespace {
 IDirect3DDevice9* device=nullptr;
 bf2142::EyeCamera currentEye{};
 unsigned renders=0,presents=0,advances=0,suppressed=0,recenters=0;
-bool valid=true,scopeFixture=false,reflexFixture=false,desktopFixture=false,solidFixture=false,hiddenWeapon=false;
+bool nativeAaOff=false,valid=true,scopeFixture=false,reflexFixture=false,desktopFixture=false,solidFixture=false,hiddenWeapon=false;
 std::vector<DWORD> lastDesktop;
 double expectedNativeTime=1.0/60;
 using Present=HRESULT(STDMETHODCALLTYPE*)(IDirect3DDevice9*,const RECT*,const RECT*,HWND,const RGNDATA*);
@@ -77,6 +77,7 @@ bool __fastcall Scene(void*,void*,double delta,float) {
         D3DRECT hud{0,0,40,20};device->Clear(1,&hud,D3DCLEAR_TARGET,0xff00ff00,1,0);
         bf2142::StereoHudEnd();
     } else valid=false;
+    if(nativeAaOff)device->SetRenderState(D3DRS_MULTISAMPLEANTIALIAS,FALSE);
     valid=SUCCEEDED(device->EndScene()) && valid;
     // Model a native renderer that presents internally. The stereo loop must
     // hold both of these calls until readback, then present once for the pair.
@@ -150,8 +151,11 @@ void PublishControllerCommand(const ControllerCommand&,bool){}
 void ClearControllerCommand(){}
 }
 int wmain(int argc,wchar_t** argv) {
-    bool on12=false;for(int i=1;i<argc;++i)on12|=wcscmp(argv[i],L"--on12")==0;
+    bool gpuFixture=false;for(int i=1;i<argc;++i)gpuFixture|=wcscmp(argv[i],L"--gpu-transfer")==0;
+    if(gpuFixture)SetEnvironmentVariableW(L"BF2142VR_GPU_TRANSFER",L"1");
+    bool on12=gpuFixture;for(int i=1;i<argc;++i)on12|=wcscmp(argv[i],L"--on12")==0;
     bool msaa=false;for(int i=1;i<argc;++i){msaa|=wcscmp(argv[i],L"--msaa")==0;scopeFixture|=wcscmp(argv[i],L"--scope")==0;reflexFixture|=wcscmp(argv[i],L"--reflex")==0;desktopFixture|=wcscmp(argv[i],L"--desktop")==0;solidFixture|=wcscmp(argv[i],L"--solid")==0;}
+    bool msaa8=false;for(int i=1;i<argc;++i){nativeAaOff|=wcscmp(argv[i],L"--native-aa-off")==0;msaa8|=wcscmp(argv[i],L"--msaa8")==0;}
     const unsigned passes=scopeFixture?3u:2u;
     wchar_t path[32768]{};GetModuleFileNameW(nullptr,path,32768);
     const auto folder=std::filesystem::path(path).parent_path()/L"stereo-gpu-check";
@@ -182,7 +186,9 @@ int wmain(int argc,wchar_t** argv) {
     D3DPRESENT_PARAMETERS p{};p.Windowed=TRUE;p.SwapEffect=D3DSWAPEFFECT_DISCARD;p.hDeviceWindow=window;
     p.BackBufferWidth=320;p.BackBufferHeight=240;p.PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;
     if(msaa){p.MultiSampleType=D3DMULTISAMPLE_4_SAMPLES;p.EnableAutoDepthStencil=TRUE;p.AutoDepthStencilFormat=D3DFMT_D24S8;}
-    if(!factory || FAILED(factory->CreateDevice(0,D3DDEVTYPE_HAL,window,D3DCREATE_SOFTWARE_VERTEXPROCESSING,&p,&device)))return 77;
+    bool hardware=false;for(int i=1;i<argc;++i)hardware|=wcscmp(argv[i],L"--hardware")==0;
+    if(msaa8)p.MultiSampleType=D3DMULTISAMPLE_8_SAMPLES;
+    if(!factory || FAILED(factory->CreateDevice(0,D3DDEVTYPE_HAL,window,hardware?D3DCREATE_HARDWARE_VERTEXPROCESSING:D3DCREATE_SOFTWARE_VERTEXPROCESSING,&p,&device)))return 77;
     if(on12){
         Microsoft::WRL::ComPtr<IDirect3DDevice9On12> interop;
         if(FAILED(device->QueryInterface(IID_PPV_ARGS(&interop)))){puts("Requested backend was not activated.");return 1;}
@@ -206,6 +212,11 @@ int wmain(int argc,wchar_t** argv) {
     valid=renders==beforeRenders&&presents==beforePresents&&advances==beforeAdvances&&valid;
     bf2142::TestHoldStereoConsumer(false);
     if(desktopFixture){
+        if(gpuFixture){
+            const auto fast=bf2142::TestGpuPublished();
+            valid=(fast==((scopeFixture||reflexFixture)?0u:60u))&&valid;
+            printf("GPU fixture: %u fast frames; scope/reflex CPU fallback preserved.\n",fast);
+        }
         valid=lastDesktop.size()==320u*240u && valid;
         if(!lastDesktop.empty())valid=lastDesktop.front()==0xff00ff00 && lastDesktop.back()==0xff102030 && Centroid(lastDesktop)>0 && valid;
         valid=renders==60*passes && advances==60 && suppressed==60*passes && presents==120 && valid;

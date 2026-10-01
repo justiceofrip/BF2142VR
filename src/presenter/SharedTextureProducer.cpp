@@ -253,6 +253,7 @@ void SharedTextureProducer::CopyDescriptions(
 
 void SharedTextureProducer::Shutdown()
 {
+    if (gpuCompletion_) { gpuCompletion_->Release(); gpuCompletion_ = nullptr; }
     for (Texture& texture : textures_)
     {
         ReleaseTexture(texture);
