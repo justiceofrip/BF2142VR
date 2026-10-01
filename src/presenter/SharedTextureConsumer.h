@@ -108,6 +108,7 @@ private:
     bool collectPerformanceDiagnostics_ = true;
     bool scalerRequired_ = false;
     bool fullEyeTextureFov_ = false;
+    bool widescreenUiCanvas_ = false;
     bool worldFxaaEnabled_ = true;
     float worldFxaaSharpeningStrength_ = 0.25F;
     bool worldBloomEnabled_ = false;

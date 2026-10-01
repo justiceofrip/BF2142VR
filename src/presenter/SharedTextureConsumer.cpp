@@ -218,6 +218,7 @@ bool SharedTextureConsumer::Initialize(
         0.0F,
         2.0F);
     fullEyeTextureFov_ = (producerFlags & kProducerFlagFullEyeTextureFov) != 0;
+    widescreenUiCanvas_ = (producerFlags & kProducerFlagWidescreenUiCanvas) != 0;
     if (fullEyeTextureFov_) WriteLog(L"Runtime-FOV eye textures fill each eye destination; UI retains aspect fit.");
     const bool ambientOcclusionRequested =
         (producerFlags & kProducerFlagAmbientOcclusionRequested) != 0;
@@ -696,7 +697,8 @@ bool SharedTextureConsumer::ConsumeFrame(
                 index != static_cast<std::size_t>(TextureSlot::Ref2Ui)
                     ? worldColorGrading_
                     : D3D11ColorGradingConfiguration{},
-                fullEyeTextureFov_ && index != static_cast<std::size_t>(TextureSlot::Ref2Ui)) && copied;
+                fullEyeTextureFov_ && index != static_cast<std::size_t>(TextureSlot::Ref2Ui),
+                widescreenUiCanvas_ && index == static_cast<std::size_t>(TextureSlot::Ref2Ui) ? 16.0F/9.0F : 0.0F) && copied;
         }
         else
         {
@@ -1023,6 +1025,7 @@ bool SharedTextureConsumer::ReadCenterPixels(DWORD* pixels, std::size_t count)
 void SharedTextureConsumer::Shutdown()
 {
     fullEyeTextureFov_ = false;
+    widescreenUiCanvas_ = false;
     (void)CompleteFrameConsumption();
     performanceSummary_.ReportFinal(logCallback_, logContext_);
     mainMenuOverlay_.Shutdown();
@@ -1248,7 +1251,8 @@ bool SharedTextureConsumer::OpenTexture(
         worldBloomEnabled_ &&
         index != static_cast<std::size_t>(TextureSlot::Ref2Ui);
     texture.requiresScaling =
-        texture.requiresScaling || texture.applyAntialiasing || texture.applyBloom;
+        texture.requiresScaling || texture.applyAntialiasing || texture.applyBloom ||
+        (widescreenUiCanvas_ && index == static_cast<std::size_t>(TextureSlot::Ref2Ui));
     scalerRequired_ = scalerRequired_ || texture.requiresScaling;
     WriteLog(
         transport == SharedTextureTransport::D3D9LegacyHandle

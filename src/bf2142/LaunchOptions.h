@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include "RenderCanvasPolicy.h"
 namespace bfvr::bf2142 {
 struct LaunchOptions {
     std::wstring gameDirectory;
@@ -13,6 +14,7 @@ struct LaunchOptions {
     bool help = false;
     bool windowed = false;
     unsigned renderWidth=0,renderHeight=0;
+    bool renderCanvas=false,headsetResolution=false;
     bool diagnosticStereo = false;
     bool desktopVr = false;
     bool networkObserver = false;
@@ -40,7 +42,10 @@ inline bool ParseOptions(const std::vector<std::wstring>& args,
         else if (args[i] == L"--diagnostic-stereo") result.diagnosticStereo = true;
         else if (args[i] == L"--desktop-vr") result.desktopVr = true;
         else if ((args[i] == L"--network-observer" || args[i] == L"--flat")) result.networkObserver = true;
-        else if (args[i] == L"--render-size") {
+        else if (args[i] == L"--headset-resolution") {result.headsetResolution=true;result.windowed=true;}
+        else if (args[i] == L"--render-size" || args[i] == L"--render-canvas") {
+            const bool canvas=args[i]==L"--render-canvas";
+            if(result.renderWidth){error=L"Specify only one render size.";return false;}
             if(++i>=args.size()){error=L"--render-size requires WIDTHxHEIGHT.";return false;}
             const auto split=args[i].find(L'x');
             if(split==std::wstring::npos){error=L"--render-size requires WIDTHxHEIGHT.";return false;}
@@ -52,6 +57,8 @@ inline bool ParseOptions(const std::vector<std::wstring>& args,
             if(!parse(args[i].substr(0,split),result.renderWidth)||!parse(args[i].substr(split+1),result.renderHeight)){
                 error=L"Render dimensions must be 640-3072 pixels each.";return false;
             }
+            if(canvas){result.renderCanvas=true;result.windowed=true;
+                if(!ValidCanvas({result.renderWidth,result.renderHeight})){error=L"Render canvas exceeds the pixel budget.";return false;}}
         }
         else if (args[i] == L"--windowed") result.windowed = true;
         else if (args[i] == L"--game-dir" || args[i] == L"--mod" || args[i] == L"--presenter" || args[i] == L"--join-local" || args[i] == L"--observer-profile" || args[i] == L"--join-server" || args[i] == L"--port") {
@@ -76,6 +83,10 @@ inline bool ParseOptions(const std::vector<std::wstring>& args,
         } else { error = L"Unknown argument: " + args[i]; return false; }
     }
     if (result.help) return true;
+    if((result.headsetResolution&&(result.presenter.empty()||result.renderWidth)) ||
+       ((result.headsetResolution||result.renderCanvas)&&result.networkObserver)){
+        error=L"Headset resolution requires --presenter and no explicit size; canvas experiments do not apply to flat observers.";return false;
+    }
     if ((!result.joinServer.empty() && (!ValidJoinHost(result.joinServer)||!result.joinPort||result.joinLocalPort)) || (result.joinServer.empty()&&result.joinPort)) {
         error=L"Use --join-server HOST --port PORT, separately from --join-local.";return false;
     }

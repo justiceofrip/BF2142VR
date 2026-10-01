@@ -1,4 +1,5 @@
 #include "FrameCapture.h"
+#include "FramePixels.h"
 #include <cstring>
 #include <wrl/client.h>
 namespace bfvr::bf2142 {
@@ -48,12 +49,7 @@ HRESULT FrameCapture::ReadSurface(IDirect3DDevice9* device, IDirect3DSurface9* s
     if (FAILED(hr)) return hr;
     for (UINT y=0;y<height;++y) {
         const auto* row=reinterpret_cast<const DWORD*>(static_cast<const BYTE*>(locked.pBits)+y*locked.Pitch);
-        for (UINT x=0;x<width;++x) {
-            DWORD p=row[x];
-            const DWORD alpha=preserveAlpha && sourceFormat==D3DFMT_A8R8G8B8 ? p&0xff000000 : 0xff000000;
-            if (rgba) p=(p&0x0000ff00)|((p&0xff)<<16)|((p>>16)&0xff);
-            pixels[static_cast<size_t>(y)*width+x]=(p&0x00ffffff)|alpha;
-        }
+        CopyFramePixels(pixels.data()+size_t(y)*width,row,width,rgba,!(preserveAlpha&&sourceFormat==D3DFMT_A8R8G8B8));
     }
     return staging->UnlockRect();
 }

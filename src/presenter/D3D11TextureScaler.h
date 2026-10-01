@@ -58,7 +58,8 @@ public:
         float bloomThreshold,
         float bloomIntensity,
         const D3D11ColorGradingConfiguration& colorGrading = {},
-        bool fillDestination = false);
+        bool fillDestination = false,
+        float presentationAspect = 0.0F);
     bool BeginBloomFrame();
     void EndBloomFrame();
     void CollectBloomFrameTimings();

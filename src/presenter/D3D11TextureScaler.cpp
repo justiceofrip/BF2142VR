@@ -928,7 +928,8 @@ bool D3D11TextureScaler::ScaleAspectFit(
     float bloomThreshold,
     float bloomIntensity,
     const D3D11ColorGradingConfiguration& colorGrading,
-    bool fillDestination)
+    bool fillDestination,
+    float presentationAspect)
 {
     if (context_ == nullptr ||
         device_ == nullptr ||
@@ -995,15 +996,19 @@ bool D3D11TextureScaler::ScaleAspectFit(
         return false;
     }
 
+    // Pixel dimensions still describe the real image for sampling/effects.
+    // A UI canvas can have a separate authored display aspect from its raster.
+    const float layoutWidth = presentationAspect > 0.0F ? presentationAspect : static_cast<float>(sourceWidth);
+    const float layoutHeight = presentationAspect > 0.0F ? 1.0F : static_cast<float>(sourceHeight);
     const float horizontalScale =
-        static_cast<float>(destinationWidth) / static_cast<float>(sourceWidth);
+        static_cast<float>(destinationWidth) / layoutWidth;
     const float verticalScale =
-        static_cast<float>(destinationHeight) / static_cast<float>(sourceHeight);
+        static_cast<float>(destinationHeight) / layoutHeight;
     const float scale = std::min(horizontalScale, verticalScale);
     const float fittedWidth = fillDestination ? static_cast<float>(destinationWidth)
-        : static_cast<float>(sourceWidth) * scale;
+        : layoutWidth * scale;
     const float fittedHeight = fillDestination ? static_cast<float>(destinationHeight)
-        : static_cast<float>(sourceHeight) * scale;
+        : layoutHeight * scale;
     const D3D11_VIEWPORT viewport = {
         (static_cast<float>(destinationWidth) - fittedWidth) * 0.5F,
         (static_cast<float>(destinationHeight) - fittedHeight) * 0.5F,

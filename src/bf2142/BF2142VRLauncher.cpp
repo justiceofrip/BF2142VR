@@ -1,4 +1,5 @@
 #include "LaunchOptions.h"
+#include "CanvasLaunch.h"
 #include <windows.h>
 #include <tlhelp32.h>
 #include <cstdio>
@@ -116,6 +117,7 @@ int Run(int argc, wchar_t** argv) {
             L"--network-observer receives multiplayer arms in the native flat view; requires private network configuration.\n"
             L"--observer-profile PATH isolates Documents for a second flat client; requires an explicit join destination.\n"
             L"Headset source defaults to menu-compatible 1600x900. --render-size is an experimental explicit override.\n"
+            L"--headset-resolution queries the runtime before startup (experimental); --render-canvas WIDTHxHEIGHT tests logical canvas handling explicitly.\n"
             L"--inspect validates paths and x86 images without starting the game.\n");
         return 0;
     }
@@ -150,6 +152,8 @@ int Run(int argc, wchar_t** argv) {
     swprintf_s(logName, L"bf2142-renderer-%04u%02u%02u-%02u%02u%02u-%lu.log",
         now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond, GetCurrentProcessId());
     const fs::path logPath = folder / L"logs" / logName;
+    bfvr::bf2142::QueryCanvas(options,logPath);
+    bfvr::bf2142::CanvasEnvironment canvasEnvironment(options);
     std::wstring command = bfvr::bf2142::GameCommand(executable.wstring(), options);
     STARTUPINFOW startup{};
     startup.cb = sizeof(startup);

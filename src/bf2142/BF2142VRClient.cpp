@@ -1,5 +1,6 @@
 #include "StereoSession.h"
 #include "NativeAntialiasing.h"
+#include "NativeRenderCanvas.h"
 #include "VrSettings.h"
 #include <initializer_list>
 #include "LegacyShaderMemory.h"
@@ -220,6 +221,8 @@ HRESULT STDMETHODCALLTYPE EndSceneHook(IDirect3DDevice9* device) {
 HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
     D3DPRESENT_PARAMETERS* parameters) {
     bfvr::bf2142::StereoReset();
+    D3DDEVICE_CREATION_PARAMETERS canvasCreation{};device->GetCreationParameters(&canvasCreation);
+    bfvr::bf2142::ConfigureRenderCanvas(parameters,canvasCreation.hFocusWindow);
     D3DPRESENT_PARAMETERS saved{};bool changed=false;
     if(parameters){saved=*parameters;IDirect3D9* api=nullptr;D3DDEVICE_CREATION_PARAMETERS creation{};
         if(SUCCEEDED(device->GetDirect3D(&api))){
@@ -233,12 +236,13 @@ HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
     if (count <= 16) Log("Reset result=0x%08lX size=%ux%u windowed=%d",
         static_cast<unsigned long>(result), parameters ? parameters->BackBufferWidth : 0,
         parameters ? parameters->BackBufferHeight : 0, parameters ? parameters->Windowed : 0);
-    if (SUCCEEDED(result)) ConnectDefaultSwapChain(device);
+    if (SUCCEEDED(result)) {ConnectDefaultSwapChain(device);bfvr::bf2142::ConfirmRenderCanvas(device);}
     return result;
 }
 HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
     D3DDEVTYPE type, HWND window, DWORD behavior,
     D3DPRESENT_PARAMETERS* parameters, IDirect3DDevice9** output) {
+    bfvr::bf2142::ConfigureRenderCanvas(parameters,window);
     D3DPRESENT_PARAMETERS saved{};bool changed=false;
     if(parameters){saved=*parameters;changed=bfvr::bf2142::SelectWorldSamples(factory,adapter,type,requestedWorldSamples,*parameters);}
     if(parameters&&runtimePacing&&parameters->PresentationInterval!=D3DPRESENT_INTERVAL_IMMEDIATE){parameters->PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;changed=true;}
@@ -249,6 +253,7 @@ HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
         static_cast<unsigned long>(result), adapter, parameters ? parameters->BackBufferWidth : 0,
         parameters ? parameters->BackBufferHeight : 0, parameters ? parameters->Windowed : 0, behavior);
     if (SUCCEEDED(result) && output && *output) {
+        bfvr::bf2142::ConfirmRenderCanvas(*output);
         ConnectShaderFailureLog();
         if (networkObserver) {
             auto renderer=reinterpret_cast<BYTE*>(GetModuleHandleW(L"RendDX9_ori.dll"));
@@ -318,6 +323,7 @@ extern "C" DWORD WINAPI BF2142VRInitialize(void* parameter) {
         reinterpret_cast<void**>(&originalCreate9), create9Target)) return 0;
     Log("Direct3DCreate9 connection installed.");
     networkObserver=presenter==L"@observer";
+    if(!networkObserver&&!bfvr::bf2142::InstallRenderCanvas(Log))return 0;
     runtimePacing=!presenter.empty()&&presenter.front()!=L'@';
     if(!presenter.empty()&&!networkObserver)requestedWorldSamples=bfvr::bf2142::LoadVrSettings(logPath).worldSamples;
     if (networkObserver) Log("Flat network observer requested: receive-only poses, native camera/input; no OpenXR.");

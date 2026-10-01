@@ -22,6 +22,8 @@ constexpr DWORD kProducerFlagFullEyeTextureFov = 0x10;
 // B-hold recenter, or map-button shortcuts. Protocol layout stays unchanged.
 constexpr DWORD kProducerFlagOwnControllerMappings = 0x20;
 constexpr DWORD kProducerFlagBattlefield2142 = 0x40;
+// Optional presentation capability; no shared layout or network pose change.
+constexpr DWORD kProducerFlagWidescreenUiCanvas = 0x80;
 constexpr DWORD kProducerFlagAmbientOcclusionRequested = 0x2;
 constexpr DWORD kProducerFlagWaterReflectionsRequested = 0x4;
 constexpr DWORD kProducerFlagScreenSpaceGlobalIlluminationRequested = 0x8;

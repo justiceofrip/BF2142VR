@@ -1,6 +1,6 @@
 add_subdirectory(voice)
 # Opt-in BF2142 startup connection.
-add_library(BF2142VRClient SHARED ObserverProfile.cpp BF2142VRClient.cpp NativeVehicle.cpp VehicleControls.cpp LegacyShaderMemory.cpp BF2142VRClient.def WeaponGrip.cpp GrenadeArc.cpp BodyInventory.cpp BodyEquipment.cpp BodyEquipmentGpu.cpp WristMenu.cpp WristMenuGpu.cpp DesktopSimulation.cpp NativeHudPointer.cpp NativeOptics.cpp GunOptics.cpp EyeRestore.cpp NativeStereo.cpp NativeWorldMarkers.cpp WorldMarker.cpp NativeCrosshair.cpp NativeComfort.cpp TraversalControls.cpp ComfortCamera.cpp NativeQueryGuard.cpp NativeHands.cpp MotionActions.cpp HandPoseMath.cpp ControllerHandPose.cpp HandBindingCache.cpp WeaponOptic.cpp NativeMenus.cpp StereoSession.cpp ShoulderRadio.cpp ShoulderRadioGpu.cpp SupportCrates.cpp MenuPointer.cpp MenuWindowInput.cpp NativeMenuState.cpp NativeHudState.cpp
+add_library(BF2142VRClient SHARED NativeRenderCanvas.cpp ObserverProfile.cpp BF2142VRClient.cpp NativeVehicle.cpp VehicleControls.cpp LegacyShaderMemory.cpp BF2142VRClient.def WeaponGrip.cpp GrenadeArc.cpp BodyInventory.cpp BodyEquipment.cpp BodyEquipmentGpu.cpp WristMenu.cpp WristMenuGpu.cpp DesktopSimulation.cpp NativeHudPointer.cpp NativeOptics.cpp GunOptics.cpp EyeRestore.cpp NativeStereo.cpp NativeWorldMarkers.cpp WorldMarker.cpp NativeCrosshair.cpp NativeComfort.cpp TraversalControls.cpp ComfortCamera.cpp NativeQueryGuard.cpp NativeHands.cpp MotionActions.cpp HandPoseMath.cpp ControllerHandPose.cpp HandBindingCache.cpp WeaponOptic.cpp NativeMenus.cpp StereoSession.cpp ShoulderRadio.cpp ShoulderRadioGpu.cpp SupportCrates.cpp MenuPointer.cpp MenuWindowInput.cpp NativeMenuState.cpp NativeHudState.cpp
   StereoCamera.cpp StereoDiagnostics.cpp ControllerPolicy.cpp ComfortControls.cpp VrControlsMenu.cpp VrSettings.cpp MenuRoom.cpp MenuRoomGpu.cpp LobbyScene.cpp ControllerInput.cpp InputOverlay.cpp TrackingMath.cpp FrameCapture.cpp NativeUiCapture.cpp ../presenter/SharedControlChannel.cpp
   ../presenter/SharedTextureProducer.cpp ../presenter/D3DSystemRuntime.cpp)
 add_executable(BF2142VRStereoIntegrationSmoke StereoIntegrationSmoke.cpp WeaponGrip.cpp GrenadeArc.cpp BodyInventory.cpp BodyEquipment.cpp BodyEquipmentGpu.cpp WristMenu.cpp WristMenuGpu.cpp DesktopSimulation.cpp GunOptics.cpp EyeRestore.cpp TraversalControls.cpp ComfortCamera.cpp StereoSession.cpp ShoulderRadio.cpp ShoulderRadioGpu.cpp SupportCrates.cpp MenuPointer.cpp MenuWindowInput.cpp NativeMenuState.cpp NativeHudState.cpp StereoCamera.cpp StereoDiagnostics.cpp TrackingMath.cpp ControllerPolicy.cpp ComfortControls.cpp VrControlsMenu.cpp VrSettings.cpp MenuRoom.cpp MenuRoomGpu.cpp LobbyScene.cpp FrameCapture.cpp NativeUiCapture.cpp ../presenter/SharedControlChannel.cpp ../presenter/SharedTextureProducer.cpp ../presenter/D3DSystemRuntime.cpp)
@@ -377,4 +377,29 @@ endforeach()
 target_link_libraries(BF2142VREquipmentGpuSmoke PRIVATE BFVRStereoMath d3d9 gdi32 user32)
 if(BUILD_TESTING)
  add_test(NAME BF2142VRNativeFramePacingTests COMMAND BF2142VRNativeFramePacingTests)
+endif()
+
+add_executable(BF2142VRNativeRenderCanvasTests NativeRenderCanvasTests.cpp)
+target_include_directories(BF2142VRNativeRenderCanvasTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
+target_link_libraries(BF2142VRNativeRenderCanvasTests PRIVATE minhook user32 d3d9)
+target_compile_definitions(BF2142VRNativeRenderCanvasTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+target_compile_options(BF2142VRNativeRenderCanvasTests PRIVATE /W4 /permissive-)
+set_property(TARGET BF2142VRNativeRenderCanvasTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+if(BUILD_TESTING)
+  add_test(NAME BF2142VRNativeRenderCanvasTests COMMAND BF2142VRNativeRenderCanvasTests)
+endif()
+
+add_executable(BF2142VRUiCanvasSmoke UiCanvasSmoke.cpp ../presenter/D3D11TextureScaler.cpp)
+target_include_directories(BF2142VRUiCanvasSmoke PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
+target_link_libraries(BF2142VRUiCanvasSmoke PRIVATE d3d11 d3dcompiler)
+target_compile_definitions(BF2142VRUiCanvasSmoke PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+target_compile_options(BF2142VRUiCanvasSmoke PRIVATE /W4 /permissive-)
+set_property(TARGET BF2142VRUiCanvasSmoke PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+add_executable(BF2142VRFramePixelsTests FramePixelsTests.cpp)
+target_compile_definitions(BF2142VRFramePixelsTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_compile_options(BF2142VRFramePixelsTests PRIVATE /W4 /permissive-)
+set_property(TARGET BF2142VRFramePixelsTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+if(BUILD_TESTING)
+ add_test(NAME BF2142VRFramePixelsTests COMMAND BF2142VRFramePixelsTests)
 endif()

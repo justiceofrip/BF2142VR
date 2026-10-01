@@ -15,7 +15,7 @@ struct MenuRayHit {
     stereo::Vec3 origin{},end{}; // In the menu anchor's local frame.
 };
 std::optional<MenuRayHit> MenuRayTarget(const shared::SharedControllerHandSample& hand,
-    const stereo::Pose& anchor,UINT width,UINT height,UINT uiWidth,UINT uiHeight);
+    const stereo::Pose& anchor,UINT width,UINT height,UINT uiWidth,UINT uiHeight,bool widescreen=false);
 void DrawMenuPointer(std::vector<DWORD>& left,std::vector<DWORD>& right,std::vector<DWORD>& ui,
     UINT width,UINT height,DXGI_FORMAT format,const shared::SharedRenderRequest& request,
     const stereo::Pose& anchor,const stereo::UiCanvasPoint& point,const std::optional<MenuRayHit>& ray,bool pressed);
@@ -31,7 +31,7 @@ public:
     const stereo::Pose& Anchor() const {return anchor;}
     void Update(bool showMenu,const shared::SharedControllerSample* sample,
         const shared::SharedRenderRequest& request,UINT width,UINT height,
-        UINT uiWidth,UINT uiHeight,ControllerCommand& command,VrControlsMenu* controls=nullptr,VrSettings* settings=nullptr);
+        UINT uiWidth,UINT uiHeight,ControllerCommand& command,VrControlsMenu* controls=nullptr,VrSettings* settings=nullptr,bool widescreen=false,bool desktopMouse=false);
     void Draw(std::vector<DWORD>& left,std::vector<DWORD>& right,std::vector<DWORD>& ui,
         DXGI_FORMAT format,const shared::SharedRenderRequest& request) const;
     void Reset();

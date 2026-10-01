@@ -1641,9 +1641,9 @@ int RunPresenter(
 
 int wmain(int argc, wchar_t** argv)
 {
-    if(argc==3 && wcscmp(argv[1],L"--query-bf2142-view-size")==0){
+    if(argc==3 && (wcscmp(argv[1],L"--query-bf2142-view-size")==0 || wcscmp(argv[1],L"--query-bf2142-render-size")==0)){
         wchar_t folder[32768]{};if(!GetExecutableDirectory(folder,std::size(folder)))return 2;
-        return bfvr::QueryOpenXRViewSize(folder,argv[2]);
+        return bfvr::QueryOpenXRViewSize(folder,argv[2],wcscmp(argv[1],L"--query-bf2142-render-size")==0);
     }
     const wchar_t* channelName = nullptr;
     bool useCylinderUi = false;

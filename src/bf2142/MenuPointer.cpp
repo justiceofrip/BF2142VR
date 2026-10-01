@@ -59,18 +59,18 @@ void Beam(std::vector<DWORD>& pixels,UINT width,UINT height,const stereo::Pose& 
 }
 }
 std::optional<MenuRayHit> MenuRayTarget(const shared::SharedControllerHandSample& hand,
-    const stereo::Pose& anchor,UINT width,UINT height,UINT uiWidth,UINT uiHeight) {
+    const stereo::Pose& anchor,UINT width,UINT height,UINT uiWidth,UINT uiHeight,bool widescreen) {
     constexpr DWORD required=shared::kControllerHandFlagAimActive|shared::kControllerHandFlagAimPositionValid|
         shared::kControllerHandFlagAimOrientationValid|shared::kControllerHandFlagAimPositionTracked|shared::kControllerHandFlagAimOrientationTracked;
     if((hand.flags&required)!=required || !width || !height || !uiWidth || !uiHeight)return {};
     const auto aim=stereo::MakeRelativePose(anchor,Pose(hand.aimPose));if(!aim)return {};
     const float h=menuWidthMeters*float(uiHeight)/uiWidth;
     const stereo::Pose quad{{0,0,-menuDistanceMeters},{}};
-    const auto point=stereo::MapOpenXRAimPoseToAspectFitUiCanvas(*aim,quad,menuWidthMeters,h,uiWidth,uiHeight,width,height,width,height);
+    const auto point=stereo::MapOpenXRAimPoseToAspectFitUiCanvas(*aim,quad,menuWidthMeters,h,uiWidth,uiHeight,widescreen?16:width,widescreen?9:height,width,height);
     if(!point)return {};
     // The canvas may be letterboxed inside the square runtime UI texture.
-    const float contentWidth=std::min(menuWidthMeters,h*float(width)/height);
-    const float contentHeight=std::min(h,menuWidthMeters*float(height)/width);
+    const float contentWidth=std::min(menuWidthMeters,h*(widescreen?16.f/9:float(width)/height));
+    const float contentHeight=std::min(h,menuWidthMeters*(widescreen?9.f/16:float(height)/width));
     return MenuRayHit{*point,aim->position,{(point->normalizedX-.5f)*contentWidth,(.5f-point->normalizedY)*contentHeight,-menuDistanceMeters}};
 }
 bool MenuClickState::Update(bool enabled,bool hit,bool trigger) noexcept {
@@ -95,7 +95,7 @@ void MenuPointer::ExpireInput(){
     if(!Focused(window) || input.Expired(GetTickCount64())){input.Release(window);PublishNativeHudPointer(false);click={};buttonHeld=false;pressed=false;}
 }
 void MenuPointer::Update(bool showMenu,const shared::SharedControllerSample* sample,
-    const shared::SharedRenderRequest& request,UINT w,UINT h,UINT uiW,UINT uiH,ControllerCommand& command,VrControlsMenu* controls,VrSettings* settings) {
+    const shared::SharedRenderRequest& request,UINT w,UINT h,UINT uiW,UINT uiH,ControllerCommand& command,VrControlsMenu* controls,VrSettings* settings,bool widescreen,bool desktopMouse) {
     width=w;height=h;visible=false;ray.reset();pressed=false;
     PublishNativeHudPointer(false);
     if(!showMenu){Reset();input.ObserveGameplayEscape(command.keys[DIK_ESCAPE]!=0);return;}
@@ -105,7 +105,7 @@ void MenuPointer::Update(bool showMenu,const shared::SharedControllerSample* sam
     if(!focused){input.Release(window);click={};buttonHeld=false;return;}
     const auto& hand=sample?sample->hands[1]:shared::SharedControllerHandSample{};
     const bool controller=sample && (sample->flags&shared::kControllerSampleFlagSessionFocused);
-    if(controller)ray=MenuRayTarget(hand,anchor,width,height,uiW,uiH);
+    if(controller&&!desktopMouse)ray=MenuRayTarget(hand,anchor,width,height,uiW,uiH,widescreen);
     if(ray){point=ray->canvas;visible=true;}
     else {
         POINT p{};RECT client{};
@@ -123,25 +123,29 @@ void MenuPointer::Update(bool showMenu,const shared::SharedControllerSample* sam
         command.mouseX=command.mouseY=0;command.buttons={};command.keys[DIK_RETURN]=0;
         const bool escape=command.keys[DIK_ESCAPE]!=0;command.keys[DIK_ESCAPE]=0;
         bool sent=false;
-        const bool fire=click.Update(true,ray.has_value(),trigger);
-        buttonHeld=ray.has_value() && trigger && (buttonHeld || fire);
+        // Desktop simulation derives its ray from the OS mouse. Feeding the
+        // projected ray back through SetCursorPos creates a cursor feedback
+        // loop. Keep physical mouse input native; F9 can still test VR clicks.
+        const bool hit=desktopMouse?visible:ray.has_value();
+        const bool fire=click.Update(true,hit,trigger);
+        buttonHeld=hit && trigger && (buttonHeld || fire);
         if(controls && settings && controls->Interact(visible?point.normalizedX:-1.f,visible?point.normalizedY:-1.f,fire,escape,*settings,request.headPose.positionY)){
             input.Release(window);buttonHeld=false;pressed=trigger;return;
         }
-        if(ray) {
+        if(hit) {
             RECT client{};
             if(GetClientRect(window,&client) && client.right>0 && client.bottom>0) {
                 POINT pixel{std::clamp(LONG(std::lround(point.normalizedX*client.right)),0L,client.right-1),
                     std::clamp(LONG(std::lround(point.normalizedY*client.bottom)),0L,client.bottom-1)};
                 POINT screen=pixel;
-                if(ClientToScreen(window,&screen) && Focused(window)) {
-                    SetCursorPos(screen.x,screen.y);
+                if((desktopMouse||ClientToScreen(window,&screen)) && Focused(window)) {
+                    if(!desktopMouse)SetCursorPos(screen.x,screen.y);
                     if(NativeHudMenuActive()){
                         input.Update(window,true,nullptr,false,false);
-                        PublishNativeHudPointer(true,point.normalizedX,point.normalizedY,buttonHeld);
+                        PublishNativeHudPointer(!desktopMouse||buttonHeld,point.normalizedX,point.normalizedY,buttonHeld);
                         // Deployment is driven by the game's ordinary Escape action.
                         command.keys[DIK_ESCAPE]=escape?0x80:0;
-                    }else input.Update(window,true,&pixel,buttonHeld,escape);
+                    }else input.Update(window,true,desktopMouse&&!buttonHeld?nullptr:&pixel,buttonHeld,escape);
                     sent=true;
                 } else buttonHeld=false;
             }

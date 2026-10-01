@@ -1,4 +1,6 @@
 #include "StereoSession.h"
+#include "RenderProfile.h"
+#include "FramePixels.h"
 #include "LaunchOptions.h"
 #include "FrameCapture.h"
 #include "NativeUiCapture.h"
@@ -56,7 +58,8 @@ unsigned suppressedPresents=0;
 LogFunction logger=nullptr;
 IDirect3DDevice9* gameDevice=nullptr; // Borrowed: resources released before Reset.
 HANDLE presenterProcess=nullptr;
-bool diagnostic=false,desktop=false,desktopCaptureHeld=false;
+bool diagnostic=false,desktop=false,desktopCaptureHeld=false,widescreenUi=false;
+RenderProfile renderProfile;
 HWND desktopWindow=nullptr;
 RenderTimeBudget renderTime;bool opticHudReady=false;
 std::vector<DWORD> opticHudPixels,opticHudBaseline;
@@ -91,6 +94,7 @@ DXGI_FORMAT colorFormat=DXGI_FORMAT_UNKNOWN;
 shared::SharedRenderRequest request{};
 stereo::Pose reference{};
 std::array<std::vector<DWORD>,shared::kTextureCount> pixels;
+std::vector<DWORD> desktopPixels;
 
 unsigned long pairs=0,menuFrames=0;
 void ProducerLog(void*,const wchar_t* text) {
@@ -316,7 +320,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     if(vehicleValid&&accepted){command.keys[0x22]=0;command.keys[0x39]=(sample.hands[1].buttons&shared::kControllerHandButtonPrimary)?0x80:0;}
     UpdateNativeVehicle(vehicleValid&&!command.recenter?&vehicle:nullptr,accepted?&sample:nullptr,reference,Pose(request.headPose),settings.worldScale,settings.heightOffset,command);
     menuPointer.Update(showMenu,accepted?&sample:nullptr,request,width,height,
-        (diagnostic||desktop)?width:b->requirements.uiWidth,(diagnostic||desktop)?height:b->requirements.uiHeight,command,&controlsMenu,&settings);
+        (diagnostic||desktop)?(widescreenUi?1600:width):b->requirements.uiWidth,(diagnostic||desktop)?(widescreenUi?900:height):b->requirements.uiHeight,command,&controlsMenu,&settings,widescreenUi,desktop);
     if(controlsMenu.RecenterRequested()){Recenter(true);ClearNativeHands();command.keys[0x2f]=0;}
     SetCrosshairHidden(settings.hideCrosshair);
     if(AutomaticAdsButton(accepted && gameplay && !showMenu && !mounted && !command.recenter && !body.key && !supportFrame.busy))command.buttons[1]=0x80;
@@ -331,6 +335,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     return true;
 }
 bool ReadFrame(std::vector<DWORD>& output) {
+    auto profile=renderProfile.Measure(RenderProfile::EyeReadback);
     const HRESULT hr=capture.Read(gameDevice,colorFormat,output);
     if (FAILED(hr)) { Fail("D3D9 eye readback",hr); return false; }
     if (capture.Width()!=width || capture.Height()!=height) {
@@ -339,26 +344,22 @@ bool ReadFrame(std::vector<DWORD>& output) {
     return true;
 }
 void Publish(bool world) {
+    auto profile=renderProfile.Measure(RenderProfile::Publish);
     auto* b=channel.Get();
     if(!world && lastRequestMainMenu && settings.menuRoom && !diagnostic){
         // A failed optional backdrop retains the native background; no slow
         // CPU fallback is inserted into the user's VR frame loop.
         (void)menuRoomGpu.Draw(gameDevice,pixels[0],pixels[1],width,height,colorFormat,request,menuPointer.Anchor());
     }
-    if(menuPointer.Active() && !diagnostic)controlsMenu.Draw(pixels[2],width,height,colorFormat,settings);
+    if(menuPointer.Active() && !diagnostic)controlsMenu.Draw(pixels[2],width,height,colorFormat,settings,widescreenUi);
     menuPointer.Draw(pixels[0],pixels[1],pixels[2],colorFormat,request);
     std::array<shared::SharedTexturePixels,shared::kTextureCount> frame{};
     for (size_t i=0;i<frame.size();++i) frame[i]={pixels[i].data(),width*4,width,height,colorFormat};
     if (!diagnostic && !desktop && !producer.PublishFrame(frame)) { Fail("shared stereo texture upload"); return; }
     if(desktop){
-        std::vector<DWORD> flat=world?pixels[0]:std::vector<DWORD>(size_t(width)*height,0xff000000);
-        for(size_t i=0;i<flat.size();++i){
-            const DWORD ui=pixels[2][i];const unsigned a=ui>>24;
-            DWORD color=0xff000000;
-            for(unsigned shift:{0u,8u,16u})color|=std::min<DWORD>(255u,((ui>>shift)&255u)+(((flat[i]>>shift)&255u)*(255-a)+127)/255)<<shift;
-            flat[i]=color;
-        }
-        if(!eyeRestore.Draw(gameDevice,flat,width,height,colorFormat)){Fail("desktop VR composite");return;}
+        if(world)desktopPixels=pixels[0];else desktopPixels.assign(size_t(width)*height,0xff000000);
+        BlendDesktopHud(desktopPixels.data(),pixels[2].data(),desktopPixels.size());
+        if(!eyeRestore.Draw(gameDevice,desktopPixels,width,height,colorFormat)){Fail("desktop VR composite");return;}
     }
     if(desktop){
         DWORD focused=0;GetWindowThreadProcessId(GetForegroundWindow(),&focused);
@@ -409,8 +410,9 @@ void Publish(bool world) {
 struct CameraScope { ~CameraScope() { EndNativeEye(); } };
 }
 bool StartStereo(const std::wstring& presenter,const std::wstring& log,LogFunction logCallback) {
-    logger=logCallback;
+    logger=logCallback;renderProfile.Initialize(logger);
     settings=LoadVrSettings(log);
+    wchar_t canvasRequest[64]{};widescreenUi=GetEnvironmentVariableW(L"BF2142VR_RENDER_CANVAS",canvasRequest,64)>0;
     if(!settings.lobbySceneFile.empty())logger("Private walker lobby assets: %s.",menuRoomGpu.LoadScene(settings.lobbySceneFile)?"loaded":"unavailable; basic room retained");
     ConfigureAutomaticAds(settings.automaticAds);
     const auto name=L"Local\\BF2142VR-"+std::to_wstring(GetCurrentProcessId())+L"-"+std::to_wstring(GetTickCount64());
@@ -422,7 +424,8 @@ bool StartStereo(const std::wstring& presenter,const std::wstring& log,LogFuncti
     }
     if (presenter==L"@diagnostic") { diagnostic=true; diagnosticPrefix=log; enabled=true; logger("Diagnostic stereo: synthetic poses and local image capture; controller commands remain disabled."); if(settings.controllers)StartControllerInput(logger); return true; }
     channel.Get()->producerFlags=shared::kProducerFlagRuntimeTimedRender | shared::kProducerFlagFullEyeTextureFov |
-        shared::kProducerFlagOwnControllerMappings | shared::kProducerFlagBattlefield2142;
+        shared::kProducerFlagOwnControllerMappings | shared::kProducerFlagBattlefield2142 |
+        (widescreenUi?shared::kProducerFlagWidescreenUiCanvas:0);
     std::wstring command=QuoteArgument(presenter)+L" --channel "+QuoteArgument(name)+
         L" --run-until-stopped --log "+QuoteArgument(log+L".openxr.log");
     STARTUPINFOW startup{}; startup.cb=sizeof(startup);
@@ -464,6 +467,10 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
         if(enabled){renderTime.Skip(delta);return lastRenderResult;}
         renderTime.Reset();return original(renderer,delta,interpolation);
     }
+    struct ProfileFrame {
+        ~ProfileFrame(){renderProfile.CompleteFrame();}
+    } profileFrame;
+    auto profile=renderProfile.Measure(RenderProfile::Frame);
     delta=renderTime.Take(delta);
     if(pairs==1)logger("Native renderer time argument retained: %.6f, interpolation=%.6f.",delta,double(interpolation));
     opticHudReady=false;opticHudPixels.clear();
@@ -488,7 +495,8 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
                 CameraScope camera;
                 // Only the first eye advances renderer-side animation time.
                 // The outer game simulation and input processing still run once.
-                const bool eyeResult=original(renderer,eye==0?delta:0.0,interpolation);
+                bool eyeResult=false;
+                {auto timing=renderProfile.Measure(RenderProfile::NativeEye);eyeResult=original(renderer,eye==0?delta:0.0,interpolation);}
                 if (!rendered) result=eyeResult;
                 rendered=true;
                 if(!ReadNativeEyeCamera(&eyeCameras[eye]))return result;
@@ -496,9 +504,11 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
             if (!ReadFrame(pixels[eye])) return result;
         }
         if(!diagnostic && opticsReady)UpdateAutomaticAds(eyeCameras);
-        if(opticHudReady&&uiCapture.Read(colorFormat,opticHudBaseline)&&uiCapture.ReadOptic(colorFormat,opticHudPixels))
-            IsolateOpticHud(opticHudPixels,opticHudBaseline,width,height);
-        else opticHudPixels.clear();
+        {auto timing=renderProfile.Measure(RenderProfile::OpticHud);
+            if(opticHudReady&&uiCapture.Read(colorFormat,opticHudBaseline)&&uiCapture.ReadOptic(colorFormat,opticHudPixels))
+                IsolateOpticHud(opticHudPixels,opticHudBaseline,width,height);
+            else opticHudPixels.clear();
+        }
         GunOptic optic;
         // Diagnostic fixtures can supply a synthetic native optic. Ordinary
         // diagnostic game runs have no hand adapter and always return false.
@@ -508,17 +518,20 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
                 // Reflex glass retains the normal stereo world. Only draw the
                 // sight's collimated dot; never re-render or magnify this eye.
                 const bool rgba=colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM||colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+                auto timing=renderProfile.Measure(RenderProfile::OpticComposite);
                 for(unsigned i=0;i<2;++i)CompositeGunOptic(pixels[i],{},width,height,optic,eyeCameras[i],*scope,i,rgba,opticHudPixels);
             }else if(scope){
                 activeEye=2;
                 bool captured=false;
                 if(BeginNativeScope(renderer,scope->world,scope->fov)){
                     CameraScope camera;
-                    original(renderer,0.0,interpolation);
+                    {auto timing=renderProfile.Measure(RenderProfile::NativeScope);original(renderer,0.0,interpolation);}
+                    auto timing=renderProfile.Measure(RenderProfile::ScopeReadback);
                     captured=SUCCEEDED(capture.Read(gameDevice,colorFormat,scopePixels)) && scopePixels.size()==pixels[0].size();
                 }
                 if(captured){
                     const bool rgba=colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM||colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+                    auto timing=renderProfile.Measure(RenderProfile::OpticComposite);
                     for(unsigned i=0;i<2;++i)CompositeGunOptic(pixels[i],scopePixels,width,height,optic,eyeCameras[i],*scope,i,rgba,opticHudPixels);
                 }else{DisableNativeOptics();opticsReady=false;}
                 // The extra native Present stayed suppressed. Restore a normal
@@ -610,7 +623,7 @@ void StereoPresent(IDirect3DDevice9* device) {
         if (pairReady) {
             pairReady=false;
             if (!Healthy()) return;
-            if (uiReady) uiReady=uiCapture.Read(colorFormat,pixels[2]) && pixels[2].size()==size_t(width)*height;
+            if (uiReady) {auto timing=renderProfile.Measure(RenderProfile::UiReadback);uiReady=uiCapture.Read(colorFormat,pixels[2]) && pixels[2].size()==size_t(width)*height;}
             if (!uiReady) pixels[2].assign(size_t(width)*height,0);
             if (pairs==0 || pairs==119) logger("Stereo boundary: suppressed presents=%u, HUD isolated=%d.",suppressedPresents,uiReady);
             Publish(true);

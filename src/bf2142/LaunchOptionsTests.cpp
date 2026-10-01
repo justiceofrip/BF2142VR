@@ -4,6 +4,11 @@
 #include <cstdio>
 #include <vector>
 int main() {
+    {
+        bfvr::bf2142::LaunchOptions o;std::wstring error;using bfvr::bf2142::ParseOptions;
+        if(ParseOptions({L"--game-dir",L"G:\\Game",L"--render-canvas",L"2528x2704",L"--render-size",L"3072x3072"},o,error))return 120;
+        if(ParseOptions({L"--game-dir",L"G:\\Game",L"--render-size",L"1600x900",L"--render-canvas",L"2528x2704"},o,error))return 121;
+    }
     int failed = 0;
     auto check = [&](bool result, const char* name) {
         if (!result) { fprintf(stderr, "FAIL: %s\n", name); ++failed; }
@@ -95,6 +100,21 @@ int main() {
     check(menuCommand.find(L"+szx 1600 +szy 900")!=std::wstring::npos && !options.renderWidth && !options.renderHeight,"automatic headset source retains verified native menu dimensions");
     check(ParseOptions({L"--game-dir",L"G:\\Game",L"--windowed",L"--presenter",L"runtime.exe",L"--render-size",L"1920x1080"},options,error),"manual source remains explicit");
     check(bfvr::bf2142::GameCommand(L"BF2142.exe",options).find(L"+szx 1920 +szy 1080")!=std::wstring::npos,"explicit source override preserved");
+    check(ParseOptions({L"--game-dir",L"G:\\Game",L"--presenter",L"p.exe",L"--headset-resolution"},options,error)
+          && options.headsetResolution&&options.windowed&&!options.renderWidth,"runtime sizing is an opt-in preflight, not parsing side effect");
+    check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--headset-resolution"},options,error),"auto size needs same presenter identity");
+    check(!ParseOptions({L"--game-dir",L"G:\\Game",L"--flat",L"--render-canvas",L"2528x2704"},options,error),"observer cannot opt into native canvas");
+    check(ParseOptions({L"--game-dir",L"G:\\Game",L"--desktop-vr",L"--render-canvas",L"2528x2704"},options,error)&&options.renderCanvas,"explicit canvas supports local desktop verification");
+    using namespace bfvr::bf2142;
+    check(ParseCanvas(L"2528x2704").width==2528&&!ParseCanvas(L"3072x3072").width&&!ParseCanvas(L"2528x2704 extra").width,"canvas bounds and exact parse");
+    auto size=RecommendCanvas({2528,2704},{4096,4096});
+    check(size.width==2528&&size.height==2704,"ordinary runtime recommendation retained");
+    size=RecommendCanvas({5000,6000},{4096,4096});
+    check(ValidCanvas(size)&&size.width<=3072&&size.height<=3072&&std::abs(double(size.width)/size.height-5./6)<.001,"large recommendation bounded with aspect retained");
+    size=RecommendCanvas({2528,2704},{2048,2048});check(size.width<=2048&&size.height<=2048,"both-eye runtime maximum respected");
+    check(!RecommendCanvas({0,2704},{4096,4096}).width&&!RecommendCanvas({2528,2704},{0,4096}).width,"invalid recommendations fail closed");
+    check(CanvasCoordinate(1599,1600,2528)==2527&&CanvasCoordinate(899,900,2704)==2703&&CanvasCoordinate(0,1600,2528)==0,"desktop mouse endpoints reach canvas endpoints");
+    check(CanvasCoordinate(-10,1600,2528)<0&&CanvasCoordinate(22,0,2528)==22,"outside drag and invalid client handled");
     if (!failed) puts("BF2142 launcher option and quoting checks passed.");
     return failed ? 1 : 0;
 }

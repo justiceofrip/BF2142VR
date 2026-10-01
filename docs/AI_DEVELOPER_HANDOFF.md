@@ -1,5 +1,36 @@
 # BFVR AI and Developer Handoff
 
+## Opt-in headset canvas experiment (unreleased)
+
+The first high-resolution desktop playtest was rejected for severe slowness.
+FramePixels optimizations now pass scalar equivalence and hidden scope/reflex
+GPU fixtures. Isolated benchmarks improved, but do not call gameplay fixed.
+RenderProfile is explicitly opt-in; keep defaults off. See the performance
+section in HEADSET_RENDER_CANVAS.md. Accepted player binaries remain untouched.
+
+See [HEADSET_RENDER_CANVAS.md](HEADSET_RENDER_CANVAS.md). Normal launches retain
+the accepted sizing; do not enable this automatically in installers yet.
+Query the matching x64 presenter before creating the x86 game. NativeRenderCanvas
+profiles BF2142's main WndProc, forwards logical WM_SIZE, maps client mouse
+coordinates and fixes the desktop preview independently. Both CreateDevice and
+Reset receive explicit source dimensions before saving AA fallback parameters.
+Never copy BF2 executable offsets or alter the native simulation timestep.
+
+The optional WidescreenUiCanvas producer flag changes UI layout, not shared
+structure sizes or pose/network protocols. Pair candidate client and presenter.
+MenuPointer and the presenter must use the same 16:9 content rectangle. Source
+dimensions remain real pixel dimensions for sampling; eye FOV still comes from XR.
+Desktop simulation uses native mouse coordinates without ray-to-cursor feedback;
+F9 still exercises synthetic menu button edges. Actual headset input keeps its ray.
+
+Both builds and 75 CTests pass. Hardware checks cover actual D3D9 canvas/viewport
+and reset, plus real D3D11 menu aspect and transparent padding. The isolated game
+confirmed a 2528x2704 backbuffer/capture with a 1600x900 preview and 8x MSAA.
+These are source-sizing checks, not proof of headset clarity, FPS, successful
+runtime preset changes or complete menu compatibility. Keep this opt-in until
+the connected-headset checklist has passed. No release assets were changed.
+
+
 ## Test.7 repair plans
 
 WeaponRepairWorker now replays bounded decision-only programs compiled by

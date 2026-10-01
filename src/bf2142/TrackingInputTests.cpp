@@ -116,6 +116,13 @@ int main(){
     if(!hit || !Close(hit->canvas.pixelX,640) || !Close(hit->canvas.pixelY,360))return 25;
     hand.aimPose.positionX=.4f;hit=bf2142::MenuRayTarget(hand,{},1280,720,2048,2048);
     if(!hit || !Close(hit->canvas.pixelX,960) || !Close(hit->end.x,.4f))return 26;
+    hand.aimPose.positionY=.3f;
+    hit=bf2142::MenuRayTarget(hand,{},2528,2704,2048,2048,true);
+    if(!hit||!Close(hit->canvas.normalizedX,.75f)||!Close(hit->canvas.normalizedY,1.f/6)||!Close(hit->end.y,.3f))return 125;
+    const auto desktopHit=bf2142::MenuRayTarget(hand,{},2528,2704,1600,900,true);
+    if(!desktopHit||!Close(desktopHit->canvas.normalizedY,hit->canvas.normalizedY))return 126;
+    hand.aimPose.positionY=.7f;
+    if(bf2142::MenuRayTarget(hand,{},2528,2704,2048,2048,true))return 127;
     hand.aimPose.positionY=.7f;if(bf2142::MenuRayTarget(hand,{},1280,720,2048,2048))return 27; // transparent padding
     hand.aimPose.positionY=0;hand.flags&=~shared::kControllerHandFlagAimPositionTracked;
     if(bf2142::MenuRayTarget(hand,{},1280,720,2048,2048))return 28;

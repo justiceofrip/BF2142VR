@@ -1,5 +1,22 @@
 # BFVR Changelog
 
+## Unreleased: opt-in headset source canvas
+
+- Initial larger-canvas playtest was rejected for severe slowdown; keep it opt-in.
+- Optimize exact image-format copies and sparse desktop HUD composition.
+  Benchmarks improved; actual gameplay/headset performance is not yet accepted.
+
+- Experimental launcher option reads the active OpenXR runtime's recommended
+  source size before BF2142 initializes its renderer. Larger requests are bounded
+  for the 32-bit renderer; the regular launch remains at its existing default.
+- Separate desktop window size from the native render canvas, including mouse
+  coordinates and device reset. Preserve a widescreen presentation for menus.
+- Desktop simulation uses the physical mouse directly for menu pointing instead
+  of feeding a projected simulated ray back into the system cursor.
+- Headset clarity, controller menu alignment and performance still require
+  validation. This is not a published resolution or performance fix.
+
+
 ## Optional image-filter comparison helper
 
 - Separate test.7 release download compares added FXAA and bloom, independently

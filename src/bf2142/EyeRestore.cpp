@@ -1,4 +1,5 @@
 #include "EyeRestore.h"
+#include "FramePixels.h"
 namespace bfvr::bf2142 {
 bool EyeRestore::Draw(IDirect3DDevice9* device,const std::vector<DWORD>& pixels,UINT w,UINT h,DXGI_FORMAT format){
     if(!device || !w || !h || pixels.size()!=size_t(w)*h)return false;
@@ -10,7 +11,7 @@ bool EyeRestore::Draw(IDirect3DDevice9* device,const std::vector<DWORD>& pixels,
     D3DLOCKED_RECT row{};if(FAILED(texture->LockRect(0,&row,nullptr,D3DLOCK_DISCARD)))return false;
     const bool rgba=format==DXGI_FORMAT_R8G8B8A8_UNORM||format==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     for(UINT y=0;y<h;++y){auto* dest=reinterpret_cast<DWORD*>(static_cast<BYTE*>(row.pBits)+y*row.Pitch);
-        for(UINT x=0;x<w;++x){const DWORD p=pixels[size_t(y)*w+x];dest[x]=rgba?(p&0xff00ff00)|((p&255)<<16)|((p>>16)&255):p;}}
+        CopyFramePixels(dest,pixels.data()+size_t(y)*w,w,rgba,false);}
     if(FAILED(texture->UnlockRect(0)))return false;
     Microsoft::WRL::ComPtr<IDirect3DStateBlock9> state;
     if (FAILED(device->CreateStateBlock(D3DSBT_ALL,&state))) return false;
