@@ -4,7 +4,7 @@
 #include <cmath>
 namespace bfvr::bf2142 {
 namespace {
-bool hidden=true;
+bool hidden=true;thread_local unsigned opticReplayDepth=0;
 template<class T>T Read(const void* p,size_t off=0){T v{};std::memcpy(&v,static_cast<const BYTE*>(p)+off,sizeof(v));return v;}
 // Stock ADS HUD selectors. Disable the entire weapon widget root on the main
 // panel, including fixed-opacity rangefinders and scope stabilizers. The optic
@@ -57,13 +57,17 @@ int* ResolveGui(const BYTE* game){
 void SetCrosshairHidden(bool value){hidden=value;}
 CrosshairScope::CrosshairScope():CrosshairScope(nullptr){}
 CrosshairScope::CrosshairScope(const void* module,bool optic){
- if(!hidden&&!optic)return;const auto game=module?static_cast<const BYTE*>(module):reinterpret_cast<const BYTE*>(GetModuleHandleW(nullptr));
+ // Native Flash can execute outside HudHook, and a replay can nest Flash.
+ // Suppress ADS widgets independently of the user's ordinary crosshair toggle.
+ if(!optic&&opticReplayDepth)return;
+ const auto game=module?static_cast<const BYTE*>(module):reinterpret_cast<const BYTE*>(GetModuleHandleW(nullptr));
  __try {
-  alpha=Resolve(game);if(alpha){saved=*alpha;gui=ResolveGui(game);if(gui)savedGui=*gui;
-   opticReady=gui&&OpticHud(savedGui);
-   if(optic){if(opticReady)*alpha=1;}else {*alpha=0;if(opticReady)*gui=1024;}
-  }
+  gui=ResolveGui(game);if(gui)savedGui=*gui;
+  opticReady=gui&&OpticHud(savedGui);
+  alpha=Resolve(game);if(alpha)saved=*alpha;
+  if(optic){replay=true;++opticReplayDepth;if(alpha&&opticReady)*alpha=1;}
+  else {if(alpha&&hidden)*alpha=0;if(opticReady)*gui=1024;}
  }__except(EXCEPTION_EXECUTE_HANDLER){}
 }
-CrosshairScope::~CrosshairScope(){__try{if(gui)*gui=savedGui;if(alpha)*alpha=saved;}__except(EXCEPTION_EXECUTE_HANDLER){}}
+CrosshairScope::~CrosshairScope(){if(replay&&opticReplayDepth)--opticReplayDepth;__try{if(gui)*gui=savedGui;if(alpha)*alpha=saved;}__except(EXCEPTION_EXECUTE_HANDLER){}}
 }

@@ -2,6 +2,7 @@
 #include "RenderProfile.h"
 #include "FramePixels.h"
 #include "GpuFrameTransfer.h"
+#include "GpuGunOptics.h"
 #include "LaunchOptions.h"
 #include "FrameCapture.h"
 #include "NativeUiCapture.h"
@@ -49,7 +50,7 @@ using Microsoft::WRL::ComPtr;
 shared::SharedControlChannel channel;
 shared::SharedTextureProducer producer;
 FrameCapture capture;
-GpuFrameTransfer gpuFrames;
+GpuFrameTransfer gpuFrames;GpuGunOptics gpuOptics;
 bool gpuRequested=false,gpuAttempted=false,gpuReady=false,gpuPair=false;
 unsigned gpuPublished=0;
 EyeRestore eyeRestore;MenuRoomGpu menuRoomGpu;
@@ -359,7 +360,7 @@ bool BeginGpuPair(){
         gpuAttempted=true;
         const auto hr=gpuFrames.Initialize(gameDevice,width,height,desktop?nullptr:producer.Device());
         gpuReady=SUCCEEDED(hr);
-        logger("Experimental GPU frame transport: ready=%d hr=0x%08lX; %ux%u; CPU scope/menu fallback retained.",gpuReady,hr,width,height);
+        logger("Experimental GPU frame transport: ready=%d hr=0x%08lX; %ux%u; GPU optics when available; CPU compatibility fallback retained.",gpuReady,hr,width,height);
     }
     return gpuReady;
 }
@@ -562,37 +563,59 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
         // diagnostic game runs have no hand adapter and always return false.
         if((opticsReady || diagnostic) && !menuPointer.Active() && ReadNativeOptic(&optic)){
             const auto scope=MakeOpticView(optic,eyeCameras);
-            if(scope){
-                if(!ReadGpuEyes())return result;
-                auto timing=renderProfile.Measure(RenderProfile::OpticHud);
-                if(opticHudReady&&uiCapture.Read(colorFormat,opticHudBaseline)&&uiCapture.ReadOptic(colorFormat,opticHudPixels))
-                    IsolateOpticHud(opticHudPixels,opticHudBaseline,width,height);
-                else opticHudPixels.clear();
-            }
-            if(scope && optic.magnification<=1.01f){
-                // Reflex glass retains the normal stereo world. Only draw the
-                // sight's collimated dot; never re-render or magnify this eye.
-                const bool rgba=colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM||colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-                auto timing=renderProfile.Measure(RenderProfile::OpticComposite);
-                for(unsigned i=0;i<2;++i)CompositeGunOptic(pixels[i],{},width,height,optic,eyeCameras[i],*scope,i,rgba,opticHudPixels);
-            }else if(scope){
-                activeEye=2;
-                bool captured=false;
-                if(BeginNativeScope(renderer,scope->world,scope->fov)){
-                    CameraScope camera;
-                    {auto timing=renderProfile.Measure(RenderProfile::NativeScope);original(renderer,0.0,interpolation);}
-                    auto timing=renderProfile.Measure(RenderProfile::ScopeReadback);
-                    captured=SUCCEEDED(capture.Read(gameDevice,colorFormat,scopePixels)) && scopePixels.size()==pixels[0].size();
+            const bool gpuOptic=scope&&gpuPair&&gpuOptics.Prepare(gameDevice,width,height);
+            if(gpuOptic){
+                bool captured=true;
+                if(optic.magnification>1.01f){
+                    activeEye=2;
+                    captured=false;
+                    if(BeginNativeScope(renderer,scope->world,scope->fov)){
+                        CameraScope camera;
+                        {auto timing=renderProfile.Measure(RenderProfile::NativeScope);original(renderer,0.0,interpolation);}
+                        captured=gpuOptics.CaptureScope();
+                    }
                 }
-                if(captured){
+                if(!captured){Fail("GPU optic scope capture");return result;}
+                auto timing=renderProfile.Measure(RenderProfile::OpticComposite);
+                auto* hud=opticHudReady?uiCapture.ResolveTexture(true):nullptr;
+                auto* baseline=hud?uiCapture.ResolveTexture():nullptr;
+                for(unsigned i=0;i<2;++i)if(!gpuOptics.Draw(gpuFrames.Surface(i),optic,eyeCameras[i],*scope,i,hud,baseline)){
+                    Fail("GPU optic composition");return result;
+                }
+                if(!eyeRestore.DrawTexture(gameDevice,gpuFrames.Texture(0))){Fail("GPU optic desktop restore");return result;}
+            }else{
+                if(scope){
+                    if(!ReadGpuEyes())return result;
+                    auto timing=renderProfile.Measure(RenderProfile::OpticHud);
+                    if(opticHudReady&&uiCapture.Read(colorFormat,opticHudBaseline)&&uiCapture.ReadOptic(colorFormat,opticHudPixels))
+                        IsolateOpticHud(opticHudPixels,opticHudBaseline,width,height);
+                    else opticHudPixels.clear();
+                }
+                if(scope && optic.magnification<=1.01f){
+                    // Reflex glass retains the normal stereo world. Only draw the
+                    // sight's collimated dot; never re-render or magnify this eye.
                     const bool rgba=colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM||colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
                     auto timing=renderProfile.Measure(RenderProfile::OpticComposite);
-                    for(unsigned i=0;i<2;++i)CompositeGunOptic(pixels[i],scopePixels,width,height,optic,eyeCameras[i],*scope,i,rgba,opticHudPixels);
-                }else{DisableNativeOptics();opticsReady=false;}
-                // The extra native Present stayed suppressed. Restore a normal
-                // eye before the one real desktop Present/OBS capture.
-                if(!eyeRestore.Draw(gameDevice,pixels[0],width,height,colorFormat)){
-                    DisableNativeOptics();opticsReady=false;Fail("restore normal desktop eye after optic replay");return result;
+                    for(unsigned i=0;i<2;++i)CompositeGunOptic(pixels[i],{},width,height,optic,eyeCameras[i],*scope,i,rgba,opticHudPixels);
+                }else if(scope){
+                    activeEye=2;
+                    bool captured=false;
+                    if(BeginNativeScope(renderer,scope->world,scope->fov)){
+                        CameraScope camera;
+                        {auto timing=renderProfile.Measure(RenderProfile::NativeScope);original(renderer,0.0,interpolation);}
+                        auto timing=renderProfile.Measure(RenderProfile::ScopeReadback);
+                        captured=SUCCEEDED(capture.Read(gameDevice,colorFormat,scopePixels)) && scopePixels.size()==pixels[0].size();
+                    }
+                    if(captured){
+                        const bool rgba=colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM||colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+                        auto timing=renderProfile.Measure(RenderProfile::OpticComposite);
+                        for(unsigned i=0;i<2;++i)CompositeGunOptic(pixels[i],scopePixels,width,height,optic,eyeCameras[i],*scope,i,rgba,opticHudPixels);
+                    }else{DisableNativeOptics();opticsReady=false;}
+                    // The extra native Present stayed suppressed. Restore a normal
+                    // eye before the one real desktop Present/OBS capture.
+                    if(!eyeRestore.Draw(gameDevice,pixels[0],width,height,colorFormat)){
+                        DisableNativeOptics();opticsReady=false;Fail("restore normal desktop eye after optic replay");return result;
+                    }
                 }
             }
         }
@@ -718,7 +741,7 @@ void StereoPresent(IDirect3DDevice9* device) {
     } catch (...) { Fail("stereo presentation allocation or runtime exception"); }
 }
 void StereoReset() {
-    gpuFrames.Reset();gpuReady=false;gpuAttempted=false;gpuPair=false;
+    gpuOptics.Reset();gpuFrames.Reset();gpuReady=false;gpuAttempted=false;gpuPair=false;
     renderTime.Reset();opticHudReady=false;opticHudPixels.clear();opticHudBaseline.clear();
     RestoreFramePacing();
     RecenterNativeVehicle();traversalControls.Reset();weaponGrip.Reset();SetNativeWeaponHeld(true);controlsMenu.Reset();physicalStance.Reset();ConfigurePhysicalCamera(false);standingHeight.Reset();

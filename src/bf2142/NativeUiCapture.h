@@ -14,6 +14,7 @@ public:
     bool BeginOptic(IDirect3DDevice9*);
     bool EndOptic();
     bool ReadOptic(DXGI_FORMAT,std::vector<DWORD>&);
+    IDirect3DTexture9* ResolveTexture(bool optic=false); // borrowed, GPU-only MSAA resolve
 
     IDirect3DSurface9* Surface() const { return active || opticActive ? nullptr : surface.Get(); } // borrowed
     bool Active() const { return active; }

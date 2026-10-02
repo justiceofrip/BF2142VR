@@ -33,7 +33,15 @@ int main(){
   {CrosshairScope optic(g,true);if(!optic.Optic()||index!=zoom||alpha!=1)return 15;}if(alpha!=.8f)return 16;
  }
  for(int other:{0,24,25,55,82,93,777}){index=other;{CrosshairScope scope(g);if(index!=other||alpha!=0)return 9;}if(alpha!=.8f)return 10;}
- index=84;SetCrosshairHidden(false);{CrosshairScope scope(g);if(index!=84||alpha!=.8f)return 11;}SetCrosshairHidden(true);
+ index=84;SetCrosshairHidden(false);{CrosshairScope scope(g);if(index!=1024||alpha!=.8f)return 11;}SetCrosshairHidden(true);
+ index=84;{CrosshairScope optic(g,true);if(index!=84||alpha!=1)return 17;
+  {CrosshairScope flash(g);if(index!=84||alpha!=1)return 18;}
+  if(index!=84||alpha!=1)return 19;
+ }if(index!=84||alpha!=.8f)return 20;
+ // Missing crosshair-alpha lookup must not let fixed-opacity ADS widgets leak.
+ Put(entry.data(),0x10,static_cast<float*>(nullptr));
+ {CrosshairScope flash(g);if(index!=1024)return 21;}if(index!=84)return 22;
+ Put(entry.data(),0x10,&alpha);
  g[0x4e490]=0;{CrosshairScope scope(g);if(index!=84||alpha!=0)return 12;}if(alpha!=.8f)return 13;
  g[0x4e490]=intMap[0];Put(intEntry.data(),0x10,reinterpret_cast<int*>(1));if(ResolveGui(g))return 14;
  puts("Signature-backed named crosshair alpha lookup passed; unrelated HUD state remains untouched.");return 0;

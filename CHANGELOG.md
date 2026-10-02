@@ -1,5 +1,19 @@
 # BFVR Changelog
 
+## Unreleased: ADS GPU candidate
+
+- Keep supported optics on GPU eye transfer instead of reading both eyes and
+  scope/HUD images to the CPU and uploading them again. Magnified optics still
+  render one additional world view; reflex sights do not.
+- Compose only inside the projected sight aperture and restore native graphics
+  state. Retain the existing sight geometry, eye relief and animation timing.
+- Suppress recognized ADS widget roots independently of the ordinary crosshair
+  toggle, including nested/standalone Flash batches. Preserve the optic HUD
+  replay so its artwork can be placed inside the sight.
+- Synthetic pixel/state/timing checks pass; actual headset FPS and the reported
+  below-gun HUD leak still require a new playtest. Not included in test.8.
+
+
 ## v0.2.0-beta.4-test.8 — clarity, GPU transfer and bounded uploads
 
 - Use the active OpenXR runtime recommendation for the eye source, bounded for the 32-bit game, with independent desktop menu sizing/input.

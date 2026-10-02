@@ -144,6 +144,16 @@ bool NativeUiCapture::EndOptic(){
 bool NativeUiCapture::ReadOptic(DXGI_FORMAT format,std::vector<DWORD>& pixels){
  return !opticActive&&opticSurface&&SUCCEEDED(capture.ReadSurface(device,opticSurface.Get(),format,pixels,true));
 }
+IDirect3DTexture9* NativeUiCapture::ResolveTexture(bool optic){
+ if(active||opticActive)return nullptr;
+ auto* image=optic?opticTexture.Get():texture.Get();auto* source=optic?opticSurface.Get():surface.Get();
+ if(!image||!source)return nullptr;
+ if(samples!=D3DMULTISAMPLE_NONE){
+  Microsoft::WRL::ComPtr<IDirect3DSurface9> resolved;
+  if(FAILED(image->GetSurfaceLevel(0,&resolved))||FAILED(device->StretchRect(source,nullptr,resolved.Get(),nullptr,D3DTEXF_NONE)))return nullptr;
+ }
+ return image;
+}
 void NativeUiCapture::Reset() {
     if(opticActive)EndOptic();opticTexture.Reset();opticSurface.Reset();
     if (active && device) Detach();

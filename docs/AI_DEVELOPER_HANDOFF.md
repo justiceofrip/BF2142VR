@@ -1,5 +1,33 @@
 # BFVR AI and Developer Handoff
 
+## Published test.8; separate ADS candidate (2026-10-01)
+
+Test.8 source/tag, installer, ZIP and signed preview feed are published. All 18
+uploaded assets match local SHA256/size; an empty updater cache downloaded and
+verified all 168 manifest entries. Exact ZIP cold install/repair/rollback and
+standalone test.7 upgrade tests pass. Feed filename uses binary/NUL-safe Git tree
+input: Windows text-mode stdin otherwise creates an unwanted trailing CR.
+
+The ADS candidate is a separate branch. The confirmed code path previously
+forced two full-eye reads, optic/base HUD reads, scope readback, CPU composition
+and three CPU uploads. GpuGunOptics now captures/composites directly on D3D9 GPU
+surfaces; shader work is clipped to projected glass. Magnified optics retain
+the third native view and its zero animation delta. Unsupported GPU preparation
+retains the CPU path; a failed draw does not publish a partial stereo frame.
+
+NativeCrosshair now resolves ADS selector independently of crosshair alpha and
+the hide-crosshair toggle. NativeMenus wraps standalone/nested Flash batches;
+a thread-local replay guard keeps genuine scope HUD replay intact. This closes
+code-level escape paths; do not claim the reported in-game leak is visually
+fixed until tested. No game files or IK/input/shot transforms changed.
+
+24 GPU/CPU pixel-reference cases pass at both 512x512 and 2064x2208, including
+all six sight profiles, off-eye clipping, HUD alpha, rigid transforms, hostile
+native state and ResetEx. Complete native Ex stereo fixtures show 60/60 GPU
+frames for magnified and reflex sights, and exactly one renderer time advance
+per pair. Actual FPS gain and live HUD appearance remain unverified.
+
+
 ## Test.8 release candidate (2026-10-01)
 
 The accepted bounded-upload renderer is being packaged with the test.7 installer

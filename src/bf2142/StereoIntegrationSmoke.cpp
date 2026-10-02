@@ -226,8 +226,8 @@ int wmain(int argc,wchar_t** argv) {
     if(desktopFixture){
         if(gpuFixture){
             const auto fast=bf2142::TestGpuPublished();
-            valid=(fast==((scopeFixture||reflexFixture)?0u:60u))&&valid;
-            printf("GPU fixture: %u fast frames; scope/reflex CPU fallback preserved.\n",fast);
+            valid=(fast==60u)&&valid;
+            printf("GPU fixture: %u fast frames; scope/reflex stay on GPU.\n",fast);
         }
         valid=lastDesktop.size()==320u*240u && valid;
         if(!lastDesktop.empty())valid=lastDesktop.front()==0xff00ff00 && lastDesktop.back()==0xff102030 && Centroid(lastDesktop)>0 && valid;
