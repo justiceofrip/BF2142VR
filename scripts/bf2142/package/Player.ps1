@@ -78,10 +78,18 @@ try {
  $game=(Get-Content -LiteralPath (Join-Path $root 'install.json') -Raw|ConvertFrom-Json).game
  $env:BF2142VR_CONFIG=Join-Path $root 'BF2142VR.ini'
  $env:BFVR_DIAGNOSTICS='off'
+ $env:BF2142VR_FRAME_PROFILE='0'
+ $env:BF2142VR_GPU_DEBUG='0'
+ $env:BF2142VR_MENU_TRACE='0'
+ if($Action -ne 'Desktop'){
+  $env:BF2142VR_GPU_TRANSFER='dx9ex'
+  $env:BF2142VR_EX_MANAGED_UPLOAD='1'
+ }
+ $env:BFVR_USER_CONFIG_PATH=Join-Path $root 'runtime\x64\UserConfig.txt'
  $launcher=Join-Path $root 'runtime\x86\BF2142VRLauncher.exe'
  $presenter=Join-Path $root 'runtime\x64\BFVRPresenter.exe'
  $launchArgs=@('--game-dir',$game,'--windowed')
- if($Action -eq 'Desktop'){$launchArgs+='--desktop-vr'}else{$launchArgs+=@('--presenter',$presenter)}
+ if($Action -eq 'Desktop'){$launchArgs+='--desktop-vr'}else{$launchArgs+=@('--presenter',$presenter,'--headset-resolution')}
  if($Action -eq 'Inspect'){$launchArgs+='--inspect'}
  elseif($Action -ne 'Desktop'){
   $manifest=Join-Path $root 'BF2142VR.vrmanifest'

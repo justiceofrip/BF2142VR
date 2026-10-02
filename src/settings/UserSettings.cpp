@@ -68,6 +68,7 @@ constexpr std::string_view kCrosshairColorKey = "3d_crosshair_color";
 constexpr std::string_view kCrosshairOpacityKey =
     "3d_crosshair_opacity_percent";
 constexpr std::string_view kFxaaEnabledKey = "fxaa_enabled";
+constexpr std::string_view kBf2142FxaaKey = "bf2142_fxaa_enabled";
 constexpr std::string_view kFxaaSharpeningKey =
     "fxaa_sharpening_percent";
 constexpr std::string_view kAmbientOcclusionEnabledKey =
@@ -901,6 +902,15 @@ UserSettingsSchema SeededUserSettingsSchema()
             IsBoolean
         },
         {
+            std::string(kBf2142FxaaKey),
+            "false",
+            {
+                "BF2142 VR only: enable the optional world FXAA smoothing pass. Off by default because headset comparisons found it blurred text and world detail. Native geometry MSAA and bloom are independent.",
+                "Accepted values: true or false. This overrides fxaa_enabled only for BF2142; other BFVR games retain their own setting. The presenter reloads changes while running."
+            },
+            IsBoolean
+        },
+        {
             std::string(kFxaaSharpeningKey),
             std::to_string(kDefaultFxaaSharpeningPercent),
             {
@@ -1171,6 +1181,7 @@ UserSettingsValues DecodeUserSettings(const UserSettings& settings) noexcept
         ? CrosshairColor::Yellow
         : CrosshairColor::Green;
     result.fxaaEnabled = readBoolean(kFxaaEnabledKey, true);
+    result.bf2142FxaaEnabled = readBoolean(kBf2142FxaaKey, false);
     result.ambientOcclusionEnabled = readBoolean(
         kAmbientOcclusionEnabledKey,
         true);
@@ -1426,6 +1437,8 @@ void EncodeUserSettings(
         encodeCrosshairColor(values.crosshairColor);
     settings.values[std::string(kFxaaEnabledKey)] =
         values.fxaaEnabled ? "true" : "false";
+    settings.values[std::string(kBf2142FxaaKey)] =
+        values.bf2142FxaaEnabled ? "true" : "false";
     settings.values[std::string(kAmbientOcclusionEnabledKey)] =
         values.ambientOcclusionEnabled ? "true" : "false";
     settings.values[std::string(kWaterReflectionsEnabledKey)] =

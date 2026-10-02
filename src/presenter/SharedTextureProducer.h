@@ -20,6 +20,9 @@ struct SharedTextureRequirements
     UINT uiWidth = 0;
     UINT uiHeight = 0;
     DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+    // Reuse CPU-write staging textures instead of driver-managed temporary
+    // UpdateSubresource uploads. Opt-in for address-space-limited producers.
+    bool boundedCpuUpload = false;
 };
 
 struct SharedTexturePixels
@@ -58,6 +61,7 @@ private:
     struct Texture
     {
         ID3D11Texture2D* resource = nullptr;
+        ID3D11Texture2D* cpuUpload = nullptr;
         ID3D11RenderTargetView* renderTargetView = nullptr;
         IDXGIKeyedMutex* keyedMutex = nullptr;
         HANDLE sharedHandle = nullptr;
@@ -74,6 +78,7 @@ private:
     void WriteLog(const wchar_t* format, ...) const;
     void ReleaseTexture(Texture& texture);
 
+    bool boundedCpuUpload_ = false;
     ID3D11Query* gpuCompletion_ = nullptr;
     ID3D11Device* device_ = nullptr;
     ID3D11DeviceContext* context_ = nullptr;

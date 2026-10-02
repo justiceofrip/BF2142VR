@@ -1,94 +1,52 @@
 # BF2142 VR render quality
 
-## Optional image-filter comparison
+## Test.8 source resolution and presentation
 
-The presenter normally loads `runtime/x64/UserConfig.txt` (or an explicit
-`BFVR_USER_CONFIG_PATH`) and applies its saved FXAA and bloom settings. The
-seeded settings enable both. BF2142 also requests native geometry MSAA. An
-extra smoothing/glow pass can contribute to softness independently of source
-resolution; this is not proof of the cause on any particular headset.
+The installed Play VR launcher queries the **active OpenXR runtime's recommended
+eye size** before the game starts. This includes that runtime's resolution scale;
+it is a recommended render size, not necessarily the physical panel pixel count.
+For the 32-bit renderer the source is bounded to 3072 pixels per axis and
+8,388,608 pixels per eye, preserving its aspect ratio. If the query fails,
+the launcher retains the 1600x900 fallback. Connect the headset before launching
+and restart the game after changing runtime resolution.
 
-The optional `BF2142-VR-Image-Filter-Comparison.zip` asset on the test.7 release
-has four launchers: normal filters, FXAA off, bloom off, and both off. Extract
-it anywhere, close the game, connect the headset and select your BF2142.exe.
-Each run uses a temporary presenter-config copy. Normal Play VR retains the
-original settings; source size, native MSAA, game effects and gameplay remain
-unchanged. Compare the same view. No headset/FPS improvement is claimed yet.
-The helper source is `scripts/bf2142/Compare-ImageFilters.ps1`; validation uses
-`Test-ImageFilters.ps1` and the actual presenter settings reader.
+The desktop preview remains a compact widescreen window. Its input coordinates
+and the native menu canvas are mapped separately from the eye source. Changing
+the in-game resolution does not replace the launcher's source selection. Native
+texture/detail settings still apply; this is not a texture replacement pack.
 
-The installer-only test.7 does not enable this experiment automatically.
+Ordinary world frames use native D3D9Ex shared GPU textures. Managed-resource
+staging preserves native row layout, and reset/COM dispatch corrections preserve
+menu fonts and ground textures. CPU fallback uploads reuse staging allocations
+instead of accumulating driver upload memory in the 32-bit process.
 
+## Filters and antialiasing
 
-## Separate beta.4-test.4 experimental build
+BF2142's added FXAA defaults **off**, following community comparisons that
+isolated it as the source of fuzzy text and edges. `bf2142_fxaa_enabled` in the
+presenter's `runtime/x64/UserConfig.txt` controls this separately from the older
+`fxaa_enabled` used by other BFVR games. Bloom remains independent.
 
-Test.2 restores the verified **1600x900 native source**. Test.1 automatically
-raised that source using the runtime recommendation and broke the native menu
-layout in the owner playtest. That automatic enlargement has been removed.
-OpenXR continues to choose output eye dimensions and FOV. Output supersampling
-does not recover detail absent from the source. Explicit --render-size remains
-experimental: unsupported layouts may distort the native menus.
+The VR client requests real native **8x MSAA**, with supported 4x/2x fallback.
+`WorldMSAASamples=8` under `[VR]` in `BF2142VR.ini` selects that default; 4 or 2
+reduces cost, while 0 preserves native AA behavior. Restart after changes.
+MSAA does not remove all transparent-foliage shimmer, enhance old textures,
+or remove wireless compression artifacts.
 
-This is a higher-detail candidate, not a promise of higher FPS. Rendering more
-pixels costs more; reduce runtime resolution or use --render-size if needed.
-The native monitor vsync wait is removed for actual headset launches; OpenXR
-still schedules presentation. The native FPS-unlock request respects game
-restrictions and restores the previous cap outside focused gameplay.
+## Validation and limits
 
-Holstered equipment now uses the full-resolution GPU eye target and its MSAA,
-with linear/mip texture filtering. Regenerating assets retains nearer stock mesh
-detail and 256px textures; older packs also benefit from GPU rendering. The
-hangar was already rendered on the GPU and benefits from source size, but its
-stock textures have not been upscaled. Full game texture upscaling stays separate.
+The owner accepted clear, smooth Quest 3/Steam Link/SteamVR gameplay at a
+2064x2208 per-eye source, actual 8x MSAA, and 90 Hz. Repeated unscoped batches
+tracked that cadence; heavier scenes dipped below it. This is not a promise
+of constant 90 FPS, 120/144 Hz performance, or compatibility with every headset.
+Login, readable menus and clean terrain succeeded in the accepted session.
 
-Automated checks pass; headset visual quality and actual FPS still need testing.
-Test.3 preserves elapsed effects time when the XR consumer skips native render
-calls, isolates belt depth and captures supported native scope HUDs separately.
-The faint black HUD outline remains unconfirmed.
-The following describes the published beta.2/beta.3 behavior.
+ADS still reads GPU eyes back to the CPU for compositing, and magnified optics
+render another native view. This slower path and stray optic HUD graphics are
+separate follow-up work. No ADS performance fix is claimed in test.8.
 
-
-Windowed headset launches use a **1600 x 900 source per eye**. Flat/observer and
-simulated launches default to 1280 x 720. The native window, backbuffer and Flash
-canvas share one size. The earlier square-source/compact-mirror experiment was
-withdrawn because it broke menus; do not restore that path.
-
-## Native geometry antialiasing
-
-The quality hotfix requests real **8x MSAA** when creating/resetting
-the VR D3D9 device, with 4x/2x fallback according to color/depth support. The
-owned windowed game reported 8x in its video menu but created an unmultisampled
-source; the new path records the actual swapchain sample count. It requires the
-native discard swapchain and automatic depth allocation, preserves formats and
-size, and retries the original parameters on creation/reset failure. Unknown
-manual-depth/lockable configurations remain unchanged. Flat observers retain
-native settings.
-
-`WorldMSAASamples=8` in `[VR]` selects this default; `4`/`2` reduce cost and `0`
-leaves native AA unchanged. Restart the game after changing it. Keep world FXAA
-enabled in the presenter; it complements geometry MSAA. Neither path changes
-Steam Link compression or magically adds detail to old textures. Transparent
-foliage and shader shimmer may still need additional work.
-
-The GPU check draws diagonal geometry with 0/2/4/8 samples and verifies partial
-edge coverage survives the same MSAA resolve/readback used for eye transport.
-UI capture separately preserves native color/depth/viewport state and alpha.
-Actual headset appearance and performance require a headset play session.
-
-## Explicit source size
-
-`--render-size WIDTHxHEIGHT` overrides the launcher source size (640-3072 per
-axis). It is not a headset-native resolution setting. OpenXR controls output eye
-swapchains and FOV. Raising this size increases native rendering, CPU readback
-and transfer cost; keep the verified widescreen menu layout as the baseline.
-
-Texture upscaling remains an optional separate experiment. No generated or
-proprietary game textures are bundled with this source or candidate.
-
-## Player settings
-
-Use the updated launcher: its source size overrides the in-game resolution at
-startup. Changing the video menu alone does not raise that source. No special
-in-game preset is required. SteamVR supersampling can raise the output size,
-but cannot recover detail absent from the source. Leave texture quality at your
-preferred level; texture enhancement is separate and lowest priority.
+For explicit developer comparisons, `--render-canvas WIDTHxHEIGHT` selects a
+bounded source with separate menu/window mapping. `--render-size` alone changes
+the older shared window/source size and is not the equivalent of runtime sizing.
+Diagnostics remain off by default. The filter comparison helpers under
+`scripts/bf2142` can override FXAA/bloom using a temporary configuration.

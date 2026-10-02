@@ -182,6 +182,7 @@ struct UserSettingsValues
     std::uint32_t crosshairOpacityPercent =
         kDefaultCrosshairOpacityPercent;
     bool fxaaEnabled = true;
+    bool bf2142FxaaEnabled = false;
     std::uint32_t fxaaSharpeningPercent = kDefaultFxaaSharpeningPercent;
     bool ambientOcclusionEnabled = true;
     std::uint32_t ambientOcclusionRadiusCentimeters =

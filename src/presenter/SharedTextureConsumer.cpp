@@ -27,16 +27,15 @@ bool IsSrgbFormat(DXGI_FORMAT format)
         format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 }
 
-bool ReadWorldFxaaEnabled()
+bool ReadWorldFxaaEnabled(bool battlefield2142)
 {
     wchar_t value[2] = {};
     const DWORD length = GetEnvironmentVariableW(
         L"BFVR_OPENXR_FXAA",
         value,
         static_cast<DWORD>(std::size(value)));
-    // The owner has accepted this quality path. Disable it only for a
-    // deliberate measured A/B; it must not silently change visual quality.
-    return !(length == 1 && value[0] == L'0');
+    if(length == 1 && (value[0] == L'0' || value[0] == L'1'))return value[0] == L'1';
+    return !battlefield2142;
 }
 
 struct WorldBloomConfiguration
@@ -168,13 +167,14 @@ bool SharedTextureConsumer::Initialize(
     context_ = context;
     context_->AddRef();
     collectPerformanceDiagnostics_ = ReadPerformanceDiagnosticsEnabled();
+    battlefield2142_ = (producerFlags & kProducerFlagBattlefield2142) != 0;
     const auto& userSettingsRuntime =
         settings::ProcessUserSettingsRuntime();
     if (userSettingsRuntime.IsReady())
     {
         const settings::UserSettingsValues values =
             settings::DecodeUserSettings(userSettingsRuntime.Current());
-        worldFxaaEnabled_ = values.fxaaEnabled;
+        worldFxaaEnabled_ = battlefield2142_ ? values.bf2142FxaaEnabled : values.fxaaEnabled;
         worldFxaaSharpeningStrength_ =
             static_cast<float>(values.fxaaSharpeningPercent) / 100.0F;
         worldBloomEnabled_ = values.bloomEnabled;
@@ -196,7 +196,7 @@ bool SharedTextureConsumer::Initialize(
     }
     else
     {
-        worldFxaaEnabled_ = ReadWorldFxaaEnabled();
+        worldFxaaEnabled_ = ReadWorldFxaaEnabled(battlefield2142_);
         const WorldBloomConfiguration bloom = ReadWorldBloomConfiguration();
         worldBloomEnabled_ = bloom.enabled;
         worldBloomThreshold_ = bloom.threshold;
@@ -469,7 +469,7 @@ bool SharedTextureConsumer::Initialize(
                         ? L"Shared texture consumer opened the three color resources plus two packed-depth resources; native-resolution world AO is active at intensity %.2f, temporal history and bloom are disabled."
                         : worldFxaaEnabled_
                         ? L"Shared texture consumer opened all three x86-produced resources and enabled x64 aspect-fit conversion with world FXAA; AO and bloom are disabled."
-                        : L"Shared texture consumer opened all three x86-produced resources and enabled x64 aspect-fit conversion with world FXAA disabled by BFVR_OPENXR_FXAA=0; AO and bloom are disabled.",
+                        : L"Shared texture consumer opened all three x86-produced resources and enabled x64 aspect-fit conversion with world FXAA disabled by the active game settings; AO and bloom are disabled.",
                     ambientOcclusionIntensity_);
             }
         }
@@ -924,9 +924,10 @@ void SharedTextureConsumer::ApplySavedLiveSettings()
     }
     const settings::UserSettingsValues values =
         settings::DecodeUserSettings(runtime.Current());
-    if (worldFxaaEnabled_ != values.fxaaEnabled)
+    const bool fxaa = battlefield2142_ ? values.bf2142FxaaEnabled : values.fxaaEnabled;
+    if (worldFxaaEnabled_ != fxaa)
     {
-        worldFxaaEnabled_ = values.fxaaEnabled;
+        worldFxaaEnabled_ = fxaa;
         for (std::size_t index = 0; index < textures_.size(); ++index)
         {
             textures_[index].applyAntialiasing =
@@ -1036,6 +1037,7 @@ void SharedTextureConsumer::Shutdown()
     scalerRequired_ = false;
     requiresLegacyCompletionWait_ = false;
     collectPerformanceDiagnostics_ = true;
+    battlefield2142_ = false;
     worldFxaaEnabled_ = true;
     worldFxaaSharpeningStrength_ = 0.25F;
     worldBloomEnabled_ = false;

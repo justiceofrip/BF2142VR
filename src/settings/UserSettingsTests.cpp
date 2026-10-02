@@ -233,7 +233,7 @@ bool TestProductionSeedAndTypedValues(const std::wstring& directory)
     }
     const auto defaults = store.Defaults();
     const auto decodedDefaults = bfvr::settings::DecodeUserSettings(defaults);
-    if (defaults.values.size() != 46 ||
+    if (defaults.values.size() != 47 ||
         decodedDefaults.playMode != bfvr::settings::PlayMode::Seated ||
         decodedDefaults.artificialTurnMode !=
             bfvr::settings::ArtificialTurnMode::Smooth ||
@@ -276,6 +276,7 @@ bool TestProductionSeedAndTypedValues(const std::wstring& directory)
             bfvr::settings::CrosshairColor::Green ||
         decodedDefaults.crosshairOpacityPercent != 100 ||
         !decodedDefaults.fxaaEnabled ||
+        decodedDefaults.bf2142FxaaEnabled ||
         decodedDefaults.fxaaSharpeningPercent != 30 ||
         !decodedDefaults.ambientOcclusionEnabled ||
         decodedDefaults.ambientOcclusionRadiusCentimeters != 60 ||
@@ -350,6 +351,7 @@ bool TestProductionSeedAndTypedValues(const std::wstring& directory)
     changed.crosshairColor = bfvr::settings::CrosshairColor::Purple;
     changed.crosshairOpacityPercent = 35;
     changed.fxaaEnabled = false;
+    changed.bf2142FxaaEnabled = true;
     changed.fxaaSharpeningPercent = 80;
     changed.ambientOcclusionEnabled = false;
     changed.ambientOcclusionRadiusCentimeters = 95;
@@ -492,6 +494,7 @@ bool TestProductionSeedAndTypedValues(const std::wstring& directory)
         contents.find("Zero is deliberately rejected") !=
             std::string::npos &&
         contents.find("fxaa_enabled = false") != std::string::npos &&
+        contents.find("bf2142_fxaa_enabled = true") != std::string::npos &&
         contents.find("fxaa_sharpening_percent = 80") !=
             std::string::npos &&
         contents.find("without requiring a restart") != std::string::npos &&

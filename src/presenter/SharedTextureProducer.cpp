@@ -8,6 +8,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cwchar>
+#include <cstring>
 #include <iterator>
 
 namespace
@@ -54,6 +55,7 @@ bool SharedTextureProducer::Initialize(
     Shutdown();
     logCallback_ = logCallback;
     logContext_ = logContext;
+    boundedCpuUpload_ = requirements.boundedCpuUpload;
     if (channelName == nullptr || *channelName == L'\0' ||
         requirements.format == DXGI_FORMAT_UNKNOWN ||
         requirements.leftWorldWidth == 0 || requirements.leftWorldHeight == 0 ||
@@ -217,17 +219,59 @@ bool SharedTextureProducer::PublishFrame(
         acquired[index] = true;
     }
 
+    bool uploaded = true;
     for (std::size_t index = 0; index < textures_.size(); ++index)
     {
-        context_->UpdateSubresource(
-            textures_[index].resource,
-            0,
-            nullptr,
-            frame[index].data,
-            frame[index].rowPitch,
-            0);
+        Texture& texture = textures_[index];
+        if (!boundedCpuUpload_)
+        {
+            context_->UpdateSubresource(texture.resource, 0, nullptr,
+                frame[index].data, frame[index].rowPitch, 0);
+            continue;
+        }
+        if (!texture.cpuUpload)
+        {
+            D3D11_TEXTURE2D_DESC desc = {};
+            texture.resource->GetDesc(&desc);
+            desc.Usage = D3D11_USAGE_STAGING;
+            desc.BindFlags = desc.MiscFlags = 0;
+            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            const HRESULT result = device_->CreateTexture2D(&desc, nullptr, &texture.cpuUpload);
+            if (FAILED(result))
+            {
+                WriteLog(L"CPU upload staging creation failed at slot %zu (HRESULT=0x%08lX).", index, result);
+                uploaded = false;
+                break;
+            }
+        }
+        // WRITE (not DISCARD) waits for any preceding GPU copy from this same
+        // staging allocation. This bounds upload memory while preserving the
+        // keyed ownership protocol and arbitrary source/destination row pitch.
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        const HRESULT result = context_->Map(texture.cpuUpload, 0, D3D11_MAP_WRITE, 0, &mapped);
+        if (FAILED(result))
+        {
+            WriteLog(L"CPU upload staging map failed at slot %zu (HRESULT=0x%08lX).", index, result);
+            uploaded = false;
+            break;
+        }
+        const std::size_t rowBytes = std::size_t(frame[index].width) * sizeof(DWORD);
+        const auto* source = static_cast<const BYTE*>(frame[index].data);
+        auto* destination = static_cast<BYTE*>(mapped.pData);
+        for (UINT row = 0; row < frame[index].height; ++row)
+            std::memcpy(destination + std::size_t(row) * mapped.RowPitch,
+                source + std::size_t(row) * frame[index].rowPitch, rowBytes);
+        context_->Unmap(texture.cpuUpload, 0);
+        context_->CopyResource(texture.resource, texture.cpuUpload);
     }
     context_->Flush();
+    if (!uploaded)
+    {
+        // No frame was published. Return every acquired slot to the producer,
+        // including those already copied; the caller will not advance sequence.
+        for (Texture& texture : textures_) texture.keyedMutex->ReleaseSync(0);
+        return false;
+    }
 
     bool released = true;
     for (Texture& texture : textures_)
@@ -269,6 +313,7 @@ void SharedTextureProducer::Shutdown()
         device_ = nullptr;
     }
     featureLevel_ = D3D_FEATURE_LEVEL_9_1;
+    boundedCpuUpload_ = false;
 }
 
 D3D_FEATURE_LEVEL SharedTextureProducer::DeviceFeatureLevel() const noexcept
@@ -470,6 +515,11 @@ void SharedTextureProducer::WriteLog(const wchar_t* format, ...) const
 
 void SharedTextureProducer::ReleaseTexture(Texture& texture)
 {
+    if (texture.cpuUpload != nullptr)
+    {
+        texture.cpuUpload->Release();
+        texture.cpuUpload = nullptr;
+    }
     if (texture.sharedHandle != nullptr)
     {
         CloseHandle(texture.sharedHandle);

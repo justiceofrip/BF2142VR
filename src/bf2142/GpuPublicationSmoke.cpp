@@ -31,6 +31,7 @@ int wmain(int argc,wchar_t** argv){
         ComPtr<ID3D12Device> d12;Check(interop->GetD3D12Device(IID_PPV_ARGS(&d12)),"underlying device");adapterLuid=d12->GetAdapterLuid();
     }
     shared::SharedTextureRequirements requirements{};
+    requirements.boundedCpuUpload=true;
     requirements.adapterLuid=adapterLuid;requirements.format=DXGI_FORMAT_B8G8R8A8_UNORM;
     requirements.leftWorldWidth=requirements.rightWorldWidth=requirements.uiWidth=w;
     requirements.leftWorldHeight=requirements.rightWorldHeight=requirements.uiHeight=h;

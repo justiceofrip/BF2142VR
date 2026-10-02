@@ -1,4 +1,5 @@
 #include "NativeExResources.h"
+#include "NativeExReset.h"
 #include <MinHook.h>
 #include <wrl/client.h>
 #include <cstdio>
@@ -11,7 +12,11 @@ int main(){
  HWND window=CreateWindowExW(0,L"STATIC",L"Hidden native D3D9Ex compatibility",WS_OVERLAPPED,0,0,320,240,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);CHECK(window);
  ComPtr<IDirect3D9Ex> api;CHECK(SUCCEEDED(Direct3DCreate9Ex(D3D_SDK_VERSION,&api)));
  D3DPRESENT_PARAMETERS p{};p.Windowed=TRUE;p.hDeviceWindow=window;p.BackBufferWidth=320;p.BackBufferHeight=240;p.BackBufferFormat=D3DFMT_A8R8G8B8;p.SwapEffect=D3DSWAPEFFECT_DISCARD;p.MultiSampleType=D3DMULTISAMPLE_8_SAMPLES;p.PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;
- ComPtr<IDirect3DDevice9Ex> d;CHECK(SUCCEEDED(api->CreateDeviceEx(0,D3DDEVTYPE_HAL,window,D3DCREATE_HARDWARE_VERTEXPROCESSING,&p,nullptr,&d)));
+ ComPtr<IDirect3DDevice9Ex> d;CHECK(SUCCEEDED(api->CreateDeviceEx(0,D3DDEVTYPE_HAL,window,D3DCREATE_HARDWARE_VERTEXPROCESSING|D3DCREATE_PUREDEVICE,&p,nullptr,&d)));
+ // This overlay exists before resource hooks are registered for native assets.
+ ComPtr<IDirect3DTexture9> upload;
+ CHECK(SUCCEEDED(d->CreateTexture(320,240,1,D3DUSAGE_DYNAMIC,D3DFMT_A8R8G8B8,D3DPOOL_DEFAULT,&upload,nullptr)));
+ bfvr::bf2142::NativeExReset reset;CHECK(SUCCEEDED(reset.Initialize(d.Get())));
  ComPtr<IDirect3DTexture9> tex;CHECK(FAILED(d->CreateTexture(16,16,1,0,D3DFMT_A8R8G8B8,D3DPOOL_MANAGED,&tex,nullptr)));
  CHECK(MH_Initialize()==MH_OK);CHECK(bfvr::bf2142::InstallNativeExResources(d.Get(),nullptr));
  CHECK(SUCCEEDED(d->CreateTexture(16,16,0,0,D3DFMT_A8R8G8B8,D3DPOOL_MANAGED,&tex,nullptr)));
@@ -28,16 +33,37 @@ int main(){
  D3DVOLUME_DESC vd{};CHECK(SUCCEEDED(volume->GetLevelDesc(0,&vd))&&vd.Pool==D3DPOOL_MANAGED&&vd.Usage==0);
  D3DLOCKED_BOX box{};CHECK(SUCCEEDED(volume->LockBox(0,&box,nullptr,0)));*static_cast<DWORD*>(box.pBits)=0xff987654;CHECK(SUCCEEDED(volume->UnlockBox(0)));
  ComPtr<IDirect3DVolume9> layer;CHECK(SUCCEEDED(volume->GetVolumeLevel(0,&layer)));CHECK(SUCCEEDED(layer->GetDesc(&vd))&&vd.Pool==D3DPOOL_MANAGED);
- ComPtr<IDirect3DVertexBuffer9> vb;ComPtr<IDirect3DIndexBuffer9> ib;CHECK(SUCCEEDED(d->CreateVertexBuffer(256,D3DUSAGE_WRITEONLY,D3DFVF_XYZ,D3DPOOL_MANAGED,&vb,nullptr)));CHECK(SUCCEEDED(d->CreateIndexBuffer(128,D3DUSAGE_WRITEONLY,D3DFMT_INDEX16,D3DPOOL_MANAGED,&ib,nullptr)));
- D3DVERTEXBUFFER_DESC vbd{};D3DINDEXBUFFER_DESC ibd{};CHECK(SUCCEEDED(vb->GetDesc(&vbd))&&vbd.Pool==D3DPOOL_MANAGED&&vbd.Usage==D3DUSAGE_WRITEONLY);CHECK(SUCCEEDED(ib->GetDesc(&ibd))&&ibd.Pool==D3DPOOL_MANAGED&&ibd.Usage==D3DUSAGE_WRITEONLY);
+ ComPtr<IDirect3DVertexBuffer9> vb;ComPtr<IDirect3DIndexBuffer9> ib;CHECK(SUCCEEDED(d->CreateVertexBuffer(256,0,D3DFVF_XYZ,D3DPOOL_MANAGED,&vb,nullptr)));CHECK(SUCCEEDED(d->CreateIndexBuffer(128,0,D3DFMT_INDEX16,D3DPOOL_MANAGED,&ib,nullptr)));
+ D3DVERTEXBUFFER_DESC vbd{};D3DINDEXBUFFER_DESC ibd{};CHECK(SUCCEEDED(vb->GetDesc(&vbd))&&vbd.Pool==D3DPOOL_MANAGED&&vbd.Usage==0);CHECK(SUCCEEDED(ib->GetDesc(&ibd))&&ibd.Pool==D3DPOOL_MANAGED&&ibd.Usage==0);
  void* data=nullptr;CHECK(SUCCEEDED(vb->Lock(0,0,&data,0)));std::memset(data,0x46,256);CHECK(SUCCEEDED(vb->Unlock()));CHECK(SUCCEEDED(ib->Lock(0,0,&data,0)));std::memset(data,0x35,128);CHECK(SUCCEEDED(ib->Unlock()));
  // Managed compressed textures are used throughout the stock game.
  for(auto format:{D3DFMT_DXT1,D3DFMT_DXT3,D3DFMT_DXT5}){ComPtr<IDirect3DTexture9> compressed;CHECK(SUCCEEDED(d->CreateTexture(16,16,0,0,format,D3DPOOL_MANAGED,&compressed,nullptr)));for(UINT level=0;level<compressed->GetLevelCount();++level){CHECK(SUCCEEDED(compressed->LockRect(level,&lock,nullptr,0)));std::memset(lock.pBits,0,format==D3DFMT_DXT1?8:16);CHECK(SUCCEEDED(compressed->UnlockRect(level)));}}
  // Native font-like alpha texture: half is transparent, half is opaque.
  ComPtr<IDirect3DTexture9> font;CHECK(SUCCEEDED(d->CreateTexture(16,16,1,0,D3DFMT_A8,D3DPOOL_MANAGED,&font,nullptr)));
  CHECK(SUCCEEDED(font->LockRect(0,&lock,nullptr,0)));for(int y=0;y<16;++y)for(int x=0;x<16;++x)static_cast<BYTE*>(lock.pBits)[y*lock.Pitch+x]=x<8?0:255;CHECK(SUCCEEDED(font->UnlockRect(0)));
+ // Mixed resource classes must not overwrite an older object's trampoline.
+ D3DSURFACE_DESC overlayDesc{};CHECK(SUCCEEDED(upload->GetLevelDesc(0,&overlayDesc))&&overlayDesc.Pool==D3DPOOL_DEFAULT&&(overlayDesc.Usage&D3DUSAGE_DYNAMIC));
+ CHECK(SUCCEEDED(upload->LockRect(0,&lock,nullptr,D3DLOCK_DISCARD)));*static_cast<DWORD*>(lock.pBits)=0xff2468ac;CHECK(SUCCEEDED(upload->UnlockRect(0)));
  for(unsigned pass=0;pass<2;++pass){
-  if(pass){CHECK(SUCCEEDED(d->SetTexture(0,nullptr)));CHECK(SUCCEEDED(d->ResetEx(&p,nullptr)));}
+  if(pass){
+   // Reproduce legacy menu state surviving an Ex reset. Verify both that the
+   // mismatch exists and that the adapter clears it without losing resources.
+   CHECK(SUCCEEDED(d->SetRenderState(D3DRS_SCISSORTESTENABLE,TRUE)));
+   CHECK(SUCCEEDED(d->SetRenderState(D3DRS_DEPTHBIAS,0x3f000000)));
+   CHECK(SUCCEEDED(d->SetRenderState(D3DRS_FOGENABLE,TRUE)));
+   CHECK(SUCCEEDED(d->SetStreamSource(0,vb.Get(),0,12)));CHECK(SUCCEEDED(d->SetIndices(ib.Get())));
+   p.BackBufferWidth=400;p.BackBufferHeight=300;
+   CHECK(SUCCEEDED(d->ResetEx(&p,nullptr)));
+   DWORD state=0;CHECK(SUCCEEDED(d->GetRenderState(D3DRS_SCISSORTESTENABLE,&state))&&state==TRUE);
+   CHECK(SUCCEEDED(reset.Restore(d.Get(),false)));
+   for(auto rs:{D3DRS_SCISSORTESTENABLE,D3DRS_DEPTHBIAS,D3DRS_FOGENABLE,D3DRS_ALPHABLENDENABLE})CHECK(SUCCEEDED(d->GetRenderState(rs,&state))&&state==0);
+   ComPtr<IDirect3DBaseTexture9> bound;CHECK(SUCCEEDED(d->GetTexture(0,&bound))&&!bound);
+   ComPtr<IDirect3DVertexBuffer9> stream;UINT offset=0,stride=0;CHECK(SUCCEEDED(d->GetStreamSource(0,&stream,&offset,&stride))&&!stream);
+   ComPtr<IDirect3DIndexBuffer9> indices;CHECK(SUCCEEDED(d->GetIndices(&indices))&&!indices);
+   D3DVIEWPORT9 viewport{};RECT scissor{};CHECK(SUCCEEDED(d->GetViewport(&viewport))&&viewport.Width==400&&viewport.Height==300);
+   CHECK(SUCCEEDED(d->GetScissorRect(&scissor))&&scissor.left==0&&scissor.top==0&&scissor.right==400&&scissor.bottom==300);
+   p.BackBufferWidth=320;p.BackBufferHeight=240;CHECK(SUCCEEDED(d->ResetEx(&p,nullptr)));CHECK(SUCCEEDED(reset.Restore(d.Get(),false)));
+  }
   CHECK(SUCCEEDED(tex->LockRect(0,&lock,nullptr,D3DLOCK_READONLY)));CHECK(*static_cast<DWORD*>(lock.pBits)==0xff123400);CHECK(reinterpret_cast<DWORD*>(static_cast<BYTE*>(lock.pBits)+2*lock.Pitch)[2]==0xffabcdee);CHECK(SUCCEEDED(tex->UnlockRect(0)));
   CHECK(SUCCEEDED(cube->LockRect(D3DCUBEMAP_FACE_POSITIVE_X,0,&lock,nullptr,D3DLOCK_READONLY)));CHECK(*static_cast<DWORD*>(lock.pBits)==0xff567890);CHECK(SUCCEEDED(cube->UnlockRect(D3DCUBEMAP_FACE_POSITIVE_X,0)));
   CHECK(SUCCEEDED(volume->LockBox(0,&box,nullptr,D3DLOCK_READONLY)));CHECK(*static_cast<DWORD*>(box.pBits)==0xff987654);CHECK(SUCCEEDED(volume->UnlockBox(0)));

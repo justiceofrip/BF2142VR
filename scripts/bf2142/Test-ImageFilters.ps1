@@ -5,7 +5,7 @@ $root=Join-Path $base 'Game\BF2142VR'
 '{"status":"installed"}'|Set-Content -LiteralPath (Join-Path $root 'install.json')
 "throw 'PrepareOnly must never launch the game'"|Set-Content -LiteralPath (Join-Path $root 'tools\Player.ps1')
 $source=Join-Path $root 'runtime\x64\UserConfig.txt'
-$initial="# test fixture`r`nschema_version = 1`r`nfxaa_enabled = true`r`nbloom_enabled = true`r`nfxaa_sharpening_percent = 65`r`ncolor_contrast_percent = 10`r`n"
+$initial="# test fixture`r`nschema_version = 1`r`nfxaa_enabled = true`r`nbf2142_fxaa_enabled = false`r`nbloom_enabled = true`r`nfxaa_sharpening_percent = 65`r`ncolor_contrast_percent = 10`r`n"
 [IO.File]::WriteAllText($source,$initial)
 $saved=[Environment]::GetEnvironmentVariable('BFVR_USER_CONFIG_PATH','Process')
 try{
@@ -15,7 +15,7 @@ try{
   $text=[IO.File]::ReadAllText($result.config)
   $fxaa=if($mode -in @('NoFXAA','Clean')){'false'}else{'true'}
   $bloom=if($mode -in @('NoBloom','Clean')){'false'}else{'true'}
-  if(-not $text.Contains('fxaa_enabled = '+$fxaa) -or -not $text.Contains('bloom_enabled = '+$bloom)){throw 'Wrong isolated overrides'}
+  if($text -notmatch ('(?m)^fxaa_enabled = '+$fxaa+'\r?$') -or $text -notmatch ('(?m)^bf2142_fxaa_enabled = '+$fxaa+'\r?$') -or -not $text.Contains('bloom_enabled = '+$bloom)){throw 'Wrong isolated overrides'}
   if(-not $text.Contains('fxaa_sharpening_percent = 65') -or -not $text.Contains('color_contrast_percent = 10')){throw 'Unrelated setting changed'}
   if([IO.File]::ReadAllText($source) -cne $initial){throw 'Original configuration modified'}
   if([Environment]::GetEnvironmentVariable('BFVR_USER_CONFIG_PATH','Process') -cne $source){throw 'Environment changed by preparation'}

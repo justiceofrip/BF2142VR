@@ -8,6 +8,7 @@
 #include "StereoDiagnostics.h"
 #include "ControllerInput.h"
 #include "MenuPointer.h"
+#include "MenuTrace.h"
 #include "VrSettings.h"
 #include "TrackingMath.h"
 #include "NativeHands.h"
@@ -148,6 +149,7 @@ bool PrepareTransport() {
     // The established presenter already converts supported color formats.
     if(gpuRequested)colorFormat=DXGI_FORMAT_B8G8R8A8_UNORM;
     shared::SharedTextureRequirements r{};
+    r.boundedCpuUpload=true; // Bound menu/scope CPU uploads inside the 32-bit game.
     r.adapterLuid={b->requirements.adapterLuidLow,b->requirements.adapterLuidHigh};
     r.minimumFeatureLevel=static_cast<D3D_FEATURE_LEVEL>(b->requirements.minimumFeatureLevel);
     // Use the game's current source resolution. The existing presenter scales
@@ -215,6 +217,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     MemoryBarrier();sample=b->controllerSample;MemoryBarrier();
     const bool accepted=!diagnostic && settings.controllers && controllerSequence==ReadCounter(b->controllerSampleSequence) &&
         MatchingControllerSample(sample,controllerSequence,request,pending);
+    if(pausedMenu||!gameplay)menuTrace::Request(accepted);
     const auto runtimeFocus=ObserveRuntimeFocus(controllerSequence>0 && controllerSequence==ReadCounter(b->controllerSampleSequence),
         sample.predictedDisplayTime,request.predictedDisplayTime,(sample.flags&shared::kControllerSampleFlagSessionFocused)!=0);
     if(!diagnostic && runtimeFocus && homePolicy.Update(*runtimeFocus,GetTickCount64()))Recenter();
@@ -373,6 +376,7 @@ void Publish(bool world) {
     auto profile=renderProfile.Measure(RenderProfile::Publish);
     auto* b=channel.Get();
     const bool gpu=world&&gpuPair;
+    if(!world)menuTrace::Frame(pixels[2],width,height,lastRequestMainMenu);
     if(!world && lastRequestMainMenu && settings.menuRoom && !diagnostic){
         // A failed optional backdrop retains the native background; no slow
         // CPU fallback is inserted into the user's VR frame loop.
@@ -454,7 +458,7 @@ void Publish(bool world) {
 struct CameraScope { ~CameraScope() { EndNativeEye(); } };
 }
 bool StartStereo(const std::wstring& presenter,const std::wstring& log,LogFunction logCallback) {
-    logger=logCallback;renderProfile.Initialize(logger);gpuRequested=GpuTransferRequested();
+    logger=logCallback;menuTrace::Initialize(logger);renderProfile.Initialize(logger);gpuRequested=GpuTransferRequested();
     settings=LoadVrSettings(log);
     wchar_t canvasRequest[64]{};widescreenUi=GetEnvironmentVariableW(L"BF2142VR_RENDER_CANVAS",canvasRequest,64)>0;
     if(!settings.lobbySceneFile.empty())logger("Private walker lobby assets: %s.",menuRoomGpu.LoadScene(settings.lobbySceneFile)?"loaded":"unavailable; basic room retained");

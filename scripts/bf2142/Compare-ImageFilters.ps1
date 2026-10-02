@@ -38,7 +38,10 @@ if([regex]::Matches($text,'(?m)^[\t ]*schema_version[\t ]*=[\t ]*1[\t ]*\r?$').C
  throw 'Presenter settings schema is missing or unsupported; comparison cancelled.'
 }
 $overrides=@{}
-if($Mode -in @('NoFXAA','Clean')){$overrides['fxaa_enabled']='false'}
+# Explicit on/off pairs remain comparable across old and BF2142-specific defaults.
+$fxaa=if($Mode -in @('NoFXAA','Clean')){'false'}else{'true'}
+$overrides['fxaa_enabled']=$fxaa
+$overrides['bf2142_fxaa_enabled']=$fxaa
 if($Mode -in @('NoBloom','Clean')){$overrides['bloom_enabled']='false'}
 foreach($key in $overrides.Keys){
  $expression='(?m)^[\t ]*'+[regex]::Escape($key)+'[\t ]*=[^\r\n]*'

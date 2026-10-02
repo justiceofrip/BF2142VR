@@ -194,7 +194,8 @@ int wmain(int argc,wchar_t** argv) {
     bool hardware=false;for(int i=1;i<argc;++i)hardware|=wcscmp(argv[i],L"--hardware")==0;
     if(msaa8)p.MultiSampleType=D3DMULTISAMPLE_8_SAMPLES;
     if(!factory)return 77;
-    const DWORD creation=hardware?D3DCREATE_HARDWARE_VERTEXPROCESSING:D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+    bool pure=false;for(int i=1;i<argc;++i)pure|=wcscmp(argv[i],L"--pure")==0;
+    const DWORD creation=(hardware?D3DCREATE_HARDWARE_VERTEXPROCESSING:D3DCREATE_SOFTWARE_VERTEXPROCESSING)|(pure?D3DCREATE_PUREDEVICE:0);
     if(nativeEx){
         Microsoft::WRL::ComPtr<IDirect3D9Ex> apiEx;IDirect3DDevice9Ex* d=nullptr;
         if(FAILED(factory.As(&apiEx))||FAILED(apiEx->CreateDeviceEx(0,D3DDEVTYPE_HAL,window,creation,&p,nullptr,&d)))return 77;device=d;

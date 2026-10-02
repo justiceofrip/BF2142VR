@@ -1,16 +1,20 @@
-BF2142 VR v0.2.0-beta.4-test.7 - installer repair update
+BF2142 VR v0.2.0-beta.4-test.8 - renderer and installer update
 
-Weapon setup now replays precomputed repair decisions instead of running the
-geometric surface searches on every user's PC. Instructions contain no game
-vertices, texture data or mesh index buffers: each player's own stock archive
-is required, and every finished model and the complete archive retain the
-accepted hashes. Verified cache, isolated workers and the one-retry limit stay.
+Play VR now queries the active OpenXR runtime's recommended eye resolution,
+bounded to 3072 pixels per axis and 8 megapixels per eye for the 32-bit game.
+The desktop window remains compact, with corrected menu/text/mouse mapping.
+The BF2142-specific added FXAA filter defaults off; native geometry MSAA stays.
+Native D3D9Ex GPU eye transfer avoids ordinary world-frame CPU readback.
+Managed texture layout/reset fixes address the observed black ground strips
+and broken map labels. Reused CPU staging textures fix reproduced upload
+memory growth; the high-resolution Sign In and map test then succeeded.
 
-All 28 outputs match the previous build byte-for-byte in local validation.
-This removes most of the CPU work in the failing repair stage. It does not
-establish the cause of native crashes on the reporting PC or guarantee that
-they cannot recur; reporter confirmation is pending.
+Includes the previous verified repair instructions, isolated weapon workers,
+resumable cache, one bounded retry, signed updater and original-file backups.
+Use BF2142VRSetup.exe -> Install / Update. Do not revert to stock each time.
+The reporting PC's intermittent native installer crash still needs confirmation.
 
-Use the existing BF2142VRSetup.exe and click Install / Update, or use this ZIP.
-Settings and original backups are preserved. Gameplay binaries are unchanged
-from test.5/test.6: no resolution, FPS, menu, IK or network change in test.7.
+The owner accepted clear, smooth Quest 3/SteamVR gameplay at 2064x2208/8x MSAA
+and a 90 Hz runtime. This does not promise a fixed FPS or validate every headset.
+ADS still invokes a slower CPU fallback; optic HUD placement also needs further
+work. This release does not claim those follow-up fixes. No texture pack included.

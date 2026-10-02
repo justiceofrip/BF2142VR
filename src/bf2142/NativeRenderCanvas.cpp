@@ -1,5 +1,6 @@
 #include "NativeRenderCanvas.h"
 #include "RenderCanvasPolicy.h"
+#include "MenuTrace.h"
 #include <MinHook.h>
 #include <cstring>
 namespace bfvr::bf2142 {
@@ -48,7 +49,9 @@ LRESULT CALLBACK WindowHook(HWND window,UINT message,WPARAM w,LPARAM l) {
                             CanvasCoordinate(short(HIWORD(l)),r.bottom,canvas.height));
         }
     }
+    if(window==mainWindow)menuTrace::Delivered(message,false);
     const LRESULT result=CallWindowProcA(nativeProc,window,message,w,l);
+    if(window==mainWindow)menuTrace::Delivered(message,true);
     if(window==mainWindow&&message==WM_CREATE&&result!=-1){
         // Initial geometry can be chosen before WM_NCCREATE. Fit after create
         // and explicitly publish the logical size even if no resize was sent.

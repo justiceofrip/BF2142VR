@@ -1,5 +1,228 @@
 # BFVR AI and Developer Handoff
 
+## Test.8 release candidate (2026-10-01)
+
+The accepted bounded-upload renderer is being packaged with the test.7 installer
+repairs. Installed Play VR now requests --headset-resolution and native D3D9Ex
+with managed staging. Diagnostics/profile/debug/menu tracing default off.
+Runtime recommendations are bounded by RenderCanvasPolicy, with compact desktop
+mapping retained. The accepted headset session below supersedes older failed
+candidate notes. Do not change global SteamVR settings.
+
+ADS currently forces full-eye GPU readback and CPU compositing; magnified optics
+add another native scene render. Preserve this accepted renderer release while
+developing that follow-up separately. No ADS improvement is claimed in test.8.
+
+
+## Live bounded-upload check: Sign In succeeds (2026-10-01 22:34 EDT)
+
+Owner requested the saved test. Verified staged hashes and launched the bounded
+upload candidate in SteamVR at actual 2064x2208/8x. Read-only shared UI capture
+shows logged-in Video settings, confirming this Sign In attempt succeeded.
+Menu private memory held 531-607 MiB versus 3113 MiB previously. The map
+subsequently loaded with GPU stereo active. Repeated unscoped batches measured
+60 pairs in 661-675 ms (89-91 fresh pairs/sec). Game memory was 1424 MiB with
+a 1975 MiB largest free VA block. Brief scope use is not a sustained scope test.
+Owner now reports smooth gameplay and a clear image: accepted for this live
+run. SteamVR compositor log confirms HMD 90 Hz at recommended 2064x2208.
+The earlier 89-91 fresh pairs/sec follows that runtime cadence; later heavier
+batches can dip below it. This is not evidence of sustained 120/144 FPS or
+long-session stability. Game/presenter remain running; no agent input, settings,
+shortcuts or release changes.
+This supersedes the closed-game/pending-login statements below.
+
+
+## Latest: reproduced upload allocation surge fixed; live check pending (2026-10-01)
+
+This supersedes earlier unrun/still-open statements below. The owner ran the
+Sign In diagnostic and reported another stall. Both button edges were queued,
+entered the native window callback, and returned normally. Read-only GPU UI
+capture showed the native "Contacting EA master server" dialog. Rendering
+continued around 18-21 frames/sec. Native Flash counters stopped only after
+foreground loss; do not confuse that with the initial failure. The presenter
+later exited and the agent closed only the stalled game after diagnostics.
+
+At 2064x2208/8x, game private memory was 3113 MiB; largest free VA block was
+30.6 MiB despite 421 MiB total free. One thread snapshot resolved to
+FrameCapture::ReadSurface in the driver; a single sample is not a deadlock.
+OpenSpy TCP/TLS probe succeeded without account data; installed OpenSpy is
+newer than the legacy DLL linked by the FAQ. Do not downgrade it or claim
+that either credentials or a service outage caused this issue.
+
+A desktop-only comparison at the SAME actual 2064x2208/8x source stayed at
+502 MiB. It did not log in and is not proof of login behavior. A standalone
+32-bit producer/consumer fixture then reproduced 2995 MiB by 60 uploads, with
+no game or OpenXR involved. UpdateSubresource's driver upload allocations are
+the reproduced problem, independent of input/login or the optional lobby.
+
+BF2142 sets SharedTextureRequirements::boundedCpuUpload. PublishFrame lazily
+owns one CPU-write STAGING texture per slot, uses Map(WRITE) rather than
+DISCARD, honors both row pitches, and copies to the original shared textures.
+Reusing a staging allocation waits for its prior copy; keyed ownership and
+frame sequence protocol are unchanged. Partial failure returns every acquired
+slot to key 0 and does not publish. Shutdown releases staging textures. The
+default remains false for other games. GPU world publication is unchanged.
+
+The new manual BF2142VRCpuUploadSmoke checks 120 full-size patterned frames,
+padded pitch, alpha, keyed ownership, and a sustained memory-growth bound.
+It held 159.2 MiB. Native Ex full-size GpuPublicationSmoke passes CPU/GPU
+alternation, stale-HUD clearing, managed lifetime and reset. Both builds and
+all 76 CTests pass. Private Play-VR-Bounded-Upload.ps1 and its own x86 folder
+are staged with verified hashes. Earlier diagnostic binaries remain intact.
+
+This is an allocation fix with hardware evidence, NOT confirmed resolution
+of the owner's Sign In stall. Next check is real headset Sign In, memory,
+menu response, then a map at the same native size/High settings/8x. Preserve
+SteamVR settings. No live game is left running, no shortcut changed and no
+release published. User has not yet answered whether room/laser motion also
+froze; do not state that observation as fact.
+
+
+## Latest: high-resolution Sign In stall; game closed (2026-10-01)
+
+This supersedes the pending/running statements in the older entries below.
+Owner accepted the fast native Ex 1600x900 headset run: menus worked, terrain
+had no black strips or other observed visual bugs; textures remained blurry.
+Unscoped gameplay was about 90 new pairs/sec, scoped fallback about 45-57.
+
+The subsequent 2064x2208 runtime-source runs repeatedly stalled on Sign In.
+Owner closed the last run. The final sample still advanced about 18 frames/sec;
+presenter exited healthy with 1822 consumed/submitted frames, no reused frames,
+and no reported rendering error. Game private memory was about 3.3 GB. This is
+not proof of a graphics deadlock or of memory exhaustion. Native login/input
+progress was not instrumented. The owner changed game video settings to High
+before these runs, so this is no longer a resolution-only A/B. Preserve those
+settings. Do not change SteamVR settings or manipulate the desktop in a live test.
+
+A hidden D3D9Ex/8x/PUREDEVICE fixture using the actual private lobby assets did
+not reproduce the failure: 1600x900 UI readback 1.13 ms and stereo lobby/readback
+2.67 ms; 2064x2208 2.18 ms and 5.28 ms. Its private memory after 60 frames was
+125/200 MiB. This isolates the optional lobby, not the whole game/login or XR.
+
+New BF2142VR_MENU_TRACE=1 plus BFVR_DIAGNOSTICS=normal/deep enables diagnostic
+click queue/native callback enter/return logs, native Flash begin/end counts,
+controller sample acceptance, sampled UI-change counts, foreground ownership,
+and private/available virtual memory every five seconds. No text/keys/account
+data or images are logged. It does not change input/rendering policy and defaults
+off. Both builds and all 76 CTests pass. Do not present this instrumentation as
+a fix. The separate private Play-VR-SignIn-Diagnostic.ps1 is staged but UNRUN;
+it uses its own x86 binary folder and leaves the earlier candidates intact.
+
+No confirmed root cause, high-resolution acceptance, shortcut update or public
+release. Next real reproduction needs the diagnostic log and, if callbacks stop
+returning, a local thread-stack capture before closing. Ask whether the laser/view
+kept moving or the entire view froze; that question is currently unanswered.
+No game was launched during this investigation.
+
+
+## Latest headset comparison: native Ex at the same 1600x900 source
+
+After a fresh SteamVR session, the native Ex comparison reached live gameplay.
+The ordinary-renderer control was accepted for working menus but still blurry.
+It measured roughly 47-61 new frames/sec, with a scoped batch about 42/sec.
+The subsequent native Ex 1600x900/8x run logged 60 unscoped world pairs per
+~660 ms (about 90/sec) with eye/HUD readback eliminated. Scope fallback measured
+about 45-57/sec. This is actual headset-session evidence; user confirmation of
+menu stability/terrain remains pending. Memory was around 1.6 GB in that run.
+This does not establish the cause of the earlier freeze or accept high resolution.
+
+Private Play-VR-Fast-HeadsetSize.ps1 is prepared for a resolution-only comparison,
+with runtime query, FXAA off, the same native Ex/staging settings, and normal
+logging. It never modifies SteamVR settings. Do not interrupt the current match
+until the owner finishes the pending comparison feedback. Normal player shortcut
+and public assets are unchanged. Keep the earlier failed-run record below.
+
+## Headset attempt: menu freeze, stable-renderer control now running
+
+The first native Ex headset attempt was rejected: the owner pressed Login,
+reported a yellow pointer and a frozen view. Producer/consumer/request counters
+all remained at 2519 in two live samples; neither side reported an error in the
+shared block. The x86 working set reached roughly 3 GB. Diagnostic logging was
+off for that run, so there is no established root cause. Steam Link recorded
+stream resets/timeouts, including before this launch; this alone does not assign
+blame. Do not call the fast path headset-accepted or publish it.
+
+The runtime initially recommended 920x984 at a global 20% resolution setting.
+The agent changed that global setting to 100% for the first attempt (2064x2208),
+then restored the previous 20% after the owner objected. Do not change global
+SteamVR settings again as part of a mod test. Keep settings changes explicit and
+isolated from renderer comparisons. Runtime recommendations can remain cached.
+
+Windows retained an exited game object after the failed run. The launcher now
+ignores only instances whose exit code confirms termination; live or inaccessible
+instances still block. For this confirmed-exited case only, the native supported
++multi 1 switch avoids BF2142's own stale-instance rejection (exit code 42).
+The subsequent real launch succeeded; all 75 CTests pass, though no dedicated
+stale-process automated fixture has been added yet.
+
+The control session uses ordinary D3D9, the menu-compatible 1600x900 source,
+latest FXAA-off presenter, unchanged native gameplay/IK settings, and opt-in
+normal diagnostics. Live shared counters advanced 357->412 and presentation
+642->698 over one second, with fresh focused controller tracking logged. This
+proves a working control launch, not accepted clarity or fast-renderer FPS.
+Await the owner's visual/menu feedback. No public release/normal shortcut update.
+
+## Latest private follow-up: stereo ground regression cleared on desktop
+
+After the resource-original dispatch fix below, the owner confirmed Suez Canal
+without black strips at 1600x900 and again at 2528x2704, both 8x MSAA. Logs
+confirmed stereo remained active and shared GPU frames avoided eye/HUD readback;
+approximately 100 desktop pairs/sec is not a headset measurement. Keep
+`BF2142VR_GPU_TRANSFER=dx9ex` plus `BF2142VR_EX_MANAGED_UPLOAD=1` together for
+this candidate; their individual contributions are not yet isolated. High-canvas
+CreateDevice/reset/capture dimensions now agreed in the successful run. Earlier
+flat fallback and rejection records below describe earlier experiments.
+
+Community A/B reports identify FXAA as the fuzzy-text/detail cause independently
+of bloom. BF2142 now uses a separate persisted `bf2142_fxaa_enabled` key, default
+false, selected from the producer flag; other games keep `fxaa_enabled`. Native
+MSAA and bloom are unchanged. Use an explicit private presenter config path for
+the headset test. Do not promote experimental backend/default source sizes to
+normal launches until the headset check. No public release or shortcut update.
+
+## Continuing native Ex investigation: do not stop at rollback
+
+The owner explicitly asked to continue fixing the fast path after the ordinary
+D3D9 rollback. Reset semantics and PUREDEVICE were tested: native Ex retains
+blend/scissor/depth-bias/texture state across both Reset and ResetEx, unlike
+ordinary D3D9. NativeExReset captures initial state before game/overlay setup,
+restores only at legacy Reset, and sets viewport/scissor to the NEW backbuffer.
+Never apply this block between eyes. Preserve original native Ex creation flags;
+the rejected On12 path still strips PUREDEVICE. These corrections passed hidden
+fixtures and 75 CTests, but the owner confirmed black strips still present.
+
+Preserving buffer Usage (DEFAULT VB/IB do not require DYNAMIC for Lock) also did
+not remove the reported strips. Expanded diagnostics now cover surface, cube,
+volume-texture and NOOVERWRITE locks. All remain opt-in. That candidate stopped
+stereo at `Desktop composite failed at upload lock hr=0x8876086C` during menus,
+then continued flat; do not describe its in-map performance as stereo.
+
+Private hidden layout probe: e.g. 16x16 A8R8G8B8 managed/system-memory rows are
+64 bytes while Ex DEFAULT+DYNAMIC rows are 128 bytes on this adapter; small A8,
+L8, R5G6B5 and R32F also differ. `BF2142VR_EX_MANAGED_UPLOAD=1` now keeps an
+owned SYSTEMMEM shadow for managed 2D textures with Usage==0 and uses explicit
+UpdateTexture after unlock. COM private-data references own texture/mip shadows
+without pointer maps or GPU-parent cycles. Other texture usage/cube/volume paths
+retain existing translation. This is a comparison, not complete managed-pool
+emulation: uploads currently mark the full chain dirty, including read-only
+unlocks, and native SetLOD/PreLoad behavior is not emulated.
+
+The owner confirmed "suez canal baseline, stripes are gone" with that upload
+option. The same run had a menu upload-lock error and was flat by that point.
+Record this limited positive result; repeat it with functioning stereo before
+accepting. NativeExResources also incorrectly reused one original trampoline
+for different runtime implementations of a COM method. Resource hooks now look
+up the original by the object's actual vtable entry. A mixed-resource fixture
+includes a pre-existing dynamic menu texture after managed asset registrations;
+the corrected build is undergoing native menu/world verification.
+
+ResetEx slot 132 and additional-swapchain creation are now traced for the separate
+high-canvas startup issue. A direct Ex reset retains Ex state semantics; legacy
+Reset owns compatibility once through a reentrancy guard. No high-canvas or
+headset acceptance is claimed for these changes. Normal shortcut/public payload
+remain unchanged; keep diagnostics and both experimental options off in them.
+
+
 ## Native D3D9Ex candidate: readable menus, ground rendering blocker (unreleased)
 
 The old `BF2142VR_GPU_TRANSFER=1` On12 experiment below remains rejected. A
@@ -154,7 +377,7 @@ retains the stereo scene. Never bypass native ammunition, draw or reload timers.
 
 Private desktop reproduction: a 90 ms consumer interval extended EU handgun and
 rifle selection-to-shot delays to about 3.4 seconds. Waiting in the same engine
-frame restored roughly 0.9–1.0 seconds including the 450 ms input/settle phase.
+frame restored roughly 0.9â€“1.0 seconds including the 450 ms input/settle phase.
 This used ordinary game ammo counters and a private consumer-delay probe, not
 weapon-state writes. The probe is not part of the release. Tests cover consumer
 ownership/pose delays, immediate readiness, timeout, shutdown and recovery.

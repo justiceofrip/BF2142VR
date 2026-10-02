@@ -109,6 +109,7 @@ private:
     bool scalerRequired_ = false;
     bool fullEyeTextureFov_ = false;
     bool widescreenUiCanvas_ = false;
+    bool battlefield2142_ = false;
     bool worldFxaaEnabled_ = true;
     float worldFxaaSharpeningStrength_ = 0.25F;
     bool worldBloomEnabled_ = false;

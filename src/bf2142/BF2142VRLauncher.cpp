@@ -85,7 +85,7 @@ bool InitializeClient(Process& child, const fs::path& client, const fs::path& lo
     DWORD result = 0;
     return CallRemoteString(child.info.hProcess, remote, log.wstring() + (presenter.empty() ? L"" : L"\n" + presenter) + (observerProfile.empty()?L"":L"\n"+observerProfile), result);
 }
-bool AlreadyRunning(const fs::path& executable) {
+bool AlreadyRunning(const fs::path& executable, bool& retiredInstance) {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE) throw std::runtime_error("Could not inspect running processes.");
     PROCESSENTRY32W entry{};
@@ -94,6 +94,13 @@ bool AlreadyRunning(const fs::path& executable) {
     if (Process32FirstW(snapshot, &entry)) {
         do {
             if (_wcsicmp(entry.szExeFile, executable.filename().c_str()) == 0) {
+                // A terminated process can remain in Toolhelp while another
+                // component retains its object. It must not block a restart.
+                HANDLE process=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,entry.th32ProcessID);
+                DWORD exitCode=STILL_ACTIVE;
+                const bool exited=process && GetExitCodeProcess(process,&exitCode) && exitCode!=STILL_ACTIVE;
+                if(process)CloseHandle(process);
+                if(exited){retiredInstance=true;continue;}
                 found = true; break;
             }
         } while (Process32NextW(snapshot, &entry));
@@ -142,7 +149,8 @@ int Run(int argc, wchar_t** argv) {
     }
     wprintf(L"Game: %ls\nMod: %ls\nClient: %ls\n", executable.c_str(), options.mod.c_str(), client.c_str());
     if (options.inspect) { wprintf(L"Inspection passed; no game was launched.\n"); return 0; }
-    if (AlreadyRunning(executable) && options.observerProfile.empty()) {
+    bool retiredInstance=false;
+    if (AlreadyRunning(executable,retiredInstance) && options.observerProfile.empty()) {
         fwprintf(stderr, L"BF2142 is already running. Exit it normally before using this launcher.\n"); return 2;
     }
     fs::create_directories(folder / L"logs");
@@ -155,6 +163,10 @@ int Run(int argc, wchar_t** argv) {
     bfvr::bf2142::QueryCanvas(options,logPath);
     bfvr::bf2142::CanvasEnvironment canvasEnvironment(options);
     std::wstring command = bfvr::bf2142::GameCommand(executable.wstring(), options);
+    // Native BF2142 also checks retained instances, even after process exit.
+    // Live/inaccessible instances still fail the guard above; use the engine's
+    // supported multi-instance switch only for this confirmed-exited case.
+    if(retiredInstance && options.observerProfile.empty())command+=L" +multi 1";
     STARTUPINFOW startup{};
     startup.cb = sizeof(startup);
     Process child;

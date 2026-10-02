@@ -1,6 +1,7 @@
 #include "StereoSession.h"
 #include "GpuFrameTransfer.h"
 #include "NativeExResources.h"
+#include "NativeExReset.h"
 #include "NativeAntialiasing.h"
 #include "NativeRenderCanvas.h"
 #include "VrSettings.h"
@@ -27,6 +28,7 @@ SRWLOCK hookLock = SRWLOCK_INIT;
 std::atomic<bool> started = false;
 bool networkObserver = false;
 bool gpuBackend = false;
+bfvr::bf2142::NativeExReset nativeExReset;
 unsigned requestedWorldSamples=0;bool runtimePacing=false;
 std::atomic<bool> alternateImplementationLogged = false;
 std::atomic<unsigned long> presentations = 0;
@@ -41,6 +43,7 @@ using Present = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9*, const RECT*,
 using SwapPresent = HRESULT (STDMETHODCALLTYPE*)(IDirect3DSwapChain9*, const RECT*,
     const RECT*, HWND, const RGNDATA*, DWORD);
 using Reset = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9*, D3DPRESENT_PARAMETERS*);
+using ResetEx = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9Ex*, D3DPRESENT_PARAMETERS*, D3DDISPLAYMODEEX*);
 using GetSwapChain = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9*, UINT, IDirect3DSwapChain9**);
 using CreateSwapChain = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9*,
     D3DPRESENT_PARAMETERS*, IDirect3DSwapChain9**);
@@ -50,6 +53,8 @@ CreateDevice originalCreateDevice = nullptr;
 Present originalPresent = nullptr;
 SwapPresent originalSwapPresent = nullptr;
 Reset originalReset = nullptr;
+ResetEx originalResetEx = nullptr;
+thread_local bool legacyResetActive=false;
 GetSwapChain originalGetSwapChain = nullptr;
 CreateSwapChain originalCreateSwapChain = nullptr;
 EndScene originalEndScene = nullptr;
@@ -58,6 +63,7 @@ void* createDeviceTarget = nullptr;
 void* presentTarget = nullptr;
 void* swapPresentTarget = nullptr;
 void* resetTarget = nullptr;
+void* resetExTarget = nullptr;
 void* getSwapChainTarget = nullptr;
 void* createSwapChainTarget = nullptr;
 void* endSceneTarget = nullptr;
@@ -213,6 +219,7 @@ HRESULT STDMETHODCALLTYPE GetSwapChainHook(IDirect3DDevice9* device, UINT index,
 HRESULT STDMETHODCALLTYPE CreateSwapChainHook(IDirect3DDevice9* device,
     D3DPRESENT_PARAMETERS* parameters, IDirect3DSwapChain9** output) {
     const HRESULT result = originalCreateSwapChain(device, parameters, output);
+    if(gpuBackend)Log("Additional swapchain: device=%p hr=0x%08lX size=%ux%u window=%p.",device,result,parameters?parameters->BackBufferWidth:0,parameters?parameters->BackBufferHeight:0,parameters?parameters->hDeviceWindow:nullptr);
     if (SUCCEEDED(result) && output && *output) ConnectSwapChain(*output);
     return result;
 }
@@ -221,8 +228,21 @@ HRESULT STDMETHODCALLTYPE EndSceneHook(IDirect3DDevice9* device) {
     CountBoundary(scenes, "EndScene", result);
     return result;
 }
+HRESULT STDMETHODCALLTYPE ResetExHook(IDirect3DDevice9Ex* device,
+    D3DPRESENT_PARAMETERS* parameters,D3DDISPLAYMODEEX* mode) {
+    // Legacy ResetHook already owns teardown, canvas and state compatibility.
+    if(legacyResetActive)return originalResetEx(device,parameters,mode);
+    bfvr::bf2142::StereoReset();
+    D3DDEVICE_CREATION_PARAMETERS creation{};device->GetCreationParameters(&creation);
+    bfvr::bf2142::ConfigureRenderCanvas(parameters,creation.hFocusWindow);
+    const HRESULT result=originalResetEx(device,parameters,mode);
+    Log("Direct ResetEx: device=%p hr=0x%08lX size=%ux%u window=%p.",device,result,parameters?parameters->BackBufferWidth:0,parameters?parameters->BackBufferHeight:0,parameters?parameters->hDeviceWindow:nullptr);
+    if(SUCCEEDED(result)){ConnectDefaultSwapChain(device);bfvr::bf2142::ConfirmRenderCanvas(device);}
+    return result;
+}
 HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
     D3DPRESENT_PARAMETERS* parameters) {
+    struct ResetScope{ResetScope(){legacyResetActive=true;}~ResetScope(){legacyResetActive=false;}} scope;
     bfvr::bf2142::StereoReset();
     D3DDEVICE_CREATION_PARAMETERS canvasCreation{};device->GetCreationParameters(&canvasCreation);
     bfvr::bf2142::ConfigureRenderCanvas(parameters,canvasCreation.hFocusWindow);
@@ -237,7 +257,13 @@ HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
     const auto reset=[&](){return resetEx?resetEx->ResetEx(parameters,nullptr):originalReset(device,parameters);};
     HRESULT result=reset();
     if(FAILED(result)&&changed){*parameters=saved;result=reset();Log("VR MSAA reset fallback: original native settings retained.");}
-    if(resetEx)resetEx->Release();
+    if(resetEx){
+        if(SUCCEEDED(result)){
+            result=nativeExReset.Restore(device,parameters&&parameters->EnableAutoDepthStencil);
+            Log("NativeEx legacy reset state restored: hr=0x%08lX.",result);
+        }
+        resetEx->Release();
+    }
     if(SUCCEEDED(result)&&parameters)Log("World AA reset: samples=%u quality=%lu.",unsigned(parameters->MultiSampleType),parameters->MultiSampleQuality);
     const auto count = resets.fetch_add(1, std::memory_order_relaxed) + 1;
     if (count <= 16) Log("Reset result=0x%08lX size=%ux%u windowed=%d",
@@ -249,8 +275,12 @@ HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
 HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
     D3DDEVTYPE type, HWND window, DWORD behavior,
     D3DPRESENT_PARAMETERS* parameters, IDirect3DDevice9** output) {
-    // The interop overlays query and restore state; pure devices cannot do that.
-    if(gpuBackend){behavior&=~D3DCREATE_PUREDEVICE;bfvr::bf2142::ConfigureGpuDiagnostics(Log);}
+    // Preserve native device flags on native Ex. The separate On12 experiment
+    // needs a non-pure device for its interop overlays.
+    if(gpuBackend){
+        if(!bfvr::bf2142::NativeExTransferRequested())behavior&=~D3DCREATE_PUREDEVICE;
+        bfvr::bf2142::ConfigureGpuDiagnostics(Log);
+    }
     bfvr::bf2142::ConfigureRenderCanvas(parameters,window);
     D3DPRESENT_PARAMETERS saved{};bool changed=false;
     if(parameters){saved=*parameters;changed=bfvr::bf2142::SelectWorldSamples(factory,adapter,type,requestedWorldSamples,*parameters);}
@@ -266,7 +296,11 @@ HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
     HRESULT result=create();
     if(FAILED(result)&&changed){*parameters=saved;result=create();Log("VR MSAA creation fallback: original native settings retained.");}
     if(factoryEx){
-        if(SUCCEEDED(result)&&output&&*output&&!bfvr::bf2142::InstallNativeExResources(*output,Log)){(*output)->Release();*output=nullptr;result=E_FAIL;}
+        if(SUCCEEDED(result)&&output&&*output){
+            result=nativeExReset.Initialize(*output);
+            if(SUCCEEDED(result)&&!bfvr::bf2142::InstallNativeExResources(*output,Log))result=E_FAIL;
+            if(FAILED(result)){(*output)->Release();*output=nullptr;}
+        }
         factoryEx->Release();
     }
     if(SUCCEEDED(result)&&parameters)Log("World AA creation: samples=%u quality=%lu; autoDepth=%d depthFormat=%u swap=%u; nativeSamples=%u requested=%u.",unsigned(parameters->MultiSampleType),parameters->MultiSampleQuality,parameters->EnableAutoDepthStencil,unsigned(parameters->AutoDepthStencilFormat),unsigned(parameters->SwapEffect),unsigned(saved.MultiSampleType),requestedWorldSamples);
@@ -275,6 +309,14 @@ HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
         parameters ? parameters->BackBufferHeight : 0, parameters ? parameters->Windowed : 0, behavior);
     if (SUCCEEDED(result) && output && *output) {
         bfvr::bf2142::ConfirmRenderCanvas(*output);
+        if(gpuBackend&&bfvr::bf2142::NativeExTransferRequested()){
+            IDirect3DDevice9Ex* ex=nullptr;
+            if(SUCCEEDED((*output)->QueryInterface(IID_PPV_ARGS(&ex)))){
+                void** exTable=*reinterpret_cast<void***>(ex);
+                const bool connected=Hook(exTable[132],reinterpret_cast<void*>(&ResetExHook),reinterpret_cast<void**>(&originalResetEx),resetExTarget);
+                Log("NativeEx ResetEx connection=%d device=%p.",connected,ex);ex->Release();
+            }
+        }
         ConnectShaderFailureLog();
         if (networkObserver) {
             auto renderer=reinterpret_cast<BYTE*>(GetModuleHandleW(L"RendDX9_ori.dll"));

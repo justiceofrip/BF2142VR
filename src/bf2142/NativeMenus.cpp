@@ -1,4 +1,5 @@
 #include "StereoSession.h"
+#include "MenuTrace.h"
 #include <MinHook.h>
 #include <cstring>
 namespace bfvr::bf2142 {
@@ -12,12 +13,12 @@ EndDisplay endDisplay=nullptr;
 thread_local unsigned depth=0;
 thread_local bool captured=false;
 void __fastcall BeginHook(void* self,void*,DWORD a,DWORD b,DWORD c,DWORD d,DWORD e,DWORD f,DWORD g,DWORD h,DWORD i) {
-    if(depth++==0) captured=StereoHudBegin(true);
+    if(depth++==0) {menuTrace::Draw(false);captured=StereoHudBegin(true);}
     beginDisplay(self,a,b,c,d,e,f,g,h,i);
 }
 void __fastcall EndHook(void* self,void*) {
     endDisplay(self);
-    if(depth && --depth==0 && captured) {captured=false;StereoHudEnd();}
+    if(depth && --depth==0) {menuTrace::Draw(true);if(captured){captured=false;StereoHudEnd();}}
 }
 bool Profile(BYTE* image) {
     __try {
