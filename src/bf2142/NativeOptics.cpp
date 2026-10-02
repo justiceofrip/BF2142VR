@@ -75,7 +75,7 @@ bool ReadWeapon(void* weapon,Weapon* result){
             const float fine=Read<float>(component,0x24);
             if(!std::isfinite(fine)||fine<0||fine>.4f)return false;
             const float factor=begin[step]-fine;
-            if(step && (!std::isfinite(factor)||factor<.04f||factor>.8f))return false;
+            if(step && (!std::isfinite(factor)||factor<.04f||factor>.85f))return false;
             *result={definition,const_cast<BYTE*>(base),step,factor};return true;
         }
         return false;
@@ -94,7 +94,7 @@ bool InstallNativeOptics(LogFunction logger){
     if(!Profile())return false;auto entry=game+0x1da770;
     if(MH_CreateHook(entry,LodHook,reinterpret_cast<void**>(&nativeLod))!=MH_OK)return false;
     if(MH_EnableHook(entry)!=MH_OK){MH_RemoveHook(entry);return false;}
-    setZoom=reinterpret_cast<SetZoom>(game+0x1da3f0);installed=enabled=true;logger("VR optics connected: verified local zoom LOD; native ADS gameplay retained; six stock weapon profiles; physical alignment uses no grip binding.");return true;
+    setZoom=reinterpret_cast<SetZoom>(game+0x1da3f0);installed=enabled=true;logger("VR optics connected: verified local zoom LOD; native ADS gameplay retained; eleven stock weapon profiles; physical alignment uses no grip binding.");return true;
 }
 bool ReadNativeOptic(GunOptic* optic){
     if(!enabled||!optic)return false;TrackedWeaponFrame frame;Weapon weapon;

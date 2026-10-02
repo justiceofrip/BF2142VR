@@ -55,7 +55,7 @@ int main(){
     gun.gun=world;eyes=original;for(auto& e:eyes)e.world=Multiply(e.world,world);
     const auto moved=MakeOpticView(gun,eyes);if(!moved||!Close(moved->relief,view->relief)||!Close(moved->fov.right,view->fov.right))return 16;
     // Each measured stock profile has a usable aperture and exact name match.
-    for(const char* name:{"as_ar_rifle","eu_sni","as_sni","unl_adv_sni"}){
+    for(const char* name:{"as_ar_rifle","eu_sni","as_sni","unl_adv_sni","eu_smg","as_smg","eu_av","as_av","unl_av_rifle"}){
         const auto* p=FindGunOptic(name);if(!p)return 17;
         gun={p,Identity(),p->magnification};eyes=original;for(auto& e:eyes)e.world.values[3]={p->center.x,p->center.y,p->center.z-.2f,1};
         const auto calibrated=MakeOpticView(gun,eyes);if(!calibrated)return 18;
@@ -83,5 +83,17 @@ int main(){
     if(!CompositeGunOptic(pixels,scope,512,512,gun,original[0],*view,0,false,hud)||pixels.front()!=0xff112233)return 27;
     bool native=false;for(auto c:pixels){native|=c==0xff123456;if(c==0xffffdc70)return 28;}if(!native)return 29;
     hud=baseline;IsolateOpticHud(hud,baseline,512,512);if(!hud.empty())return 30;
+    // SMG dots stay red, preserve scene pixels and ignore stock zoom art,
+    // in both CPU channel orders. No third world image is needed.
+    for(const char* name:{"eu_smg","as_smg"})for(bool rgba:{false,true}){
+        const auto* p=FindGunOptic(name);if(!p||!p->redDot||p->magnification!=1)return 31;
+        gun={p,Identity(),1};eyes=original;
+        for(auto& e:eyes)e.world.values[3]={p->center.x,p->center.y,p->center.z-.2f,1};
+        const auto dotView=MakeOpticView(gun,eyes);if(!dotView)return 32;
+        pixels.assign(pixels.size(),0xff112233);hud.assign(pixels.size(),0xff00ffff);
+        if(!CompositeGunOptic(pixels,{},512,512,gun,eyes[0],*dotView,0,rgba,hud))return 33;
+        bool red=false;for(auto c:pixels){red|=c==(rgba?0xff4040ff:0xffff4040);if(c==0xff00ffff)return 34;}
+        if(!red)return 35;
+    }
     puts("Weapon-specific optics, eye relief, monocular alignment, magnification, aperture clipping, reticle colors and rigid-frame invariance passed.");
 }

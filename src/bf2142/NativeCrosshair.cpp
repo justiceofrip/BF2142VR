@@ -15,7 +15,7 @@ template<class T>T Read(const void* p,size_t off=0){T v{};std::memcpy(&v,static_
 // Stock ADS HUD selectors. Disable the entire weapon widget root on the main
 // panel, including fixed-opacity rangefinders and scope stabilizers. The optic
 // layer replays the unchanged native selector, then isolates its pixels.
-bool OpticHud(int index){switch(index){case 59:case 63:case 78:case 80:case 81:case 84:case 88:case 90:case 92:return true;default:return false;}}
+bool OpticHud(int index){switch(index){case 59:case 63:case 78:case 80:case 81:case 82:case 84:case 88:case 90:case 92:case 93:return true;default:return false;}}
 // Show-variable results and alpha are cached during HUD update, before Draw.
 // Changing GuiIndex during Draw cannot hide these nodes. Match only stock
 // scope roots, not HP/ammo, menus, hip crosshairs or vehicle artwork.
@@ -23,7 +23,8 @@ bool ScopeWidget(const char* name){
  if(!name)return false;
  for(const char* known:{"CarbineZoomCullNode","PacAssaultZoomCullNode",
      "EuAssaultZoomCullNode","EuMachineZoomCullNode","EuSniperHudCullNode",
-     "PacSniperHudCullNode"})if(!std::strcmp(name,known))return true;
+     "PacSniperHudCullNode","EuSmgZoomCullNode","PacZoomCullNode",
+     "EuAntiVehicleCullNode","PacAntiVehicleCullNode"})if(!std::strcmp(name,known))return true;
  return false;
 }
 bool ScopeNode(void* node){

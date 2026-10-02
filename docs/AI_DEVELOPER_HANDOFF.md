@@ -1,5 +1,27 @@
 # BFVR AI and Developer Handoff
 
+## Accepted scope HUD; missing-sight follow-up (2026-10-02)
+
+Owner accepted the bd224c1 scope-widget candidate: "that fixed it, looks great."
+This supersedes the pending scope-placement/reticle check below. It does not
+validate every weapon or the intermittent alternate Reset route. The accepted
+private checkpoint is retained unchanged while missing sights are added.
+
+New exact profiles: EU/PAC SMGs (1x red dot), EU/PAC anti-tank launchers (1.5x),
+and Pilum (2x, shares PAC anti-tank HUD selector 82). Geometry comes from local
+stock-model sight faces; no game data is shipped. SMG redDot policy deliberately
+ignores native zoom artwork, keeps scene pixels and requires no third world
+view. Existing optics retain their native HUD/fallback colors. CPU and GPU
+apply the same policy. The default false field preserves existing profiles.
+Native adapter now permits factor 0.85 only after the existing exact template,
+component, ownership and native-factor checks. Weapons remain GenericFireArm;
+no new executable hooks, firing, network, IK or animation paths are added.
+Only the four exact SMG/AT scope roots join the cached draw filter; AA targeting
+and hip-fire roots retain their normal behavior. New alignment/eye relief still
+needs headset verification before release. Both builds and 76 CTests pass; GPU
+optics pass 44 cases each at 512x512 and 2064x2208. The transition fixture retains
+151 publications, 243 replays and 91 time advances. No SteamVR settings changed.
+
 ## Private scope-widget correction after headset test (2026-10-02)
 
 Owner reports the reset/menu/ADS candidate generally working in the headset.

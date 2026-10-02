@@ -32,14 +32,14 @@ int main(){
  const BYTE intMap[]={0x55,0x8b,0xec,0x83,0xec,8,0x56,0x8d,0x71,0x1c};
  std::memcpy(g+0x4e490,intMap,sizeof(intMap));const BYTE reg[]={0xff,0x52,0x1c};std::memcpy(g+0x39f84f,reg,sizeof(reg));
  Put(g,0x39f82f,g+0x5b4238);std::memcpy(g+0x5b4238,"GuiIndex",9);Put(g,0x5221e0+0x20,g+0x4e490);Put(g,0x5221e0+0x24,g+0x4e320);
- for(int zoom:{59,63,78,80,81,84,88,90,92}){
+ for(int zoom:{59,63,78,80,81,82,84,88,90,92,93}){
   index=zoom;{CrosshairScope scope(g);if(index!=1024||alpha!=0)return 5;
    {CrosshairScope nested(g);if(index!=1024||alpha!=0)return 6;}
    if(index!=1024||alpha!=0)return 7;
   }if(index!=zoom||alpha!=.8f)return 8;
   {CrosshairScope optic(g,true);if(!optic.Optic()||index!=zoom||alpha!=1)return 15;}if(alpha!=.8f)return 16;
  }
- for(int other:{0,24,25,55,82,93,777}){index=other;{CrosshairScope scope(g);if(index!=other||alpha!=0)return 9;}if(alpha!=.8f)return 10;}
+ for(int other:{0,24,25,52,55,79,89,777}){index=other;{CrosshairScope scope(g);if(index!=other||alpha!=0)return 9;}if(alpha!=.8f)return 10;}
  index=84;SetCrosshairHidden(false);{CrosshairScope scope(g);if(index!=1024||alpha!=.8f)return 11;}SetCrosshairHidden(true);
  index=84;{CrosshairScope optic(g,true);if(index!=84||alpha!=1)return 17;
   {CrosshairScope flash(g);if(index!=84||alpha!=1)return 18;}
@@ -59,7 +59,8 @@ int main(){
  Put(node.data(),4,reinterpret_cast<void*>(0x5678));Put(node.data(),0x14,1.f);
  const auto draw=[&](){CullDrawHook(node.data(),nullptr,expectedArgument,expectedArgument,expectedArgument,expectedArgument,expectedArgument);};
  for(const char* name:{"CarbineZoomCullNode","PacAssaultZoomCullNode","EuAssaultZoomCullNode",
-                       "EuMachineZoomCullNode","EuSniperHudCullNode","PacSniperHudCullNode"}){
+                       "EuMachineZoomCullNode","EuSniperHudCullNode","PacSniperHudCullNode",
+                       "EuSmgZoomCullNode","PacZoomCullNode","EuAntiVehicleCullNode","PacAntiVehicleCullNode"}){
   Put(node.data(),0x18,name);index=84;draws=0;
   {CrosshairScope main(g);draw();if(draws||index!=1024)return 31;}
   if(index!=84||Read<float>(node.data(),0x14)!=1)return 32;
@@ -68,7 +69,7 @@ int main(){
   }
   draw();if(draws!=2)return 35; // Outside VR HUD drawing: native behavior.
  }
- for(const char* name:{"HealthCullNode","EuAssaultCrossStandardCullNode","EuSniperHudCullNodeCustom","TankCrosshairZoomCullNode"}){
+ for(const char* name:{"HealthCullNode","EuSoldierAACullNode","PacSoldierAACullNode","EuSmgCrossStandardCullNode","PacSmgCrossStandardCullNode","EuAssaultCrossStandardCullNode","EuSniperHudCullNodeCustom","TankCrosshairZoomCullNode"}){
   Put(node.data(),0x18,name);draws=0;
   {CrosshairScope main(g);draw();}if(draws!=1)return 36;
   {CrosshairScope optic(g,true);draw();if(optic.DrewArtwork())return 37;}

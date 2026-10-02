@@ -16,7 +16,15 @@ constexpr OpticDefinition definitions[]={
     {"as_ar_rifle",{-.0012f,.0815f,-.069f},.0098f,.0098f,false,.484f,2.f},
     {"eu_sni",{0,.0974f,-.073f},.0210f,.0084f,true,.312f,4.f},
     {"as_sni",{.0008f,.091f,-.225f},.0118f,.0118f,false,.312f,4.f},
-    {"unl_adv_sni",{0,.089f,-.233f},.0140f,.0110f,true,.312f,4.f}
+    {"unl_adv_sni",{0,.089f,-.233f},.0140f,.0110f,true,.312f,4.f},
+    // SMG rear sight faces, inset from their bezels. Keep 1x reflex rendering.
+    {"eu_smg",{-.01135f,.13425f,-.1056f},.0062f,.0082f,true,.749f,1.f,true},
+    {"as_smg",{.00029f,.0542f,.0605f},.0080f,.0070f,false,.8f,1.f,true},
+    // Launcher side displays. Stock native zoom is .85, not the rifle .484.
+    // Their off-bore position shares the existing finite bore-zero projection.
+    {"eu_av",{-.07075f,.0778f,.0665f},.0310f,.0110f,true,.85f,1.5f},
+    {"as_av",{-.16296f,.06845f,.0980f},.0300f,.0225f,true,.85f,1.5f},
+    {"unl_av_rifle",{-.00025f,.09275f,-.3257f},.0150f,.0140f,false,.59f,2.f}
 };
 V Sub(V a,V b){return {a.x-b.x,a.y-b.y,a.z-b.z};}
 V Add(V a,V b){return {a.x+b.x,a.y+b.y,a.z+b.z};}
@@ -98,7 +106,7 @@ size_t CompositeGunOptic(std::vector<DWORD>& pixels,const std::vector<DWORD>& sc
     const M eyeToGun=Multiply(eye.world,*gunInverse);const float scale=frame.relief/relief;
     // Reticle angular thickness stays legible at different render resolutions.
     const float line=std::clamp(relief/(h*p[1][1]),.00010f,.0008f);
-    const std::uint32_t amber=rgba?0xff70dcff:0xffffdc70;
+    const std::uint32_t ink=d.redDot?(rgba?0xff4040ff:0xffff4040):(rgba?0xff70dcff:0xffffdc70);
     size_t marked=0;
     for(int y=y0;y<y1;++y)for(int x=x0;x<x1;++x){
         const V ray=Direction({(2*(x+.5f)/w-1-p[2][0])/p[0][0],(1-2*(y+.5f)/h-p[2][1])/p[1][1],1},eyeToGun);
@@ -112,7 +120,7 @@ size_t CompositeGunOptic(std::vector<DWORD>& pixels,const std::vector<DWORD>& sc
         const bool center=dx*dx+dy*dy<line*line*2.25f;
         const bool cross=(std::abs(dx)<line && std::abs(dy)<d.halfHeight*.45f && std::abs(dy)>line*3) ||
             (std::abs(dy)<line && std::abs(dx)<d.halfWidth*.45f && std::abs(dx)>line*3);
-        const bool hasHud=nativeHud.size()==pixels.size();
+        const bool hasHud=!d.redDot && nativeHud.size()==pixels.size();
         if(hasHud){
             // Native 800x600 UI coordinates: central 400x300 contains the
             // stock scope reticle, compass, rangefinder and stabilizer.
@@ -126,7 +134,7 @@ size_t CompositeGunOptic(std::vector<DWORD>& pixels,const std::vector<DWORD>& sc
             }else if(reflex)continue;
         }else {
             if(reflex && !center)continue;
-            if(center||(d.magnification>=4 && cross))color=amber;
+            if(center||(d.magnification>=4 && cross))color=ink;
         }
         const float edge=d.rectangular?std::max(std::abs(u),std::abs(v)):std::sqrt(u*u+v*v);
         const float alpha=frame.visibility[index]*std::clamp((1-edge)*25.f,0.f,1.f);

@@ -36,6 +36,17 @@ int main(){
  Set(z.data(),0xc,static_cast<void*>(nullptr));ok=ok && !ReadNativeOptic(&optic);Set(z.data(),0xc,w.data());
  Set(w.data(),0x24,reinterpret_cast<void*>(1));ok=ok && !ReadNativeOptic(&optic);Set(w.data(),0x24,t.data());
  t[0x10]='x';LodHook(z.data(),nullptr,1);ok=ok && lastLod==1 && !ReadNativeOptic(&optic);t[0x10]='e';
+ // New exact stock names/factors use the same validated firearm component.
+ // Launcher .85 must be accepted; altered templates still fail closed.
+ for(const char* profile:{"eu_smg","as_smg","eu_av","as_av","unl_av_rifle"}){
+  const auto* def=FindGunOptic(profile);
+  std::memset(t.data()+0x10,0,16);std::memcpy(t.data()+0x10,profile,std::strlen(profile));Set(t.data(),0x20,unsigned(std::strlen(profile)));
+  factors[1]=def->nativeFactor;const auto unchanged=z;
+  LodHook(z.data(),nullptr,1);
+  if(!ReadNativeOptic(&optic)||optic.definition!=def||std::abs(optic.magnification-def->magnification)>.0001f||lastLod!=0||z!=unchanged){printf("Stock optic profile failed: %s\n",profile);return 4;}
+  factors[1]+=.01f;ok=ok&&!ReadNativeOptic(&optic);
+ }
+ std::memset(t.data()+0x10,0,16);std::memcpy(t.data()+0x10,"eu_ar_rifle",12);Set(t.data(),0x20,11u);factors[1]=.484f;
  // Automatic ADS uses native transitions, not a visual-only accuracy shortcut.
  setZoom=reinterpret_cast<SetZoom>(ZoomSpy);Set(z.data(),0x1c,0);ConfigureAutomaticAds(true);
  std::array<EyeCamera,2> eyes{};for(auto& e:eyes){e.world=tracked.world;e.world.values[3]={0,.095f,-.281f,1};}

@@ -1,13 +1,24 @@
 # BFVR Changelog
 
+## Unreleased BF2142 missing-sight candidate (2026-10-02)
+
+- Add EU/PAC SMG red-dot profiles and EU/PAC anti-tank launcher/Pilum optics.
+  SMG dots use the existing 1x path without another world view.
+- Accept the stock anti-tank zoom factor of 0.85 after exact template validation.
+  Move their scope widgets into the optic, preserving ordinary HUD/AA markers.
+- Owner accepted the preceding scope-HUD correction in the headset. Keep it as
+  a separate baseline; new sight alignment remains pending headset validation.
+- Both architecture builds, all 76 CTests, 88 CPU/GPU image comparisons at two
+  resolutions and the GPU menu/scope transition fixture pass.
+
 ## Unreleased BF2142 scope-widget candidate (2026-10-02)
 
 - Filter cached stock ADS widget draws on the main HUD and preserve them for
   the scope replay, rather than relying only on a late GuiIndex change.
 - Require a recognized visible scope widget before using native replay art;
   retain the fallback reticle for a hidden or unrecognized replay.
-- Both builds, 76 tests and GPU menu/scope transitions pass. Headset reticle
-  visibility and scope-only placement remain unverified; not published.
+- Both builds, 76 tests and GPU menu/scope transitions pass. Owner accepted
+  reticle visibility and scope-only placement in the headset; not published.
 
 ## Unreleased BF2142 menu GPU candidate (2026-10-02)
 

@@ -13,6 +13,8 @@ struct OpticDefinition {
     float halfWidth,halfHeight;
     bool rectangular;
     float nativeFactor,magnification;
+    // SMG reflex reticles use a clean red dot instead of native zoom artwork.
+    bool redDot=false;
 };
 const OpticDefinition* FindGunOptic(std::string_view name) noexcept;
 struct GunOptic {

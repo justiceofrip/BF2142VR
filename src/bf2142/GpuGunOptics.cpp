@@ -18,6 +18,7 @@ float4 axisZ : register(c5);
 float4 aperture : register(c6);
 float4 reticle : register(c7);
 float4 modes : register(c8);
+float4 fallbackInk : register(c9);
 float4 main(float2 uv:TEXCOORD0):COLOR0 {
  float3 r=float3((2*uv.x-1-projection.z)/projection.x,
                  (1-2*uv.y-projection.w)/projection.y,1);
@@ -45,7 +46,7 @@ float4 main(float2 uv:TEXCOORD0):COLOR0 {
      if(dot(abs(ink-ordinary),float4(255,255,255,255))<8)ink=0;
    }
    color=ink+color*(1-ink.a);
- } else if(center>.5||(modes.z<.5&&axisX.w>=4&&crossLine>.5))color=float4(1,220./255,112./255,1);
+ } else if(center>.5||(modes.z<.5&&axisX.w>=4&&crossLine>.5))color=fallbackInk;
  float edge=modes.y>.5?max(b.x,b.y):sqrt(radial);
  return color*(modes.x*saturate((1-edge)*25));
 })";
@@ -126,14 +127,15 @@ bool GpuGunOptics::Draw(IDirect3DSurface9* target,const GunOptic& gun,const EyeC
  if(relief<=.04f||!std::isfinite(relief)||p[0][0]<=0||p[1][1]<=0)return false;
  const float t=relief/(100-e[2]),dotX=e[0]*(1-t),dotY=e[1]*(1-t);
  const float line=std::clamp(relief/(height*p[1][1]),.00010f,.0008f);
- float constants[9][4]={{1.f/width,1.f/height,float(width),float(height)},
+ float constants[10][4]={{1.f/width,1.f/height,float(width),float(height)},
   {p[0][0],p[1][1],p[2][0],p[2][1]}, {e[0],e[1],e[2],relief},
   {matrix.values[0][0],matrix.values[0][1],matrix.values[0][2],def.magnification},
   {matrix.values[1][0],matrix.values[1][1],matrix.values[1][2],0},
   {matrix.values[2][0],matrix.values[2][1],matrix.values[2][2],0},
   {def.center.x,def.center.y,def.halfWidth,def.halfHeight},
   {dotX,dotY,line,frame.relief/relief},
-  {frame.visibility[index],def.rectangular?1.f:0.f,gun.magnification<=1.01f?1.f:0.f,hud&&baseline?1.f:0.f}};
+  {frame.visibility[index],def.rectangular?1.f:0.f,gun.magnification<=1.01f?1.f:0.f,!def.redDot&&hud&&baseline?1.f:0.f},
+  {1.f,def.redDot?64.f/255:220.f/255,def.redDot?64.f/255:112.f/255,1.f}};
  for(const auto& row:constants)for(float x:row)if(!std::isfinite(x))return false;
  D3DSURFACE_DESC desc{};if(FAILED(target->GetDesc(&desc))||desc.Width!=width||desc.Height!=height)return false;
  State saved(device);if(!saved.Save())return false;
@@ -144,7 +146,7 @@ bool GpuGunOptics::Draw(IDirect3DSurface9* target,const GunOptic& gun,const EyeC
  D3DVIEWPORT9 viewport{0,0,width,height,0,1};set(device->SetViewport(&viewport));
  set(device->SetVertexShader(nullptr));set(device->SetPixelShader(shader.Get()));
  set(device->SetFVF(D3DFVF_XYZRHW|D3DFVF_TEX1));
- set(device->SetPixelShaderConstantF(0,&constants[0][0],9));
+ set(device->SetPixelShaderConstantF(0,&constants[0][0],10));
  for(auto state:{D3DRS_ZENABLE,D3DRS_ZWRITEENABLE,D3DRS_ALPHATESTENABLE,D3DRS_STENCILENABLE,D3DRS_SCISSORTESTENABLE,
     D3DRS_FOGENABLE,D3DRS_LIGHTING,D3DRS_SRGBWRITEENABLE,D3DRS_SEPARATEALPHABLENDENABLE,D3DRS_CLIPPLANEENABLE})set(device->SetRenderState(state,FALSE));
  set(device->SetScissorRect(&bounds));set(device->SetRenderState(D3DRS_SCISSORTESTENABLE,TRUE));
