@@ -142,6 +142,18 @@ int main(){
     if(laserUi[120*320+164]!=0xff20efff)return 35;
     bf2142::DrawMenuPointer(laserLeft,laserRight,laserUi,320,240,DXGI_FORMAT_R8G8B8A8_UNORM,r,{},rayVisual.canvas,rayVisual,false);
     if(laserUi[120*320+164]!=0xffffef20)return 36;
+    {
+        const auto beam=bf2142::ProjectMenuBeam(320,240,{},rayVisual,r.views[0]);
+        if(!beam||beam->x0<0||beam->x1>=320||beam->y0<0||beam->y1>=240)return 128;
+        if(bf2142::ProjectMenuBeam(0,240,{},rayVisual,r.views[0]))return 129;
+        auto behind=rayVisual;behind.origin.z=.2f;behind.end.z=1;
+        if(bf2142::ProjectMenuBeam(320,240,{},behind,r.views[0]))return 130;
+        auto invalid=r.views[0];invalid.fov.angleLeft=invalid.fov.angleRight;
+        if(bf2142::ProjectMenuBeam(320,240,{},rayVisual,invalid))return 131;
+        auto clipped=rayVisual;clipped.origin={100,0,-.001f};
+        const auto edge=bf2142::ProjectMenuBeam(320,240,{},clipped,r.views[0]);
+        if(!edge||edge->x0<0||edge->x0>319.01f||edge->y0<0||edge->y0>239.01f)return 132;
+    }
     // Motion mode reserves left grip for support and removes thumbstick pitch.
     s={};s.flags=shared::kControllerSampleFlagSessionFocused;s.predictedDisplayTime=5000000000LL;
     s.hands[0].flags=shared::kControllerHandFlagSqueezeActive|shared::kControllerHandFlagTriggerActive;

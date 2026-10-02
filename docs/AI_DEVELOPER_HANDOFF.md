@@ -1,5 +1,46 @@
 # BFVR AI and Developer Handoff
 
+## Unreleased menu GPU follow-up (2026-10-02)
+
+Community test.8 feedback confirms sharp/smooth gameplay but severe menu/spawn
+and scope slowdown. Code inspection confirms BeginGpuPair excluded active
+menus, while main-menu room rendering read both GPU eyes to CPU and uploaded
+all three images again. Frontend capture also had a 33 ms throttle. This is
+GPU readback/compositing overhead, not evidence that native Flash or the room
+itself was rendered in software. Native UI/game CPU costs may remain.
+
+MenuRoomGpu::DrawTo now resolves each room eye directly to the transfer surfaces.
+MenuOverlayGpu shares the existing laser projection and immutable pointer hit
+coordinates. VrControlsMenu exposes the existing GDI artwork with a revision;
+only changed artwork is uploaded, using a persistent system-memory texture and
+UpdateTexture (no DISCARD allocation stream). Input routing, canvas/font sizing,
+OpenXR settings, gameplay/IK and native animation clocks are unchanged.
+
+Main/paused/spawn menus use the same three-slot GPU ownership protocol as the
+world. Stage clears both eyes before optional room rendering; missing UI is
+transparent. Optional backdrop failure clears both eyes again. Unsupported GPU
+preparation preserves CPU compatibility and its frontend capture throttle.
+GetRequest runs before paused-menu readback. GPU frontend publication is paced
+by the runtime request and consumer ownership, without the extra 33 ms gate.
+Private BF2142VR_MENU_TRACE still permits an explicit UI readback; normal menu
+frames have none. The desktop path composites the same updated UI texture.
+
+Validation: 76 CTests and x86/x64 builds pass. Hidden MenuGpuSmoke compares exact
+room pixels and eight controls/cursor states at 640x360 and 2064x2208 (the latter
+with locally generated walker assets), preserving native state/backbuffer and
+ResetEx. Completed GPU work at full size measured 1.28 ms vs 4.25 ms for the old
+room plus readback alone on the development PC; this is not headset FPS.
+StereoIntegrationSmoke --desktop --native-ex --hardware --pure --msaa --msaa8
+--menus passes gameplay -> active menu -> paused UI -> main menu -> gameplay
+with 151 GPU publications and correct native time advancement. The --scope
+combination and reflex/CPU compatibility fixtures also pass.
+
+Candidate stays separate from published test.8 and the saved ADS-only checkpoint.
+Next headset acceptance: repeated Sign In/back, spawn/revive/deploy close,
+controls/cursor/laser alignment, hangar, scope FPS and below-gun HUD, then normal
+unscoped gameplay. Do not claim those live checks passed or publish this yet.
+
+
 ## Published test.8; separate ADS candidate (2026-10-01)
 
 Test.8 source/tag, installer, ZIP and signed preview feed are published. All 18

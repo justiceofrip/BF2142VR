@@ -16,7 +16,7 @@ bool EyeRestore::Draw(IDirect3DDevice9* device,const std::vector<DWORD>& pixels,
     if(Rejected(texture->UnlockRect(0),"upload unlock"))return false;
     return DrawTexture(device,texture.Get());
 }
-bool EyeRestore::DrawTexture(IDirect3DDevice9* device,IDirect3DTexture9* image){
+bool EyeRestore::DrawTexture(IDirect3DDevice9* device,IDirect3DTexture9* image,bool blend){
     if(!device||!image)return false;
     D3DSURFACE_DESC description{};if(FAILED(image->GetLevelDesc(0,&description)))return false;
     const UINT drawWidth=description.Width,drawHeight=description.Height;
@@ -36,7 +36,7 @@ bool EyeRestore::DrawTexture(IDirect3DDevice9* device,IDirect3DTexture9* image){
     device->SetRenderState(D3DRS_CULLMODE,D3DCULL_NONE); device->SetRenderState(D3DRS_ALPHATESTENABLE,FALSE);
     device->SetRenderState(D3DRS_SCISSORTESTENABLE,FALSE); device->SetRenderState(D3DRS_STENCILENABLE,FALSE);
     device->SetRenderState(D3DRS_COLORWRITEENABLE,15); device->SetRenderState(D3DRS_SRGBWRITEENABLE,FALSE);
-    device->SetRenderState(D3DRS_ALPHABLENDENABLE,FALSE); device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE,FALSE);
+    device->SetRenderState(D3DRS_ALPHABLENDENABLE,blend?TRUE:FALSE); device->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE,FALSE);
     device->SetRenderState(D3DRS_SRCBLEND,D3DBLEND_ONE); device->SetRenderState(D3DRS_DESTBLEND,D3DBLEND_INVSRCALPHA);
     device->SetRenderState(D3DRS_BLENDOP,D3DBLENDOP_ADD);
     device->SetTextureStageState(0,D3DTSS_COLOROP,D3DTOP_SELECTARG1); device->SetTextureStageState(0,D3DTSS_COLORARG1,D3DTA_TEXTURE);

@@ -19,6 +19,13 @@ std::optional<MenuRayHit> MenuRayTarget(const shared::SharedControllerHandSample
 void DrawMenuPointer(std::vector<DWORD>& left,std::vector<DWORD>& right,std::vector<DWORD>& ui,
     UINT width,UINT height,DXGI_FORMAT format,const shared::SharedRenderRequest& request,
     const stereo::Pose& anchor,const stereo::UiCanvasPoint& point,const std::optional<MenuRayHit>& ray,bool pressed);
+struct MenuBeam { float x0,y0,x1,y1; };
+std::optional<MenuBeam> ProjectMenuBeam(UINT width,UINT height,const stereo::Pose&,
+    const MenuRayHit&,const shared::SharedPresentationView&);
+struct MenuPointerVisual {
+    bool visible=false,pressed=false;
+    stereo::Pose anchor{};stereo::UiCanvasPoint point{};std::optional<MenuRayHit> ray;
+};
 struct MenuClickState {
     bool active=false,held=false,armed=false;
     bool Update(bool enabled,bool hit,bool trigger) noexcept;
@@ -34,6 +41,7 @@ public:
         UINT uiWidth,UINT uiHeight,ControllerCommand& command,VrControlsMenu* controls=nullptr,VrSettings* settings=nullptr,bool widescreen=false,bool desktopMouse=false);
     void Draw(std::vector<DWORD>& left,std::vector<DWORD>& right,std::vector<DWORD>& ui,
         DXGI_FORMAT format,const shared::SharedRenderRequest& request) const;
+    MenuPointerVisual Visual() const {return {menu&&visible,pressed,anchor,point,ray};}
     void Reset();
     void ExpireInput();
 private:

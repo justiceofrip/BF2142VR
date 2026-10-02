@@ -1,5 +1,19 @@
 # BFVR Changelog
 
+## Unreleased BF2142 menu GPU candidate (2026-10-02)
+
+- Keep spawn/deployment and paused menus on GPU transfer instead of forcing
+  full-eye/UI CPU readback and upload.
+- Render the stereo hangar directly into GPU eye textures. Cache controls art
+  and draw the menu cursor/laser on the GPU, retaining the native UI layout
+  and click mapping.
+- Pace GPU frontend frames through the existing runtime request/consumer
+  handshake; retain the 33 ms throttle only for CPU compatibility capture.
+- Preserve the separately saved ADS candidate and published test.8 build.
+  Hidden image/state/reset and menu-transition checks pass. Real headset menu
+  performance, login and ADS appearance still need acceptance before release.
+
+
 ## Unreleased: ADS GPU candidate
 
 - Keep supported optics on GPU eye transfer instead of reading both eyes and

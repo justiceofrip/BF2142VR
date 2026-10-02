@@ -9,7 +9,7 @@ namespace bfvr::bf2142 {
 class EyeRestore {
 public:
     bool Draw(IDirect3DDevice9*,const std::vector<DWORD>&,UINT,UINT,DXGI_FORMAT);
-    bool DrawTexture(IDirect3DDevice9*,IDirect3DTexture9*);
+    bool DrawTexture(IDirect3DDevice9*,IDirect3DTexture9*,bool blend=false);
     HRESULT LastResult() const { return lastResult; }
     const char* LastStage() const { return lastStage; }
     void Reset(){texture.Reset();width=height=0;}

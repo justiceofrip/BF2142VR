@@ -35,6 +35,7 @@
 #include "VrControlsMenu.h"
 #include "MenuRoom.h"
 #include "MenuRoomGpu.h"
+#include "MenuOverlayGpu.h"
 #include "RecenterPolicy.h"
 #include "stereo/UiPointerMath.h"
 #include "presenter/SharedControlChannel.h"
@@ -51,9 +52,9 @@ shared::SharedControlChannel channel;
 shared::SharedTextureProducer producer;
 FrameCapture capture;
 GpuFrameTransfer gpuFrames;GpuGunOptics gpuOptics;
-bool gpuRequested=false,gpuAttempted=false,gpuReady=false,gpuPair=false;
+bool gpuRequested=false,gpuAttempted=false,gpuReady=false,gpuPair=false,gpuMenuBlocked=false;
 unsigned gpuPublished=0;
-EyeRestore eyeRestore;MenuRoomGpu menuRoomGpu;
+EyeRestore eyeRestore;MenuRoomGpu menuRoomGpu;MenuOverlayGpu menuOverlayGpu;
 std::vector<DWORD> scopePixels;
 bool opticsReady=false;
 NativeUiCapture uiCapture;
@@ -355,14 +356,29 @@ bool ReadFrame(std::vector<DWORD>& output) {
     return true;
 }
 bool BeginGpuPair(){
-    if(!gpuRequested||diagnostic||menuPointer.Active()||DiagnosticCpuTransfer())return false;
+    if(!gpuRequested||diagnostic||DiagnosticCpuTransfer())return false;
     if(!gpuAttempted){
         gpuAttempted=true;
         const auto hr=gpuFrames.Initialize(gameDevice,width,height,desktop?nullptr:producer.Device());
         gpuReady=SUCCEEDED(hr);
         logger("Experimental GPU frame transport: ready=%d hr=0x%08lX; %ux%u; GPU optics when available; CPU compatibility fallback retained.",gpuReady,hr,width,height);
     }
+    if(gpuReady && menuPointer.Active() && !menuOverlayGpu.Prepare(gameDevice,width,height)){
+        gpuMenuBlocked=true;return false;
+    }
     return gpuReady;
+}
+bool StageGpuMenu(IDirect3DSurface9* ui,bool backbuffer){
+    for(unsigned eye=0;eye<2;++eye)if(FAILED(gpuFrames.Stage(eye,nullptr)))return false;
+    if(FAILED(backbuffer?gpuFrames.StageBackbuffer(2):gpuFrames.Stage(2,ui)))return false;
+    if(lastRequestMainMenu && settings.menuRoom){
+        if(!menuRoomGpu.DrawTo(gameDevice,{gpuFrames.Surface(0),gpuFrames.Surface(1)},width,height,request,menuPointer.Anchor())){
+            // Optional backdrop failures keep a complete native UI with black eyes.
+            if(FAILED(gpuFrames.Stage(0,nullptr))||FAILED(gpuFrames.Stage(1,nullptr))||
+                FAILED(backbuffer?gpuFrames.StageBackbuffer(2):gpuFrames.Stage(2,ui)))return false;
+        }
+    }
+    return true;
 }
 bool ReadGpuEyes(){
     if(!gpuPair)return true;
@@ -376,19 +392,29 @@ bool ReadGpuEyes(){
 void Publish(bool world) {
     auto profile=renderProfile.Measure(RenderProfile::Publish);
     auto* b=channel.Get();
-    const bool gpu=world&&gpuPair;
+    const bool gpu=gpuPair;
+    // Explicit menu tracing retains its sampled image diagnostic. Normal GPU
+    // menus never read pixels back; enabling this private probe costs a UI read.
+    if(!world && gpu && menuTrace::enabled)
+        (void)capture.ReadSurface(gameDevice,gpuFrames.Surface(2),colorFormat,pixels[2],true);
     if(!world)menuTrace::Frame(pixels[2],width,height,lastRequestMainMenu);
-    if(!world && lastRequestMainMenu && settings.menuRoom && !diagnostic){
+    if(!world && !gpu && lastRequestMainMenu && settings.menuRoom && !diagnostic){
         // A failed optional backdrop retains the native background; no slow
         // CPU fallback is inserted into the user's VR frame loop.
         (void)menuRoomGpu.Draw(gameDevice,pixels[0],pixels[1],width,height,colorFormat,request,menuPointer.Anchor());
     }
     if(gpu){
+        if(menuPointer.Active()){
+            const auto& art=controlsMenu.Artwork(width,height,DXGI_FORMAT_B8G8R8A8_UNORM,settings,widescreenUi);
+            if(!menuOverlayGpu.Draw({gpuFrames.Surface(0),gpuFrames.Surface(1),gpuFrames.Surface(2)},
+                menuPointer.Visual(),request,art,controlsMenu.ArtworkRevision())){Fail("GPU menu overlay");return;}
+        }
         if(desktop){
-            if(!eyeRestore.DrawTexture(gameDevice,gpuFrames.Texture(0)) || (uiReady&&!uiCapture.CompositeDesktop())){
+            if((world&&!eyeRestore.DrawTexture(gameDevice,gpuFrames.Texture(0))) ||
+                !eyeRestore.DrawTexture(gameDevice,gpuFrames.Texture(2),world)){
                 Fail("GPU desktop eye/HUD composite");return;
             }
-        }else{
+        }else if(!desktop){
             const auto hr=gpuFrames.Export();
             if(FAILED(hr)||!producer.PublishGpuFrame(gpuFrames.Exported())){Fail("GPU stereo export/publication",FAILED(hr)?hr:E_FAIL);return;}
         }
@@ -718,30 +744,39 @@ void StereoPresent(IDirect3DDevice9* device) {
             // Continue the XR request/input loop when a pause menu has stopped
             // world rendering. Both B and Home/recenter remain live here.
             outsideUiReady=false;
-            const bool captured=uiCapture.Read(colorFormat,pixels[2]) && pixels[2].size()==size_t(width)*height;
-            if(captured && GetRequest(true,true)) {
-                std::fill(pixels[0].begin(),pixels[0].end(),0xff000000);
-                std::fill(pixels[1].begin(),pixels[1].end(),0xff000000);
+            if(GetRequest(true,true)) {
+                gpuPair=BeginGpuPair();
+                if(gpuPair){if(!StageGpuMenu(uiCapture.Surface(),false)){Fail("GPU paused menu snapshot");return;}}
+                else{
+                    if(!uiCapture.Read(colorFormat,pixels[2]) || pixels[2].size()!=size_t(width)*height)return;
+                    std::fill(pixels[0].begin(),pixels[0].end(),0xff000000);
+                    std::fill(pixels[1].begin(),pixels[1].end(),0xff000000);
+                }
                 Publish(false);
             }
-            if(captured && !desktop)uiCapture.CompositeDesktop();
+            if(!desktop)uiCapture.CompositeDesktop();
         } else if ((!lastRenderer || !NativeWorldActive(lastRenderer)) &&
-                   GetTickCount64()-lastMenuCapture>=33 && GetRequest()) {
-            // Loading can pump Present faster than the headset needs UI. Avoid
-            // repeated GPU readback/upload stalls while the engine builds shaders.
+                   ((gpuRequested&&!diagnostic&&!gpuMenuBlocked&&!DiagnosticCpuTransfer()&&(!gpuAttempted||gpuReady)) ||
+                    GetTickCount64()-lastMenuCapture>=33) && GetRequest()) {
+            // The request/consumer handshake paces GPU menus to the runtime.
+            // Keep the readback throttle for the CPU compatibility path only.
             lastMenuCapture=GetTickCount64();
             // Native Render may be followed by additional desktop Presents.
             // A missing eye pair is NOT evidence that the player left the world.
             // Never publish the full scene as a menu or reset gameplay tracking.
-            if (!ReadFrame(pixels[2])) return;
-            std::fill(pixels[0].begin(),pixels[0].end(),0xff000000);
-            std::fill(pixels[1].begin(),pixels[1].end(),0xff000000);
+            gpuPair=BeginGpuPair();
+            if(gpuPair){if(!StageGpuMenu(nullptr,true)){Fail("GPU frontend menu snapshot");return;}}
+            else{
+                if (!ReadFrame(pixels[2])) return;
+                std::fill(pixels[0].begin(),pixels[0].end(),0xff000000);
+                std::fill(pixels[1].begin(),pixels[1].end(),0xff000000);
+            }
             Publish(false); // Login/loading/menu UI remains accessible in the headset.
         }
     } catch (...) { Fail("stereo presentation allocation or runtime exception"); }
 }
 void StereoReset() {
-    gpuOptics.Reset();gpuFrames.Reset();gpuReady=false;gpuAttempted=false;gpuPair=false;
+    menuOverlayGpu.Reset();gpuOptics.Reset();gpuFrames.Reset();gpuReady=false;gpuAttempted=false;gpuPair=false;gpuMenuBlocked=false;
     renderTime.Reset();opticHudReady=false;opticHudPixels.clear();opticHudBaseline.clear();
     RestoreFramePacing();
     RecenterNativeVehicle();traversalControls.Reset();weaponGrip.Reset();SetNativeWeaponHeld(true);controlsMenu.Reset();physicalStance.Reset();ConfigurePhysicalCamera(false);standingHeight.Reset();
@@ -758,6 +793,13 @@ void StereoReset() {
 
 #ifdef BF2142_GPU_FIXTURE
 namespace bfvr::bf2142 {unsigned TestGpuPublished(){return gpuPublished;}
+void TestOpenControls(bool open){controlsMenu.Hotkey(false);if(controlsMenu.Open()!=open)controlsMenu.Hotkey(true);controlsMenu.Hotkey(false);}
+bool TestBeginPausedMenu(){
+    // Hidden fixtures have no foreground OS cursor. Exercise the same capture
+    // path using its diagnostic visibility override, then publish on the real GPU path.
+    const bool wasDiagnostic=diagnostic;diagnostic=true;
+    const bool result=StereoHudBegin(true);diagnostic=wasDiagnostic;return result;
+}
 void TestHoldStereoConsumer(bool hold){
  if(auto* b=channel.Get())InterlockedExchange(&b->consumedFrameSequence,ReadCounter(b->frameSequence)-(hold?1:0));
 }}

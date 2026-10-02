@@ -35,28 +35,35 @@ void Disc(std::vector<DWORD>& p,UINT width,UINT height,int x,int y,int radius,DW
 }
 void Beam(std::vector<DWORD>& pixels,UINT width,UINT height,const stereo::Pose& anchor,
     const MenuRayHit& ray,const shared::SharedPresentationView& eye,DWORD color) {
+    const auto line=ProjectMenuBeam(width,height,anchor,ray,eye);if(!line)return;
+    const float dx=line->x1-line->x0,dy=line->y1-line->y0;
+    const int steps=std::max(1,int(std::max(std::abs(dx),std::abs(dy))));
+    for(int i=0;i<=steps;++i){const float t=float(i)/steps;Disc(pixels,width,height,int(line->x0+t*dx),int(line->y0+t*dy),1,color);}
+}
+}
+std::optional<MenuBeam> ProjectMenuBeam(UINT width,UINT height,const stereo::Pose& anchor,
+    const MenuRayHit& ray,const shared::SharedPresentationView& eye) {
+    if(!width||!height||width>8192||height>8192)return {};
     stereo::Pose a{Transform(anchor,ray.origin),{}},b{Transform(anchor,ray.end),{}};
     const auto av=stereo::MakeRelativePose(Pose(eye.pose),a),bv=stereo::MakeRelativePose(Pose(eye.pose),b);
-    if(!av || !bv)return;
+    if(!av || !bv)return {};
     auto p=av->position,q=bv->position;
     constexpr float nearZ=-.03f;
-    if(p.z>nearZ && q.z>nearZ)return;
+    if(p.z>nearZ && q.z>nearZ)return {};
     const auto clip=[](stereo::Vec3& start,const stereo::Vec3& end) {
         if(start.z>nearZ){const float t=(nearZ-start.z)/(end.z-start.z);start={start.x+t*(end.x-start.x),start.y+t*(end.y-start.y),nearZ};}
     };
     clip(p,q);clip(q,p);
     const float l=std::tan(eye.fov.angleLeft),r=std::tan(eye.fov.angleRight),u=std::tan(eye.fov.angleUp),d=std::tan(eye.fov.angleDown);
-    if(!(r>l && u>d))return;
+    if(!(r>l && u>d))return {};
     float x0=(p.x/-p.z-l)/(r-l)*width,y0=(u-p.y/-p.z)/(u-d)*height;
     const float x1=(q.x/-q.z-l)/(r-l)*width,y1=(u-q.y/-q.z)/(u-d)*height;
-    if(!std::isfinite(x0)||!std::isfinite(y0)||!std::isfinite(x1)||!std::isfinite(y1))return;
+    if(!std::isfinite(x0)||!std::isfinite(y0)||!std::isfinite(x1)||!std::isfinite(y1))return {};
     const float dx=x1-x0,dy=y1-y0;
     float lo=0,hi=1;
     const auto bound=[&](float p,float q) {if(std::abs(p)<1e-8f)return q>=0;const float t=q/p;if(p<0)lo=std::max(lo,t);else hi=std::min(hi,t);return lo<=hi;};
-    if(!bound(-dx,x0)||!bound(dx,float(width-1)-x0)||!bound(-dy,y0)||!bound(dy,float(height-1)-y0))return;
-    const int steps=std::max(1,int(std::max(std::abs(dx*(hi-lo)),std::abs(dy*(hi-lo)))));
-    for(int i=0;i<=steps;++i){const float t=lo+(hi-lo)*float(i)/steps;Disc(pixels,width,height,int(x0+t*dx),int(y0+t*dy),1,color);}
-}
+    if(!bound(-dx,x0)||!bound(dx,float(width-1)-x0)||!bound(-dy,y0)||!bound(dy,float(height-1)-y0))return {};
+    return MenuBeam{x0+lo*dx,y0+lo*dy,x0+hi*dx,y0+hi*dy};
 }
 std::optional<MenuRayHit> MenuRayTarget(const shared::SharedControllerHandSample& hand,
     const stereo::Pose& anchor,UINT width,UINT height,UINT uiWidth,UINT uiHeight,bool widescreen) {

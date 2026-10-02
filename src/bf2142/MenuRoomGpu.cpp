@@ -62,6 +62,18 @@ V Rotate(const stereo::Quaternion& q,V v){const V t{2*(q.y*v.z-q.z*v.y),2*(q.z*v
 }
 bool MenuRoomGpu::Draw(IDirect3DDevice9* d,std::vector<DWORD>& left,std::vector<DWORD>& right,UINT w,UINT h,
  DXGI_FORMAT format,const shared::SharedRenderRequest& request,const stereo::Pose& anchor){
+ if(!Render(d,w,h,format,request,anchor,nullptr))return false;
+ left.swap(completed[0]);right.swap(completed[1]);return true;
+}
+bool MenuRoomGpu::DrawTo(IDirect3DDevice9* d,const std::array<IDirect3DSurface9*,2>& destinations,UINT w,UINT h,
+ const shared::SharedRenderRequest& request,const stereo::Pose& anchor){
+ for(auto* target:destinations){D3DSURFACE_DESC desc{};
+  if(!target||FAILED(target->GetDesc(&desc))||desc.Width!=w||desc.Height!=h||desc.Format!=D3DFMT_A8R8G8B8||desc.MultiSampleType!=D3DMULTISAMPLE_NONE)return false;
+ }
+ return Render(d,w,h,DXGI_FORMAT_B8G8R8A8_UNORM,request,anchor,&destinations);
+}
+bool MenuRoomGpu::Render(IDirect3DDevice9* d,UINT w,UINT h,DXGI_FORMAT format,
+ const shared::SharedRenderRequest& request,const stereo::Pose& anchor,const std::array<IDirect3DSurface9*,2>* destinations){
  if(!d||!w||!h||w>8192||h>8192)return false;
  if(d!=device||w!=width||h!=height){Reset();device=d;width=w;height=h;}
  if(failed)return false;
@@ -115,13 +127,13 @@ bool MenuRoomGpu::Draw(IDirect3DDevice9* d,std::vector<DWORD>& left,std::vector<
    ok=eye&&SUCCEEDED(d->SetDepthStencilSurface(depthSurface.Get()))&&SUCCEEDED(d->Clear(0,nullptr,D3DCLEAR_ZBUFFER,0,1,0))&&scene.Draw(d,*eye);
   }
   ok=SUCCEEDED(d->EndScene())&&ok;
-  if(ok)ok=SUCCEEDED(capture.ReadSurface(d,surface.Get(),format,completed[e]));
+  if(ok)ok=destinations?SUCCEEDED(d->StretchRect(surface.Get(),nullptr,(*destinations)[e],nullptr,D3DTEXF_NONE)):
+      SUCCEEDED(capture.ReadSurface(d,surface.Get(),format,completed[e]));
  }
  bool restored=SUCCEEDED(d->SetRenderTarget(0,previous[0].Get()));
  for(unsigned i=1;i<targets;++i)restored=SUCCEEDED(d->SetRenderTarget(i,previous[i].Get()))&&restored;
  restored=SUCCEEDED(d->SetDepthStencilSurface(depth.Get()))&&restored;
  restored=SUCCEEDED(state->Apply())&&restored;
- if(!ok||!restored)return false;
- left.swap(completed[0]);right.swap(completed[1]);return true;
+ return ok&&restored;
 }
 }

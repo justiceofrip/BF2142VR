@@ -54,11 +54,17 @@ bool VrControlsMenu::Interact(float x,float y,bool click,bool back,VrSettings& s
  saveFailed=!SaveVrPreferences(s);return true;
 }
 void VrControlsMenu::Draw(std::vector<DWORD>& image,UINT w,UINT h,DXGI_FORMAT format,const VrSettings& s,bool widescreen){
- if(!w||!h||w>8192||h>8192||image.size()!=size_t(w)*h)return;
+ if(image.size()!=size_t(w)*h)return;
+ const auto& cached=Artwork(w,h,format,s,widescreen);
+ if(cached.size()==image.size())for(size_t i=0;i<cached.size();++i)if(cached[i])image[i]=cached[i];
+}
+const std::vector<DWORD>& VrControlsMenu::Artwork(UINT w,UINT h,DXGI_FORMAT format,const VrSettings& s,bool widescreen){
+ static const std::vector<DWORD> empty;
+ if(!w||!h||w>8192||h>8192)return empty;
  if(dirty||cachedWidth!=w||cachedHeight!=h||cachedFormat!=format||cachedWidescreen!=widescreen){
   const int aw=int(w),ah=widescreen?std::max(1,int(w*9/16)):int(h);BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=aw;info.bmiHeader.biHeight=-ah;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;
-  void* bits=nullptr;HDC dc=CreateCompatibleDC(nullptr);if(!dc)return;
-  HBITMAP bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0);if(!bitmap){DeleteDC(dc);return;}
+  void* bits=nullptr;HDC dc=CreateCompatibleDC(nullptr);if(!dc)return empty;
+  HBITMAP bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0);if(!bitmap){DeleteDC(dc);return empty;}
   const auto previous=SelectObject(dc,bitmap);std::memset(bits,0,aw*ah*4);
   const auto rect=[&](float x,float y,float width,float height,COLORREF color){RECT box{LONG(x*aw),LONG(y*ah),LONG((x+width)*aw),LONG((y+height)*ah)};auto brush=CreateSolidBrush(color);FillRect(dc,&box,brush);DeleteObject(brush);};
   const auto label=[&](float x,float y,const std::wstring& text,int size,COLORREF color,bool bold=false){
@@ -95,8 +101,8 @@ void VrControlsMenu::Draw(std::vector<DWORD>& image,UINT w,UINT h,DXGI_FORMAT fo
   }
   art.resize(size_t(w)*h);auto src=static_cast<DWORD*>(bits);const bool rgba=format==DXGI_FORMAT_R8G8B8A8_UNORM||format==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
   for(UINT y=0;y<h;++y)for(UINT x=0;x<w;++x){DWORD c=src[size_t(y)*ah/h*aw+size_t(x)*aw/w];if(c){c|=0xff000000;if(rgba)c=(c&0xff00ff00)|((c&255)<<16)|((c>>16)&255);}art[size_t(y)*w+x]=c;}
-  SelectObject(dc,previous);DeleteObject(bitmap);DeleteDC(dc);cachedWidth=w;cachedHeight=h;cachedFormat=format;cachedWidescreen=widescreen;dirty=false;
+  SelectObject(dc,previous);DeleteObject(bitmap);DeleteDC(dc);cachedWidth=w;cachedHeight=h;cachedFormat=format;cachedWidescreen=widescreen;dirty=false;++revision;
  }
- for(size_t i=0;i<art.size();++i)if(art[i])image[i]=art[i];
+ return art;
 }
 }
