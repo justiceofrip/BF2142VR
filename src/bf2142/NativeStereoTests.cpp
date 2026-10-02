@@ -8,7 +8,9 @@ bool IsScopeRender(){return scopeFixture;}
 bool IsSecondStereoEye(){return false;}
 bool StereoHudBegin(bool){return false;}
 void StereoHudEnd(){}
-bool StereoOpticHudBegin(){return false;}void StereoOpticHudEnd(){}
+bool StereoOpticHudBegin(){return false;}void StereoOpticHudEnd(bool){}
+bool InstallNativeOpticHud(){return false;}
+bool CrosshairScope::DrewArtwork() const{return false;}
 bool RenderStereo(void*,NativeRender,double,float){return true;}
 bool ReadNativeComfortCamera(const stereo::Matrix4&,stereo::Matrix4*,const void*){return false;}
 bool ReadNativeVehicleCamera(const stereo::Matrix4&,stereo::Matrix4*){return false;}

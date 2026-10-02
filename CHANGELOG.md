@@ -1,5 +1,14 @@
 # BFVR Changelog
 
+## Unreleased BF2142 scope-widget candidate (2026-10-02)
+
+- Filter cached stock ADS widget draws on the main HUD and preserve them for
+  the scope replay, rather than relying only on a late GuiIndex change.
+- Require a recognized visible scope widget before using native replay art;
+  retain the fallback reticle for a hidden or unrecognized replay.
+- Both builds, 76 tests and GPU menu/scope transitions pass. Headset reticle
+  visibility and scope-only placement remain unverified; not published.
+
 ## Unreleased BF2142 menu GPU candidate (2026-10-02)
 
 - Private reset-route candidate follows a changed primary-device Reset entry

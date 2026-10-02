@@ -153,7 +153,7 @@ void __fastcall HudHook(void* hud,void*) {
     // Replay HUD only while the engine's scene is open. Native cache/device
     // state stay synchronized; no additional world or animation tick occurs.
     CrosshairScope optic(nullptr,true);
-    if(optic.Optic()&&StereoOpticHudBegin()){nativeHud(hud);StereoOpticHudEnd();}
+    if(optic.Optic()&&StereoOpticHudBegin()){nativeHud(hud);StereoOpticHudEnd(optic.DrewArtwork());}
 }
 bool __fastcall RenderHook(void* renderer,void*,double delta,float interpolation) {
     if (replayActive) return nativeRender(renderer,delta,interpolation);
@@ -263,6 +263,8 @@ bool InstallNativeStereo(LogFunction logger) {
         return false;
     }
     installed=true;
+    if(!InstallNativeOpticHud())logger("Native optic HUD draw filter unavailable; fallback reticle retained.");
+    else logger("Native optic HUD draw filter connected: cached stock scope widgets isolated from main HUD.");
     if(!InstallNativeWorldMarkers(image,logger))logger("Native 3D-map marker profile unavailable; original markers retained.");
     if(!InstallNativeHudPointer(logger))logger("Deployment HUD pointer hook unavailable: profile mismatch.");
     if(!InstallNativeComfort(logger))logger("Infantry VR comfort unavailable: native heading/recoil profile or hook mismatch.");

@@ -671,7 +671,7 @@ bool StereoOpticHudBegin(){
     GunOptic optic;if(!ReadNativeOptic(&optic))return false;
     return uiCapture.BeginOptic(gameDevice);
 }
-void StereoOpticHudEnd(){opticHudReady=uiCapture.EndOptic();}
+void StereoOpticHudEnd(bool artwork){opticHudReady=uiCapture.EndOptic()&&artwork;}
 bool SuppressStereoPresent(IDirect3DDevice9* device) {
     if (!insideRender || device!=gameDevice) return false;
     ++suppressedPresents;

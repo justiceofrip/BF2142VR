@@ -139,6 +139,7 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(BF2142VRNativeCrosshairTests NativeCrosshairTests.cpp)
+target_link_libraries(BF2142VRNativeCrosshairTests PRIVATE minhook)
 target_compile_definitions(BF2142VRNativeCrosshairTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_compile_options(BF2142VRNativeCrosshairTests PRIVATE /W4 /permissive-)
 set_property(TARGET BF2142VRNativeCrosshairTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

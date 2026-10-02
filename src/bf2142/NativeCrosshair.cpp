@@ -2,14 +2,49 @@
 #include <windows.h>
 #include <cstring>
 #include <cmath>
+#include <initializer_list>
+#include <MinHook.h>
 namespace bfvr::bf2142 {
 namespace {
-bool hidden=true;thread_local unsigned opticReplayDepth=0;
+bool hidden=true;thread_local unsigned opticReplayDepth=0,hudDrawDepth=0;
+thread_local bool replayArtwork=false;
+BYTE* widgetImage=nullptr;
+using CullDraw=void(__thiscall*)(void*,void*,void*,void*,void*,void*);
+CullDraw nativeCullDraw=nullptr;
 template<class T>T Read(const void* p,size_t off=0){T v{};std::memcpy(&v,static_cast<const BYTE*>(p)+off,sizeof(v));return v;}
 // Stock ADS HUD selectors. Disable the entire weapon widget root on the main
 // panel, including fixed-opacity rangefinders and scope stabilizers. The optic
 // layer replays the unchanged native selector, then isolates its pixels.
 bool OpticHud(int index){switch(index){case 59:case 63:case 78:case 80:case 81:case 84:case 88:case 90:case 92:return true;default:return false;}}
+// Show-variable results and alpha are cached during HUD update, before Draw.
+// Changing GuiIndex during Draw cannot hide these nodes. Match only stock
+// scope roots, not HP/ammo, menus, hip crosshairs or vehicle artwork.
+bool ScopeWidget(const char* name){
+ if(!name)return false;
+ for(const char* known:{"CarbineZoomCullNode","PacAssaultZoomCullNode",
+     "EuAssaultZoomCullNode","EuMachineZoomCullNode","EuSniperHudCullNode",
+     "PacSniperHudCullNode"})if(!std::strcmp(name,known))return true;
+ return false;
+}
+bool ScopeNode(void* node){
+ __try {
+  if(!widgetImage||Read<const BYTE*>(node)!=widgetImage+0x5bb4f8)return false;
+  const char* name=Read<const char*>(node,0x18);if(!name)return false;
+  char bounded[64]{};unsigned i=0;
+  for(;i<sizeof(bounded)-1&&name[i];++i)bounded[i]=name[i];
+  return !name[i]&&ScopeWidget(bounded);
+ }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+}
+void __fastcall CullDrawHook(void* self,void*,void* a,void* b,void* c,void* d,void* e){
+ if(hudDrawDepth&&ScopeNode(self)){
+  if(!opticReplayDepth)return;
+  // An allocated capture alone is not evidence of scope artwork. A hidden
+  // or unknown node keeps the existing fallback aiming mark on the GPU path.
+  __try {if(Read<void*>(self,4)&&Read<float>(self,0x14)>0)replayArtwork=true;}
+  __except(EXCEPTION_EXECUTE_HANDLER){}
+ }
+ nativeCullDraw(self,a,b,c,d,e);
+}
 void* NamedValue(const BYTE* manager,const char* key,size_t mapOffset){
  const auto sentinel=Read<const BYTE*>(manager,0x60);if(!sentinel)return nullptr;
  auto node=Read<const BYTE*>(sentinel,4);int id=-1;
@@ -54,20 +89,35 @@ int* ResolveGui(const BYTE* game){
  }__except(EXCEPTION_EXECUTE_HANDLER){}return nullptr;
 }
 }
+bool InstallNativeOpticHud(){
+ if(nativeCullDraw)return true;
+ auto* game=reinterpret_cast<BYTE*>(GetModuleHandleW(nullptr));
+ __try {
+  const BYTE prefix[]={0x55,0x8b,0xec,0x83,0xec,0x1c,0x56,0x8b,0xf1,0x83,0x7e,4,0};
+  if(Read<const BYTE*>(game,0x5bb4f8+0x54)!=game+0x47aca0||
+     std::memcmp(game+0x47aca0,prefix,sizeof(prefix))||
+     Read<unsigned short>(game,0x47ace3)!=0x14c2)return false;
+  if(MH_CreateHook(game+0x47aca0,CullDrawHook,reinterpret_cast<void**>(&nativeCullDraw))!=MH_OK)return false;
+  if(MH_EnableHook(game+0x47aca0)!=MH_OK){MH_RemoveHook(game+0x47aca0);nativeCullDraw=nullptr;return false;}
+  widgetImage=game;return true;
+ }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+}
 void SetCrosshairHidden(bool value){hidden=value;}
 CrosshairScope::CrosshairScope():CrosshairScope(nullptr){}
 CrosshairScope::CrosshairScope(const void* module,bool optic){
  // Native Flash can execute outside HudHook, and a replay can nest Flash.
  // Suppress ADS widgets independently of the user's ordinary crosshair toggle.
  if(!optic&&opticReplayDepth)return;
+ drawing=true;++hudDrawDepth;
  const auto game=module?static_cast<const BYTE*>(module):reinterpret_cast<const BYTE*>(GetModuleHandleW(nullptr));
  __try {
   gui=ResolveGui(game);if(gui)savedGui=*gui;
   opticReady=gui&&OpticHud(savedGui);
   alpha=Resolve(game);if(alpha)saved=*alpha;
-  if(optic){replay=true;++opticReplayDepth;if(alpha&&opticReady)*alpha=1;}
+  if(optic){replay=true;if(!opticReplayDepth)replayArtwork=false;++opticReplayDepth;if(alpha&&opticReady)*alpha=1;}
   else {if(alpha&&hidden)*alpha=0;if(opticReady)*gui=1024;}
  }__except(EXCEPTION_EXECUTE_HANDLER){}
 }
-CrosshairScope::~CrosshairScope(){if(replay&&opticReplayDepth)--opticReplayDepth;__try{if(gui)*gui=savedGui;if(alpha)*alpha=saved;}__except(EXCEPTION_EXECUTE_HANDLER){}}
+bool CrosshairScope::DrewArtwork() const{return replay&&replayArtwork;}
+CrosshairScope::~CrosshairScope(){if(drawing&&hudDrawDepth)--hudDrawDepth;if(replay&&opticReplayDepth)--opticReplayDepth;__try{if(gui)*gui=savedGui;if(alpha)*alpha=saved;}__except(EXCEPTION_EXECUTE_HANDLER){}}
 }

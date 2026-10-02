@@ -14,7 +14,7 @@ void StereoReset();
 bool StereoHudBegin(bool standaloneMenu=false);
 void StereoHudEnd();
 bool StereoOpticHudBegin();
-void StereoOpticHudEnd();
+void StereoOpticHudEnd(bool artwork=true);
 bool SuppressStereoPresent(IDirect3DDevice9* device);
 bool IsSecondStereoEye();
 bool IsScopeRender();

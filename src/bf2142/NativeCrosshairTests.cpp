@@ -5,6 +5,13 @@
 #include <cstdio>
 using namespace bfvr::bf2142;
 template<class T>void Put(BYTE* p,size_t off,T v){std::memcpy(p+off,&v,sizeof(v));}
+unsigned draws=0;void* expectedArgument=reinterpret_cast<void*>(0x1234);
+bool argumentsOk=true;
+void __fastcall DrawCachedWidget(void* self,void*,void* a,void* b,void* c,void* d,void* e){
+ argumentsOk=argumentsOk&&a==expectedArgument&&b==a&&c==a&&d==a&&e==a;
+ // Reproduce native cached visibility: drawing never reads GuiIndex again.
+ draws+=Read<float>(self,0x14)>0;
+}
 int main(){
  std::vector<BYTE> game(0x610000);std::array<BYTE,128> manager{};std::array<BYTE,64> nameRoot{},name{},floatRoot{},entry{};float alpha=.8f;
  auto g=game.data();const BYTE lookup[]={0x55,0x8b,0xec,0x8b,0x45,8,0x56,0x8b,0xf1,0x50,0x8d,0x4d,8,0x51,0x8d,0x4e,0x5c};
@@ -44,5 +51,33 @@ int main(){
  Put(entry.data(),0x10,&alpha);
  g[0x4e490]=0;{CrosshairScope scope(g);if(index!=84||alpha!=0)return 12;}if(alpha!=.8f)return 13;
  g[0x4e490]=intMap[0];Put(intEntry.data(),0x10,reinterpret_cast<int*>(1));if(ResolveGui(g))return 14;
- puts("Signature-backed named crosshair alpha lookup passed; unrelated HUD state remains untouched.");return 0;
+ // Cached node still draws even after changing the source GUI variable.
+ // Exercise the actual detour with opaque arguments, no game binary needed.
+ Put(intEntry.data(),0x10,&index);widgetImage=g;
+ nativeCullDraw=reinterpret_cast<CullDraw>(&DrawCachedWidget);
+ std::array<BYTE,64> node{};Put(node.data(),0,g+0x5bb4f8);
+ Put(node.data(),4,reinterpret_cast<void*>(0x5678));Put(node.data(),0x14,1.f);
+ const auto draw=[&](){CullDrawHook(node.data(),nullptr,expectedArgument,expectedArgument,expectedArgument,expectedArgument,expectedArgument);};
+ for(const char* name:{"CarbineZoomCullNode","PacAssaultZoomCullNode","EuAssaultZoomCullNode",
+                       "EuMachineZoomCullNode","EuSniperHudCullNode","PacSniperHudCullNode"}){
+  Put(node.data(),0x18,name);index=84;draws=0;
+  {CrosshairScope main(g);draw();if(draws||index!=1024)return 31;}
+  if(index!=84||Read<float>(node.data(),0x14)!=1)return 32;
+  {CrosshairScope optic(g,true);if(optic.DrewArtwork())return 33;
+   {CrosshairScope flash(g);draw();}if(draws!=1||!optic.DrewArtwork())return 34;
+  }
+  draw();if(draws!=2)return 35; // Outside VR HUD drawing: native behavior.
+ }
+ for(const char* name:{"HealthCullNode","EuAssaultCrossStandardCullNode","EuSniperHudCullNodeCustom","TankCrosshairZoomCullNode"}){
+  Put(node.data(),0x18,name);draws=0;
+  {CrosshairScope main(g);draw();}if(draws!=1)return 36;
+  {CrosshairScope optic(g,true);draw();if(optic.DrewArtwork())return 37;}
+ }
+ Put(node.data(),0x18,"EuSniperHudCullNode");Put(node.data(),0x14,0.f);
+ {CrosshairScope optic(g,true);draw();if(optic.DrewArtwork())return 38;}
+ Put(node.data(),0x14,1.f);Put(node.data(),4,static_cast<void*>(nullptr));
+ {CrosshairScope optic(g,true);draw();if(optic.DrewArtwork())return 39;}
+ Put(node.data(),0x18,reinterpret_cast<const char*>(1));if(ScopeNode(node.data()))return 40;
+ if(hudDrawDepth||opticReplayDepth||!argumentsOk)return 41;
+ puts("Named crosshair lookup, cached scope-node suppression, replay visibility, empty-capture fallback and unrelated HUD preservation passed.");return 0;
 }

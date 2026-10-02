@@ -1,5 +1,35 @@
 # BFVR AI and Developer Handoff
 
+## Private scope-widget correction after headset test (2026-10-02)
+
+Owner reports the reset/menu/ADS candidate generally working in the headset.
+Remaining observations: native 2D ADS elements follow the floating HUD rather
+than the scope, and the sniper reticle is absent. This accepts menu usability,
+not every weapon, universal FPS, or the intermittent alternate-reset route.
+
+Native HUD inspection confirms GuiIndex conditions are cached in named cull
+nodes before Draw. Changing GuiIndex only inside HudHook does not re-evaluate
+that cache. The stock cull draw at EXE+0x47aca0 uses cached alpha at node+0x14;
+stock named cull type is vtable EXE+0x5bb4f8, name pointer at +0x18. NativeCrosshair
+now signature-checks and hooks that Draw boundary. During ordinary HUD draws,
+only exact stock scope-root names are suppressed. Optic replay forwards those
+same native nodes with all five draw arguments unchanged. No node pointers or
+cached state are rewritten, no HUD update/animation tick is introduced, and
+unrelated menus, HP/ammo and vehicle nodes keep native drawing.
+
+Replay validity now requires a recognized visible scope root with draw content;
+an allocated/blank or unrecognized capture no longer automatically removes the
+fallback reticle. This is draw-state evidence, not a per-pixel emptiness test.
+CPU pixel isolation and GPU scope aperture projection are otherwise unchanged.
+
+Both architectures and 76 CTests pass. NativeCrosshairTests reproduces cached
+visibility independently of GuiIndex, nesting, hidden/unknown replay fallback,
+unchanged draw arguments and unrelated HUD nodes. GPU integration retains 151
+publications across scope/gameplay/menu transitions, 243 native replays and 91
+time advances. Actual scope-art placement/reticle visibility needs a headset
+retest. Saved private candidate only; no published release or SteamVR setting
+changed. Previous accepted menu candidate remains available for comparison.
+
 ## Private reset-route follow-up (2026-10-02)
 
 The first live GPU-menu run had a smooth hangar but cropped/missing buttons.
