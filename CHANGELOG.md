@@ -2,6 +2,9 @@
 
 ## Unreleased BF2142 menu GPU candidate (2026-10-02)
 
+- Private reset-route candidate follows a changed primary-device Reset entry
+  to retain the high-resolution canvas. Desktop menu accepted on one run;
+  intermittent transition and headset checks still pending.
 - Keep spawn/deployment and paused menus on GPU transfer instead of forcing
   full-eye/UI CPU readback and upload.
 - Render the stereo hangar directly into GPU eye textures. Cache controls art

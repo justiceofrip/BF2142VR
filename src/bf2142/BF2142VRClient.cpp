@@ -52,7 +52,8 @@ Create9 originalCreate9 = nullptr;
 CreateDevice originalCreateDevice = nullptr;
 Present originalPresent = nullptr;
 SwapPresent originalSwapPresent = nullptr;
-Reset originalReset = nullptr;
+Reset originalReset = nullptr, alternateReset=nullptr;
+IDirect3DDevice9* resetOwner=nullptr;void* alternateResetTarget=nullptr;
 ResetEx originalResetEx = nullptr;
 thread_local bool legacyResetActive=false;
 GetSwapChain originalGetSwapChain = nullptr;
@@ -210,9 +211,12 @@ bool ConnectDefaultSwapChain(IDirect3DDevice9* device) {
     chain->Release();
     return connected;
 }
+void RefreshResetConnection(IDirect3DDevice9* device);
 HRESULT STDMETHODCALLTYPE GetSwapChainHook(IDirect3DDevice9* device, UINT index,
     IDirect3DSwapChain9** output) {
+    RefreshResetConnection(device);
     const HRESULT result = originalGetSwapChain(device, index, output);
+    RefreshResetConnection(device);
     if (SUCCEEDED(result) && output && *output) ConnectSwapChain(*output);
     return result;
 }
@@ -224,6 +228,7 @@ HRESULT STDMETHODCALLTYPE CreateSwapChainHook(IDirect3DDevice9* device,
     return result;
 }
 HRESULT STDMETHODCALLTYPE EndSceneHook(IDirect3DDevice9* device) {
+    RefreshResetConnection(device);
     const HRESULT result = originalEndScene(device);
     CountBoundary(scenes, "EndScene", result);
     return result;
@@ -240,8 +245,8 @@ HRESULT STDMETHODCALLTYPE ResetExHook(IDirect3DDevice9Ex* device,
     if(SUCCEEDED(result)){ConnectDefaultSwapChain(device);bfvr::bf2142::ConfirmRenderCanvas(device);}
     return result;
 }
-HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
-    D3DPRESENT_PARAMETERS* parameters) {
+HRESULT ResetDevice(Reset original,IDirect3DDevice9* device,D3DPRESENT_PARAMETERS* parameters) {
+    if(legacyResetActive)return original(device,parameters);
     struct ResetScope{ResetScope(){legacyResetActive=true;}~ResetScope(){legacyResetActive=false;}} scope;
     bfvr::bf2142::StereoReset();
     D3DDEVICE_CREATION_PARAMETERS canvasCreation{};device->GetCreationParameters(&canvasCreation);
@@ -254,7 +259,7 @@ HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
     if(parameters&&runtimePacing&&parameters->PresentationInterval!=D3DPRESENT_INTERVAL_IMMEDIATE){parameters->PresentationInterval=D3DPRESENT_INTERVAL_IMMEDIATE;changed=true;}
     IDirect3DDevice9Ex* resetEx=nullptr;
     if(gpuBackend&&bfvr::bf2142::NativeExTransferRequested())device->QueryInterface(IID_PPV_ARGS(&resetEx));
-    const auto reset=[&](){return resetEx?resetEx->ResetEx(parameters,nullptr):originalReset(device,parameters);};
+    const auto reset=[&](){return resetEx?resetEx->ResetEx(parameters,nullptr):original(device,parameters);};
     HRESULT result=reset();
     if(FAILED(result)&&changed){*parameters=saved;result=reset();Log("VR MSAA reset fallback: original native settings retained.");}
     if(resetEx){
@@ -271,6 +276,15 @@ HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,
         parameters ? parameters->BackBufferHeight : 0, parameters ? parameters->Windowed : 0);
     if (SUCCEEDED(result)) {ConnectDefaultSwapChain(device);bfvr::bf2142::ConfirmRenderCanvas(device);}
     return result;
+}
+HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9* device,D3DPRESENT_PARAMETERS* parameters){return ResetDevice(originalReset,device,parameters);}
+HRESULT STDMETHODCALLTYPE AlternateResetHook(IDirect3DDevice9* device,D3DPRESENT_PARAMETERS* parameters){return ResetDevice(alternateReset,device,parameters);}
+void RefreshResetConnection(IDirect3DDevice9* device){
+    if(!device||device!=resetOwner||!resetTarget)return;
+    void* target=(*reinterpret_cast<void***>(device))[16];
+    if(target==resetTarget||target==alternateResetTarget)return;
+    const bool connected=Hook(target,reinterpret_cast<void*>(&AlternateResetHook),reinterpret_cast<void**>(&alternateReset),alternateResetTarget);
+    if(connected)Log("Native reset implementation changed: original=%p current=%p; second route connected.",resetTarget,target);
 }
 HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
     D3DDEVTYPE type, HWND window, DWORD behavior,
@@ -329,6 +343,7 @@ HRESULT STDMETHODCALLTYPE CreateDeviceHook(IDirect3D9* factory, UINT adapter,
         void** table = *reinterpret_cast<void***>(*output);
         const bool present = Hook(table[17], reinterpret_cast<void*>(&PresentHook),
             reinterpret_cast<void**>(&originalPresent), presentTarget);
+        resetOwner=*output;
         const bool reset = Hook(table[16], reinterpret_cast<void*>(&ResetHook),
             reinterpret_cast<void**>(&originalReset), resetTarget);
         const bool getSwap = Hook(table[14], reinterpret_cast<void*>(&GetSwapChainHook),

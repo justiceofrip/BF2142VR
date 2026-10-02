@@ -1,5 +1,24 @@
 # BFVR AI and Developer Handoff
 
+## Private reset-route follow-up (2026-10-02)
+
+The first live GPU-menu run had a smooth hangar but cropped/missing buttons.
+Creation requested 2084x2228/8x; transport later saw 1600x900/4x with no Reset
+log. Read-only inspection found the installed Reset target in a Windows
+compatibility wrapper while the device table pointed to unhooked native D3D9.
+The private correction refreshes the primary device Reset connection around
+GetSwapChain and at EndScene. Separate original trampolines plus a recursion
+guard retain native forwarding and existing Ex legacy-state restoration.
+Those refresh boundaries might still miss an earlier transition; a successful
+subsequent launch does not prove the intermittent problem fully resolved.
+
+Win32 rebuild and 76 CTests pass. Owner accepted the next desktop menu and
+entered a map. That run did not exercise the new alternate route. After the
+owner reconnected Steam Link, desktop closed normally and VR launched with
+creation, intercepted Reset and transport all at requested 2084x2228/8x.
+GPU publication is active; headset menu/login, spawn and ADS checks pending.
+No SteamVR settings, shortcuts or public release changed.
+
 ## Unreleased menu GPU follow-up (2026-10-02)
 
 Community test.8 feedback confirms sharp/smooth gameplay but severe menu/spawn
