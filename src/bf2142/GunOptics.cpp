@@ -17,14 +17,29 @@ constexpr OpticDefinition definitions[]={
     {"eu_sni",{0,.0974f,-.073f},.0210f,.0084f,true,.312f,4.f},
     {"as_sni",{.0008f,.091f,-.225f},.0118f,.0118f,false,.312f,4.f},
     {"unl_adv_sni",{0,.089f,-.233f},.0140f,.0110f,true,.312f,4.f},
-    // SMG rear sight faces, inset from their bezels. Keep 1x reflex rendering.
-    {"eu_smg",{-.01135f,.13425f,-.1056f},.0062f,.0082f,true,.749f,1.f,true},
-    {"as_smg",{.00029f,.0542f,.0605f},.0080f,.0070f,false,.8f,1.f,true},
+    // SMG rear sight faces, inset from their bezels. Clear their opaque lenses at 1x.
+    {"eu_smg",{-.01135f,.13425f,-.1056f},.0062f,.0082f,true,.749f,1.f,true,true},
+    {"as_smg",{.00029f,.0542f,.0605f},.0080f,.0070f,false,.8f,1.f,true,true},
     // Launcher side displays. Stock native zoom is .85, not the rifle .484.
     // Their off-bore position shares the existing finite bore-zero projection.
     {"eu_av",{-.07075f,.0778f,.0665f},.0310f,.0110f,true,.85f,1.5f},
     {"as_av",{-.16296f,.06845f,.0980f},.0300f,.0225f,true,.85f,1.5f},
-    {"unl_av_rifle",{-.00025f,.09275f,-.3257f},.0150f,.0140f,false,.59f,2.f}
+    {"unl_av_rifle",{-.00025f,.09275f,-.3257f},.0150f,.0140f,false,.59f,2.f},
+    // Remaining stock/unlock optics, including promotion and attachment modes.
+    {"as_mg",{.00172f,.0759f,-.1410f},.0110f,.0100f,false,.59f,1.f,false,true},
+    {"unl_carbine",{0,.08749f,-.0503f},.0120f,.0120f,false,.59f,1.5f},
+    {"unl_har_rifle",{0,.09568f,-.0169f},.0120f,.0120f,false,.41f,2.5f},
+    {"unl_lar_rifle",{-.03435f,.08228f,-.0169f},.0100f,.0100f,false,.59f,1.5f},
+    {"unl_hmg",{0,.11833f,-.2139f},.0039f,.0103f,true,.484f,2.f},
+    {"unl_best_buy_rifle",{.00014f,.1371f,-.1590f},.0120f,.0120f,false,.484f,2.f},
+    {"eu_aa",{-.07075f,.0778f,.0665f},.0310f,.0110f,true,.484f,2.f},
+    {"as_aa",{-.16296f,.06845f,.0980f},.0300f,.0225f,true,.484f,2.f},
+    // These are separate GenericFireArm objects, not the parent rifle name.
+    {"eu_ar_rocket",{0,.095f,-.081f},.0114f,.0137f,false,.484f,2.f},
+    {"as_ar_rocket",{-.0012f,.0815f,-.069f},.0098f,.0098f,false,.484f,2.f},
+    {"unl_har_rocket",{0,.09568f,-.0169f},.0120f,.0120f,false,.41f,2.5f},
+    {"unl_lar_rocket",{-.03435f,.08228f,-.0169f},.0100f,.0100f,false,.484f,1.5f},
+    {"unl_best_buy_rocket",{.00014f,.1371f,-.1590f},.0120f,.0120f,false,.484f,2.f}
 };
 V Sub(V a,V b){return {a.x-b.x,a.y-b.y,a.z-b.z};}
 V Add(V a,V b){return {a.x+b.x,a.y+b.y,a.z+b.z};}
@@ -64,6 +79,8 @@ void IsolateOpticHud(std::vector<DWORD>& hud,const std::vector<DWORD>& baseline,
  }
  if(!visible)hud.clear(); // unrecognized/custom HUD keeps the tested fallback reticle
 }
+std::span<const OpticDefinition> GunOpticDefinitions() noexcept{return definitions;}
+bool OpticNeedsScene(const GunOptic& optic) noexcept{return optic.definition&&(optic.definition->opaqueLens||optic.magnification>1.01f);}
 const OpticDefinition* FindGunOptic(std::string_view name) noexcept{for(const auto& d:definitions)if(name==d.name)return &d;return nullptr;}
 std::optional<OpticView> MakeOpticView(const GunOptic& o,const std::array<EyeCamera,2>& eyes) noexcept{
     if(!Valid(o))return {};const auto inv=InverseRigid(o.gun);if(!inv)return {};
@@ -90,7 +107,7 @@ std::optional<OpticView> MakeOpticView(const GunOptic& o,const std::array<EyeCam
 }
 size_t CompositeGunOptic(std::vector<DWORD>& pixels,const std::vector<DWORD>& scope,
     unsigned w,unsigned h,const GunOptic& o,const EyeCamera& eye,const OpticView& frame,unsigned index,bool rgba,const std::vector<DWORD>& nativeHud){
-    if(!Valid(o)||!w||!h||w>8192||h>8192||index>1||pixels.size()!=size_t(w)*h||(o.magnification>1.01f && scope.size()!=pixels.size())||frame.visibility[index]<.02f)return 0;
+    if(!Valid(o)||!w||!h||w>8192||h>8192||index>1||pixels.size()!=size_t(w)*h||(OpticNeedsScene(o) && scope.size()!=pixels.size())||frame.visibility[index]<.02f)return 0;
     const auto inverse=InverseRigid(eye.world),gunInverse=InverseRigid(o.gun);if(!inverse||!gunInverse)return 0;
     const auto& d=*o.definition;const V e=Transform(Pos(eye.world),*gunInverse);const float relief=d.center.z-e.z;
     if(relief<=.04f||!std::isfinite(frame.relief)||frame.relief<=0)return 0;
@@ -115,7 +132,7 @@ size_t CompositeGunOptic(std::vector<DWORD>& pixels,const std::vector<DWORD>& sc
         if(!Aperture(u,v,d.rectangular))continue;
         const float dx=hit.x-dot.x,dy=hit.y-dot.y;
         const float su=.5f+dx/d.halfWidth*.5f*scale,sv=.5f-dy/d.halfHeight*.5f*scale;
-        const bool reflex=o.magnification<=1.01f;
+        const bool reflex=!OpticNeedsScene(o);
         auto color=reflex?pixels[size_t(y)*w+x]:Sample(scope,w,h,su,sv);
         const bool center=dx*dx+dy*dy<line*line*2.25f;
         const bool cross=(std::abs(dx)<line && std::abs(dy)<d.halfHeight*.45f && std::abs(dy)>line*3) ||

@@ -1,5 +1,38 @@
 # BFVR AI and Developer Handoff
 
+## Full stock sight audit and candidate (2026-10-02)
+
+The owner requested all stock/default and unlock sights, without discovering
+missing weapons manually. Read-only scans of both the owned original install
+and repaired private game cover 86 GenericFireArm templates: 24 optical zoom
+weapons, two iron-sight pistols and 60 with no native optical zoom. This includes
+attachment objects and promotion variants; it is not a claim about custom mods.
+See BF2142_SIGHT_COVERAGE.md and scripts/bf2142/AuditWeaponOptics.py. The audit
+fails on missing optical definitions, wrong native factors, missing zoom HUD
+selectors/roots or profiles absent from the selected install.
+
+GunOpticDefinitions exposes the complete table to CPU/GPU/native tests. Heap
+strings are exercised for long promotion names. Additional profiles preserve
+exact native factors (notably Voss rifle .59 versus its rocket .484). AA HUD
+roots move to the optic as a whole: static reticle pictures do not necessarily
+have cull wrappers of their own. Native AA lock code is untouched.
+
+Opaque SMG and PAC LMG lens meshes require a 1x world image, unlike transparent
+EU LMG glass. OpticNeedsScene is shared by both compositors and StereoSession;
+1x does not itself mean dot-only. SMG dots remain red and omit zoom artwork.
+The --opaque-reflex integration fixture checks the extra view does not add an
+animation-time advance or fall back to CPU transfer. Existing six accepted
+optic calibrations and normal reflex behavior remain unchanged.
+
+Both architectures, 76 CTests and six audit fixtures pass. The live-file audit
+passes on both installs. GPU comparisons pass 96 cases at each of 512x512 and
+2064x2208. Newly added geometry/eye relief still need headset validation; these
+are automated coverage/rendering results, not a claim every gun was played.
+GPU transition fixtures pass for magnified, opaque 1x and transparent reflex
+paths: 151 publications and 91 time advances each; world replay counts are
+243, 243 and 182 respectively. No public upload or SteamVR setting change.
+Save separately from bd224c1.
+
 ## Accepted scope HUD; missing-sight follow-up (2026-10-02)
 
 Owner accepted the bd224c1 scope-widget candidate: "that fixed it, looks great."

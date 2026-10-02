@@ -101,7 +101,7 @@ bool GpuGunOptics::Draw(IDirect3DSurface9* target,const GunOptic& gun,const EyeC
  const OpticView& frame,unsigned index,IDirect3DTexture9* hud,IDirect3DTexture9* baseline){
  if(!device||!shader||!target||!gun.definition||index>1||!std::isfinite(gun.magnification)||gun.magnification<1||gun.magnification>16)return false;
  if(frame.visibility[index]<.02f)return true;
- if(gun.magnification>1.01f&&!scope)return false;
+ if(OpticNeedsScene(gun)&&!scope)return false;
  const auto inv=InverseRigid(gun.gun),view=InverseRigid(eye.world);
  if(!inv||!view||!std::isfinite(frame.relief)||frame.relief<=0)return false;
  const auto matrix=Multiply(eye.world,*inv);const auto& e=matrix.values[3];
@@ -134,7 +134,7 @@ bool GpuGunOptics::Draw(IDirect3DSurface9* target,const GunOptic& gun,const EyeC
   {matrix.values[2][0],matrix.values[2][1],matrix.values[2][2],0},
   {def.center.x,def.center.y,def.halfWidth,def.halfHeight},
   {dotX,dotY,line,frame.relief/relief},
-  {frame.visibility[index],def.rectangular?1.f:0.f,gun.magnification<=1.01f?1.f:0.f,!def.redDot&&hud&&baseline?1.f:0.f},
+  {frame.visibility[index],def.rectangular?1.f:0.f,!OpticNeedsScene(gun)?1.f:0.f,!def.redDot&&hud&&baseline?1.f:0.f},
   {1.f,def.redDot?64.f/255:220.f/255,def.redDot?64.f/255:112.f/255,1.f}};
  for(const auto& row:constants)for(float x:row)if(!std::isfinite(x))return false;
  D3DSURFACE_DESC desc{};if(FAILED(target->GetDesc(&desc))||desc.Width!=width||desc.Height!=height)return false;

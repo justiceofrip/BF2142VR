@@ -39,8 +39,8 @@ int wmain(int argc,wchar_t**){
  ComPtr<IDirect3DTexture9> hud,baseline;CHECK(Texture(d.Get(),w,h,ink,hud));CHECK(Texture(d.Get(),w,h,base,baseline));
  auto isolated=ink;IsolateOpticHud(isolated,base,w,h);CHECK(!isolated.empty());
  size_t cases=0;
- for(const char* name:{"eu_ar_rifle","as_ar_rifle","eu_mg","eu_sni","as_sni","unl_adv_sni","eu_smg","as_smg","eu_av","as_av","unl_av_rifle"})for(bool nativeHud:{false,true})for(unsigned index:{0u,1u}){
-  const auto* def=FindGunOptic(name);CHECK(def);GunOptic gun{def,Identity(),def->magnification};
+ for(const auto& profile:GunOpticDefinitions())for(bool nativeHud:{false,true})for(unsigned index:{0u,1u}){
+  const char* name=profile.name;const auto* def=FindGunOptic(name);CHECK(def==&profile);GunOptic gun{def,Identity(),def->magnification};
   auto world=Identity();const float roll=.19f;world.values[0]={cosf(roll),sinf(roll),0,0};world.values[1]={-sinf(roll),cosf(roll),0,0};world.values[3]={17,23,8,1};
   CameraInput input{Identity(),.01f,1000};input.world.values[3]={def->center.x,def->center.y,def->center.z-.20f,1};
   auto camera=MakeEyeCamera(input,{}, {},{-1,1,1,-1});CHECK(camera);

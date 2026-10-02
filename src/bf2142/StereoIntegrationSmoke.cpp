@@ -27,7 +27,7 @@ IDirect3DDevice9* device=nullptr;
 bf2142::EyeCamera currentEye{};
 unsigned renders=0,presents=0,advances=0,suppressed=0,recenters=0;
 bool menuFixture=false,worldActive=true;
-bool nativeAaOff=false,valid=true,scopeFixture=false,reflexFixture=false,desktopFixture=false,solidFixture=false,hiddenWeapon=false;
+bool nativeAaOff=false,valid=true,scopeFixture=false,reflexFixture=false,opaqueReflexFixture=false,desktopFixture=false,solidFixture=false,hiddenWeapon=false;
 std::vector<DWORD> lastDesktop;
 double expectedNativeTime=1.0/60;
 using Present=HRESULT(STDMETHODCALLTYPE*)(IDirect3DDevice9*,const RECT*,const RECT*,HWND,const RGNDATA*);
@@ -37,7 +37,7 @@ HRESULT STDMETHODCALLTYPE PresentHook(IDirect3DDevice9* d,const RECT* a,const RE
     if(bf2142::SuppressStereoPresent(d)){++suppressed;return S_OK;}
     bf2142::StereoPresent(d);
     static unsigned checkedRenders=0;
-    if(scopeFixture && renders!=checkedRenders){
+    if((scopeFixture||opaqueReflexFixture) && renders!=checkedRenders){
         checkedRenders=renders;bf2142::FrameCapture check;std::vector<DWORD> desktop;
         valid=SUCCEEDED(check.Read(d,DXGI_FORMAT_B8G8R8A8_UNORM,desktop)) && valid;
         // The magnified source fills the scope texture; the desktop must still
@@ -117,11 +117,11 @@ void SetCrosshairHidden(bool){}
 bool InstallNativeOptics(LogFunction){return true;}
 void DisableNativeOptics(){valid=false;}
 bool ReadNativeOptic(GunOptic* optic){
-    if(!scopeFixture && !reflexFixture)return false;
-    const auto* d=FindGunOptic(reflexFixture?"eu_mg":"eu_ar_rifle");auto gun=currentEye.world;
+    if(!scopeFixture && !reflexFixture && !opaqueReflexFixture)return false;
+    const auto* d=FindGunOptic(opaqueReflexFixture?"eu_smg":reflexFixture?"eu_mg":"eu_ar_rifle");auto gun=currentEye.world;
     // Keep the fixture optic 30 cm in front of the right eye as it moves.
     for(int j=0;j<3;++j)gun.values[3][j]+=gun.values[2][j]*(.3f-d->center.z)-gun.values[1][j]*d->center.y-gun.values[0][j]*d->center.x;
-    *optic={d,gun,reflexFixture?1.f:2.f};return true;
+    *optic={d,gun,d->magnification};return true;
 }
 bool BeginNativeScope(void*,const stereo::Matrix4& world,const stereo::FovTangents& fov){
     const auto camera=MakeEyeCamera({world,.04f,100}, {}, {},fov);if(!camera)return false;currentEye=*camera;return true;
@@ -162,7 +162,8 @@ int wmain(int argc,wchar_t** argv) {
     bool msaa=false;for(int i=1;i<argc;++i){msaa|=wcscmp(argv[i],L"--msaa")==0;scopeFixture|=wcscmp(argv[i],L"--scope")==0;reflexFixture|=wcscmp(argv[i],L"--reflex")==0;desktopFixture|=wcscmp(argv[i],L"--desktop")==0;solidFixture|=wcscmp(argv[i],L"--solid")==0;}
     bool msaa8=false;for(int i=1;i<argc;++i){nativeAaOff|=wcscmp(argv[i],L"--native-aa-off")==0;msaa8|=wcscmp(argv[i],L"--msaa8")==0;}
     for(int i=1;i<argc;++i)menuFixture|=wcscmp(argv[i],L"--menus")==0;
-    const unsigned passes=scopeFixture?3u:2u;
+    for(int i=1;i<argc;++i)opaqueReflexFixture|=wcscmp(argv[i],L"--opaque-reflex")==0;
+    const unsigned passes=(scopeFixture||opaqueReflexFixture)?3u:2u;
     wchar_t path[32768]{};GetModuleFileNameW(nullptr,path,32768);
     const auto folder=std::filesystem::path(path).parent_path()/L"stereo-gpu-check";
     std::filesystem::create_directories(folder);

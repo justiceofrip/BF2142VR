@@ -592,7 +592,7 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
             const bool gpuOptic=scope&&gpuPair&&gpuOptics.Prepare(gameDevice,width,height);
             if(gpuOptic){
                 bool captured=true;
-                if(optic.magnification>1.01f){
+                if(OpticNeedsScene(optic)){
                     activeEye=2;
                     captured=false;
                     if(BeginNativeScope(renderer,scope->world,scope->fov)){
@@ -617,7 +617,7 @@ bool RenderStereo(void* renderer,NativeRender original,double delta,float interp
                         IsolateOpticHud(opticHudPixels,opticHudBaseline,width,height);
                     else opticHudPixels.clear();
                 }
-                if(scope && optic.magnification<=1.01f){
+                if(scope && !OpticNeedsScene(optic)){
                     // Reflex glass retains the normal stereo world. Only draw the
                     // sight's collimated dot; never re-render or magnify this eye.
                     const bool rgba=colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM||colorFormat==DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;

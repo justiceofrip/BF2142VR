@@ -2,6 +2,7 @@
 #include "StereoCamera.h"
 #include "TrackingMath.h"
 #include <array>
+#include <span>
 #include <string_view>
 #include <vector>
 #include <cstdint>
@@ -15,13 +16,17 @@ struct OpticDefinition {
     float nativeFactor,magnification;
     // SMG reflex reticles use a clean red dot instead of native zoom artwork.
     bool redDot=false;
+    // Opaque model lenses need a 1x world image even for a red-dot sight.
+    bool opaqueLens=false;
 };
+std::span<const OpticDefinition> GunOpticDefinitions() noexcept;
 const OpticDefinition* FindGunOptic(std::string_view name) noexcept;
 struct GunOptic {
     const OpticDefinition* definition=nullptr;
     stereo::Matrix4 gun{};
     float magnification=1;
 };
+bool OpticNeedsScene(const GunOptic&) noexcept;
 struct OpticView {
     stereo::Matrix4 world{};
     stereo::FovTangents fov{};

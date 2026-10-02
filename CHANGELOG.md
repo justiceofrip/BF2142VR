@@ -1,5 +1,19 @@
 # BFVR Changelog
 
+## Unreleased BF2142 full stock-sight coverage (2026-10-02)
+
+- Complete the stock optical-zoom roster: 24 profiles, including unlock rifles,
+  PAC LMG, Ganz, both AA launchers, promotional rifle and all five rifle-mounted
+  rocket variants. Pistols retain iron sights; shotguns/tools retain native
+  non-optical aiming.
+- Route PAC LMG, rifle-rocket and AA zoom artwork into their weapon optics.
+  AA reticle and lock information replay together; native targeting is unchanged.
+- Render a clear 1x image through opaque SMG/PAC LMG lenses. Existing transparent
+  EU LMG reflex glass still requires no additional world render.
+- Add a read-only installed-game coverage audit and enumerate every profile in
+  rendering/native-adapter tests. Headset alignment of newly added profiles is
+  still pending; the accepted scope-HUD checkpoint is preserved. Not published.
+
 ## Unreleased BF2142 missing-sight candidate (2026-10-02)
 
 - Add EU/PAC SMG red-dot profiles and EU/PAC anti-tank launcher/Pilum optics.
