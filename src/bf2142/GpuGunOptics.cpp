@@ -39,7 +39,16 @@ float4 main(float2 uv:TEXCOORD0):COLOR0 {
  float center=dot(delta,delta)<reticle.z*reticle.z*2.25;
  float crossLine=(abs(delta.x)<reticle.z&&abs(delta.y)<aperture.w*.45&&abs(delta.y)>reticle.z*3)||
    (abs(delta.y)<reticle.z&&abs(delta.x)<aperture.z*.45&&abs(delta.x)>reticle.z*3);
- if(modes.w>.5){
+ if(axisY.w>.5){
+   float2 q=abs(delta/aperture.zw),stroke=reticle.zz/aperture.zw;
+   float h=(q.x>.12&&q.x<.46)?saturate(1-abs(q.y-.024)/stroke.y):0;
+   float v=(q.y>.12&&q.y<.46)?saturate(1-abs(q.x-.024)/stroke.x):0;
+   float hc=q.y<.065?saturate(1-abs(q.x-.46)/stroke.x):0;
+   float vc=q.x<.065?saturate(1-abs(q.y-.46)/stroke.y):0;
+   float coverage=max(max(h,v),max(hc,vc))*clamp((max(q.x,q.y)-.10)/.15,.35,1);
+   color=lerp(color,float4(112,220,255,255)/255,coverage);
+   if(center>.5)color=float4(255,64,64,255)/255;
+ } else if(modes.w>.5){
    float2 hu=.5+(su-.5)*.5;float4 ink=0;
    if(all(hu>=.25)&&all(hu<.75)){
      ink=tex2D(hud,hu);float4 ordinary=tex2D(baseline,hu);
@@ -130,11 +139,11 @@ bool GpuGunOptics::Draw(IDirect3DSurface9* target,const GunOptic& gun,const EyeC
  float constants[10][4]={{1.f/width,1.f/height,float(width),float(height)},
   {p[0][0],p[1][1],p[2][0],p[2][1]}, {e[0],e[1],e[2],relief},
   {matrix.values[0][0],matrix.values[0][1],matrix.values[0][2],def.magnification},
-  {matrix.values[1][0],matrix.values[1][1],matrix.values[1][2],0},
+  {matrix.values[1][0],matrix.values[1][1],matrix.values[1][2],def.euRifleBrackets?1.f:0.f},
   {matrix.values[2][0],matrix.values[2][1],matrix.values[2][2],0},
   {def.center.x,def.center.y,def.halfWidth,def.halfHeight},
   {dotX,dotY,line,frame.relief/relief},
-  {frame.visibility[index],def.rectangular?1.f:0.f,!OpticNeedsScene(gun)?1.f:0.f,!def.redDot&&hud&&baseline?1.f:0.f},
+  {frame.visibility[index],def.rectangular?1.f:0.f,!OpticNeedsScene(gun)?1.f:0.f,!def.redDot&&!def.euRifleBrackets&&hud&&baseline?1.f:0.f},
   {1.f,def.redDot?64.f/255:220.f/255,def.redDot?64.f/255:112.f/255,1.f}};
  for(const auto& row:constants)for(float x:row)if(!std::isfinite(x))return false;
  D3DSURFACE_DESC desc{};if(FAILED(target->GetDesc(&desc))||desc.Width!=width||desc.Height!=height)return false;

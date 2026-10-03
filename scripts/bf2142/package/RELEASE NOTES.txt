@@ -1,3 +1,14 @@
+BF2142 VR 0.2.0-beta.4-hotfix.2
+
+- Correct cube/volume texture uploads in the fast renderer to fix water stripes.
+- Repair the recognized Carbone Island reflection from your own map files.
+  Restore visible ripple detail and remove its dotted seam, with rollback backup.
+- EU rifle sight uses cyan split brackets and a red center; omit the rangefinder.
+- Previous hotfix remains available as a release archive.
+
+Desktop water and reticle checks accepted. This release has not had a new
+headset verification pass. See CHECKS.txt for package validation.
+
 BF2142 VR 0.2.0-beta.4-hotfix.1
 
 Launcher artwork/title and exited-process detection hotfix.

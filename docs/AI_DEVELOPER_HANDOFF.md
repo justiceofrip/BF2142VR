@@ -1,5 +1,48 @@
 # BFVR AI and Developer Handoff
 
+## Water texture compatibility and EU sight artwork candidate (2026-10-03)
+
+NativeExResources extends the existing managed 2D SYSTEMMEM shadow rule to
+usage-zero MANAGED cube and volume textures. Preserve CPU row/slice layouts;
+tag all subresources, upload to the DEFAULT-pool GPU texture after unlock, and
+keep COM-private-data ownership and per-vtable original-method dispatch. Other
+resource pools/usages retain their former path. NativeExWaterTextureSmoke
+demonstrates the former cube pitch mismatch and verifies all faces/mips,
+subresource writes, GPU samples, R5G6B5 volume normals, DXT1 cubes and ResetEx.
+Do not ship this development probe in the installer.
+
+OpticDefinition::euRifleBrackets selects only eu_ar_rifle and eu_ar_rocket,
+which share the same glass. CPU fallback and GPU composition draw blue paired
+brackets plus the existing red bore-zero dot instead of the captured native
+scope artwork/rangefinder. Preserve aperture clipping, sight alignment,
+magnification, eye selection and state restoration. Other optics retain their
+native HUD/fallback rules. Existing GPU smoke compares all 96 profile/HUD/eye
+cases; the native tests also verify both channel orders and range-HUD exclusion.
+
+The code is based on the accepted beta.4-hotfix.1 source. Both builds and 76
+native tests pass; no current headset acceptance or publication is claimed.
+The residual Carbone Island seam also reproduced in ordinary flat D3D9.
+Its water/EnvMap.dds is a single 2D scene image where the water shader expects
+a cube. Near/shadowed water uses reflection sampler 1 (shadow sampler 0);
+distant variants use reflection sampler 0. Do not replace a fixed sampler slot.
+The private desktop comparison eliminated the line with a valid cube. A first
+panoramic projection flattened reflection detail; the accepted conversion
+repeats the owned scene view, stitches shared edges and box-filters all mips.
+Missing authored directional views are approximate, not reconstructed.
+
+WaterReflectionRepair.py applies only to the exact known malformed image in
+the optional Carbone Island client archive. It generates locally, verifies a
+deterministic output identity, preserves all other entries and stages a map
+backup. Setup/update records this separate game-file mutation; the update
+journal restores both map and weapon on failure or interruption. Uninstall
+restores the original map archive. Missing maps, already valid cubes and unknown
+reflection images are skipped. No water texture or diagnostic runtime hook is
+distributed. Run TestWaterReflectionRepair and TestSetupUpdate with the setup
+Python environment. Desktop owner accepted the revised reflection. Exact ZIP fresh install,
+previous-release upgrade, repair and byte-exact uninstall checks pass, including
+the repaired map. Main installation retains all 112 maps and the accepted
+weapon archive. No new headset verification is claimed.
+
 ## Accepted beta.4 merge (2026-10-03)
 
 Supersedes the pending-headset status in the earlier private candidate notes.

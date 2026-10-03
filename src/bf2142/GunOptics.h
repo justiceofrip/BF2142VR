@@ -18,6 +18,8 @@ struct OpticDefinition {
     bool redDot=false;
     // Opaque model lenses need a 1x world image even for a red-dot sight.
     bool opaqueLens=false;
+    // EU assault rifle: blue split brackets and a red bore-zero dot, no range HUD.
+    bool euRifleBrackets=false;
 };
 std::span<const OpticDefinition> GunOpticDefinitions() noexcept;
 const OpticDefinition* FindGunOptic(std::string_view name) noexcept;

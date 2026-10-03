@@ -45,6 +45,14 @@ and then stops with its log. No mesh is skipped and the final archive must still
 match the accepted full-archive hash. All generated weapon bytes remain identical.
 Reporter confirmation of the original intermittent failure is still needed.
 
+## Optional map water repair
+
+Setup/update recognizes the known malformed Carbone Island water reflection
+and rebuilds a valid cube from the owner's installed image. Other archive
+entries remain unchanged; the original map archive is backed up and included
+in rollback/uninstall. Missing maps and unfamiliar reflection images are skipped.
+No map or water textures are downloaded with the mod. This does not add maps.
+
 ## Updates and rollback
 
 - The executable contains a pinned ECDSA P-256 public key. The channel manifest
@@ -91,7 +99,7 @@ Tests:
 
 ```powershell
 $env:PYTHONPATH = "$PWD/scripts/bf2142;$PWD/scripts/bf2142/package"
-python -m unittest TestWeaponMeshes TestCompleteSurfaces TestWeaponRepairWorker TestSetupUpdate
+python -m unittest TestWeaponMeshes TestCompleteSurfaces TestWeaponRepairWorker TestSetupUpdate TestWaterReflectionRepair
 dotnet run --project src/installer-tests/BF2142InstallerTests.csproj -c Release
 ```
 

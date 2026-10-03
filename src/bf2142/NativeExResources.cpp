@@ -10,7 +10,7 @@ IDirect3DDevice9* owner=nullptr;ExResourceLog logLine=nullptr;
 constexpr GUID managedTag={0xc99af705,0x3d84,0x4aad,{0xad,0xd4,0xe0,0x55,0xa1,0xc1,0x90,0x8d}};
 struct Metadata{DWORD magic=0x3945584d,usage=0;};
 struct HookEntry{void* address;void* detour;void* original;};
-std::array<HookEntry,32> hooks{};size_t hookCount=0;
+std::array<HookEntry,48> hooks{};size_t hookCount=0;
 SRWLOCK hookLock=SRWLOCK_INIT;
 struct HookGuard{HookGuard(){AcquireSRWLockExclusive(&hookLock);}~HookGuard(){ReleaseSRWLockExclusive(&hookLock);}};
 bool debugResources=false,managedUpload=false;
@@ -19,10 +19,19 @@ constexpr GUID surfaceShadowTag={0x26e3134b,0xe1f4,0x4da9,{0x9a,0x74,0xf8,0x85,0
 template<class T,class R> bool Shadow(R* resource,const GUID& key,ComPtr<T>& shadow){
  DWORD bytes=sizeof(T*);return resource&&SUCCEEDED(resource->GetPrivateData(key,shadow.GetAddressOf(),&bytes))&&shadow;
 }
-HRESULT UploadManaged(IDirect3DTexture9* texture){
- ComPtr<IDirect3DTexture9> shadow;ComPtr<IDirect3DDevice9> device;
+constexpr GUID volumeShadowTag={0x2ebf7011,0xaad5,0x4dda,{0x93,0x9d,0xc7,0xc6,0x1a,0xda,0x6b,0x31}};
+HRESULT DirtyAll(IDirect3DBaseTexture9* texture){
+ switch(texture->GetType()){
+ case D3DRTYPE_TEXTURE:{ComPtr<IDirect3DTexture9> t;auto hr=texture->QueryInterface(IID_PPV_ARGS(&t));return SUCCEEDED(hr)?t->AddDirtyRect(nullptr):hr;}
+ case D3DRTYPE_CUBETEXTURE:{ComPtr<IDirect3DCubeTexture9> t;auto hr=texture->QueryInterface(IID_PPV_ARGS(&t));for(unsigned face=0;SUCCEEDED(hr)&&face<6;++face)hr=t->AddDirtyRect(static_cast<D3DCUBEMAP_FACES>(face),nullptr);return hr;}
+ case D3DRTYPE_VOLUMETEXTURE:{ComPtr<IDirect3DVolumeTexture9> t;auto hr=texture->QueryInterface(IID_PPV_ARGS(&t));return SUCCEEDED(hr)?t->AddDirtyBox(nullptr):hr;}
+ default:return E_INVALIDARG;
+ }
+}
+HRESULT UploadManaged(IDirect3DBaseTexture9* texture){
+ ComPtr<IDirect3DBaseTexture9> shadow;ComPtr<IDirect3DDevice9> device;
  if(!Shadow(texture,textureShadowTag,shadow))return E_INVALIDARG;
- HRESULT hr=shadow->AddDirtyRect(nullptr);
+ HRESULT hr=DirtyAll(shadow.Get());
  if(SUCCEEDED(hr))hr=texture->GetDevice(&device);
  if(SUCCEEDED(hr))hr=device->UpdateTexture(shadow.Get(),texture);
  if(FAILED(hr)&&logLine)logLine("NativeEx managed upload failed: hr=0x%08lX.",hr);
@@ -88,13 +97,41 @@ SurfaceLock surfaceLock=nullptr;CubeLock cubeLock=nullptr;VolumeLock volumeLock=
 using SurfaceUnlock=HRESULT(STDMETHODCALLTYPE*)(IDirect3DSurface9*);
 using TextureUnlock=HRESULT(STDMETHODCALLTYPE*)(IDirect3DTexture9*,UINT);
 SurfaceUnlock surfaceUnlock=nullptr;TextureUnlock textureUnlock=nullptr;
+using CubeUnlock=HRESULT(STDMETHODCALLTYPE*)(IDirect3DCubeTexture9*,D3DCUBEMAP_FACES,UINT);
+using VolumeUnlock=HRESULT(STDMETHODCALLTYPE*)(IDirect3DVolumeTexture9*,UINT);
+using VolumeLevelLock=HRESULT(STDMETHODCALLTYPE*)(IDirect3DVolume9*,D3DLOCKED_BOX*,const D3DBOX*,DWORD);
+using VolumeLevelUnlock=HRESULT(STDMETHODCALLTYPE*)(IDirect3DVolume9*);
+CubeUnlock cubeUnlock=nullptr;VolumeUnlock volumeUnlock=nullptr;
+VolumeLevelLock volumeLevelLock=nullptr;VolumeLevelUnlock volumeLevelUnlock=nullptr;
+HRESULT STDMETHODCALLTYPE UnlockCube(IDirect3DCubeTexture9* texture,D3DCUBEMAP_FACES face,UINT level){
+ ComPtr<IDirect3DCubeTexture9> shadow;
+ if(!Shadow(texture,textureShadowTag,shadow)){const auto original=Original<CubeUnlock>(texture,20);return original?original(texture,face,level):E_FAIL;}
+ auto hr=shadow->UnlockRect(face,level);return SUCCEEDED(hr)?UploadManaged(texture):hr;
+}
+HRESULT STDMETHODCALLTYPE UnlockVolume(IDirect3DVolumeTexture9* texture,UINT level){
+ ComPtr<IDirect3DVolumeTexture9> shadow;
+ if(!Shadow(texture,textureShadowTag,shadow)){const auto original=Original<VolumeUnlock>(texture,20);return original?original(texture,level):E_FAIL;}
+ auto hr=shadow->UnlockBox(level);return SUCCEEDED(hr)?UploadManaged(texture):hr;
+}
+HRESULT STDMETHODCALLTYPE LockVolumeLevel(IDirect3DVolume9* volume,D3DLOCKED_BOX* result,const D3DBOX* box,DWORD flags){
+ ComPtr<IDirect3DVolume9> shadow;
+ if(Shadow(volume,volumeShadowTag,shadow))return shadow->LockBox(result,box,flags);
+ const auto original=Original<VolumeLevelLock>(volume,9);return original?original(volume,result,box,flags):E_FAIL;
+}
+HRESULT STDMETHODCALLTYPE UnlockVolumeLevel(IDirect3DVolume9* volume){
+ ComPtr<IDirect3DVolume9> shadow;
+ if(!Shadow(volume,volumeShadowTag,shadow)){const auto original=Original<VolumeLevelUnlock>(volume,10);return original?original(volume):E_FAIL;}
+ auto hr=shadow->UnlockBox();ComPtr<IDirect3DVolumeTexture9> parent;
+ if(SUCCEEDED(hr))hr=volume->GetContainer(IID_PPV_ARGS(&parent));
+ return SUCCEEDED(hr)?UploadManaged(parent.Get()):hr;
+}
 HRESULT STDMETHODCALLTYPE UnlockTexture(IDirect3DTexture9* texture,UINT level){
  ComPtr<IDirect3DTexture9> shadow;if(!Shadow(texture,textureShadowTag,shadow)){const auto original=Original<TextureUnlock>(texture,20);return original?original(texture,level):E_FAIL;}
  const auto hr=shadow->UnlockRect(level);return SUCCEEDED(hr)?UploadManaged(texture):hr;
 }
 HRESULT STDMETHODCALLTYPE UnlockSurface(IDirect3DSurface9* surface){
  ComPtr<IDirect3DSurface9> shadow;if(!Shadow(surface,surfaceShadowTag,shadow)){const auto original=Original<SurfaceUnlock>(surface,14);return original?original(surface):E_FAIL;}
- auto hr=shadow->UnlockRect();ComPtr<IDirect3DTexture9> parent;
+ auto hr=shadow->UnlockRect();ComPtr<IDirect3DBaseTexture9> parent;
  if(SUCCEEDED(hr))hr=surface->GetContainer(IID_PPV_ARGS(&parent));
  return SUCCEEDED(hr)?UploadManaged(parent.Get()):hr;
 }
@@ -111,13 +148,17 @@ HRESULT STDMETHODCALLTYPE LockSurface(IDirect3DSurface9* resource,D3DLOCKED_RECT
  return hr;
 }
 HRESULT STDMETHODCALLTYPE LockCube(IDirect3DCubeTexture9* resource,D3DCUBEMAP_FACES face,UINT level,D3DLOCKED_RECT* result,const RECT* rect,DWORD flags){
- const auto original=Original<CubeLock>(resource,19);if(!original)return E_FAIL;const auto hr=original(resource,face,level,result,rect,flags);Metadata m;
+ ComPtr<IDirect3DCubeTexture9> shadow;
+ const auto original=Original<CubeLock>(resource,19);if(!original)return E_FAIL;
+ const auto hr=Shadow(resource,textureShadowTag,shadow)?shadow->LockRect(face,level,result,rect,flags):original(resource,face,level,result,rect,flags);Metadata m;
  if((FAILED(hr)||(flags&(D3DLOCK_DISCARD|D3DLOCK_NOOVERWRITE)))&&ReadTag(resource,m)&&subresourceWarnings.fetch_add(1)<32&&logLine)
   logLine("NativeEx cube lock: level=%u flags=0x%08lX hr=0x%08lX.",level,flags,hr);
  return hr;
 }
 HRESULT STDMETHODCALLTYPE LockVolume(IDirect3DVolumeTexture9* resource,UINT level,D3DLOCKED_BOX* result,const D3DBOX* box,DWORD flags){
- const auto original=Original<VolumeLock>(resource,19);if(!original)return E_FAIL;const auto hr=original(resource,level,result,box,flags);Metadata m;
+ ComPtr<IDirect3DVolumeTexture9> shadow;
+ const auto original=Original<VolumeLock>(resource,19);if(!original)return E_FAIL;
+ const auto hr=Shadow(resource,textureShadowTag,shadow)?shadow->LockBox(level,result,box,flags):original(resource,level,result,box,flags);Metadata m;
  if((FAILED(hr)||(flags&(D3DLOCK_DISCARD|D3DLOCK_NOOVERWRITE)))&&ReadTag(resource,m)&&subresourceWarnings.fetch_add(1)<32&&logLine)
   logLine("NativeEx volume lock: level=%u flags=0x%08lX hr=0x%08lX.",level,flags,hr);
  return hr;
@@ -150,14 +191,15 @@ bool Track(IDirect3DTexture9* t,DWORD usage){
  SUCCEEDED(t->GetSurfaceLevel(0,&s))&&Connect(s.Get(),12,DescribeSurface,&surfaceDesc)&&(!(debugResources||managedUpload)||(Connect(s.Get(),13,LockSurface,&surfaceLock)&&Connect(s.Get(),14,UnlockSurface,&surfaceUnlock)));
 }
 bool Track(IDirect3DCubeTexture9* t,DWORD usage){
- if(debugResources&&!Connect(t,19,LockCube,&cubeLock))return false;
+ if((debugResources||managedUpload)&&(!Connect(t,19,LockCube,&cubeLock)||!Connect(t,20,UnlockCube,&cubeUnlock)))return false;
  ComPtr<IDirect3DSurface9> s;return SUCCEEDED(Tag(t,usage))&&Connect<IDirect3DCubeTexture9,LevelDesc>(t,17,DescribeLevel,&cubeDesc)&&
  SUCCEEDED(t->GetCubeMapSurface(D3DCUBEMAP_FACE_POSITIVE_X,0,&s))&&Connect(s.Get(),12,DescribeSurface,&surfaceDesc)&&(!(debugResources||managedUpload)||(Connect(s.Get(),13,LockSurface,&surfaceLock)&&Connect(s.Get(),14,UnlockSurface,&surfaceUnlock)));
 }
 bool Track(IDirect3DVolumeTexture9* t,DWORD usage){
- if(debugResources&&!Connect(t,19,LockVolume,&volumeLock))return false;
+ if((debugResources||managedUpload)&&(!Connect(t,19,LockVolume,&volumeLock)||!Connect(t,20,UnlockVolume,&volumeUnlock)))return false;
  ComPtr<IDirect3DVolume9> v;return SUCCEEDED(Tag(t,usage))&&Connect(t,17,DescribeVolumeLevel,&volumeLevelDesc)&&
- SUCCEEDED(t->GetVolumeLevel(0,&v))&&Connect(v.Get(),8,DescribeVolume,&volumeDesc);
+ SUCCEEDED(t->GetVolumeLevel(0,&v))&&Connect(v.Get(),8,DescribeVolume,&volumeDesc)&&
+ (!(debugResources||managedUpload)||(Connect(v.Get(),9,LockVolumeLevel,&volumeLevelLock)&&Connect(v.Get(),10,UnlockVolumeLevel,&volumeLevelUnlock)));
 }
 bool Track(IDirect3DVertexBuffer9* b,DWORD usage){if(debugResources&&!Connect<IDirect3DVertexBuffer9,BufferLock>(b,11,LockBuffer,&vertexLock))return false;return SUCCEEDED(Tag(b,usage))&&Connect<IDirect3DVertexBuffer9,BufferDesc>(b,13,DescribeBuffer,&vbDesc);}
 bool Track(IDirect3DIndexBuffer9* b,DWORD usage){if(debugResources&&!Connect<IDirect3DIndexBuffer9,BufferLock>(b,11,LockBuffer,&indexLock))return false;return SUCCEEDED(Tag(b,usage))&&Connect<IDirect3DIndexBuffer9,BufferDesc>(b,13,DescribeBuffer,&ibDesc);}
@@ -187,10 +229,37 @@ HRESULT STDMETHODCALLTYPE Texture(IDirect3DDevice9* d,UINT w,UINT h,UINT levels,
  return Finish(hr,out,usage,convert);
 }
 HRESULT STDMETHODCALLTYPE Volume(IDirect3DDevice9* d,UINT w,UINT h,UINT depth,UINT levels,DWORD usage,D3DFORMAT f,D3DPOOL p,IDirect3DVolumeTexture9** out,HANDLE* handle){
- const bool convert=d==owner&&p==D3DPOOL_MANAGED;return Finish(createVolume(d,w,h,depth,levels,convert?usage|D3DUSAGE_DYNAMIC:usage,f,convert?D3DPOOL_DEFAULT:p,out,handle),out,usage,convert);
+ const bool convert=d==owner&&p==D3DPOOL_MANAGED,staged=convert&&managedUpload&&usage==0;
+ auto hr=createVolume(d,w,h,depth,levels,convert&&!staged?usage|D3DUSAGE_DYNAMIC:usage,f,convert?D3DPOOL_DEFAULT:p,out,handle);
+ if(SUCCEEDED(hr)&&staged&&out&&*out){
+  // Water's volume-normal mip chain must retain native row AND slice pitch.
+  ComPtr<IDirect3DVolumeTexture9> shadow;
+  hr=createVolume(d,w,h,depth,(*out)->GetLevelCount(),0,f,D3DPOOL_SYSTEMMEM,&shadow,nullptr);
+  if(SUCCEEDED(hr))hr=(*out)->SetPrivateData(textureShadowTag,shadow.Get(),sizeof(IUnknown*),D3DSPD_IUNKNOWN);
+  for(UINT level=0;SUCCEEDED(hr)&&level<(*out)->GetLevelCount();++level){
+   ComPtr<IDirect3DVolume9> volume,backing;hr=(*out)->GetVolumeLevel(level,&volume);
+   if(SUCCEEDED(hr))hr=shadow->GetVolumeLevel(level,&backing);
+   if(SUCCEEDED(hr))hr=volume->SetPrivateData(volumeShadowTag,backing.Get(),sizeof(IUnknown*),D3DSPD_IUNKNOWN);
+  }
+  if(FAILED(hr)){(*out)->Release();*out=nullptr;}
+ }
+ return Finish(hr,out,usage,convert);
 }
 HRESULT STDMETHODCALLTYPE Cube(IDirect3DDevice9* d,UINT w,UINT levels,DWORD usage,D3DFORMAT f,D3DPOOL p,IDirect3DCubeTexture9** out,HANDLE* handle){
- const bool convert=d==owner&&p==D3DPOOL_MANAGED;return Finish(createCube(d,w,levels,convert?usage|D3DUSAGE_DYNAMIC:usage,f,convert?D3DPOOL_DEFAULT:p,out,handle),out,usage,convert);
+ const bool convert=d==owner&&p==D3DPOOL_MANAGED,staged=convert&&managedUpload&&usage==0;
+ auto hr=createCube(d,w,levels,convert&&!staged?usage|D3DUSAGE_DYNAMIC:usage,f,convert?D3DPOOL_DEFAULT:p,out,handle);
+ if(SUCCEEDED(hr)&&staged&&out&&*out){
+  ComPtr<IDirect3DCubeTexture9> shadow;hr=createCube(d,w,(*out)->GetLevelCount(),0,f,D3DPOOL_SYSTEMMEM,&shadow,nullptr);
+  if(SUCCEEDED(hr))hr=(*out)->SetPrivateData(textureShadowTag,shadow.Get(),sizeof(IUnknown*),D3DSPD_IUNKNOWN);
+  for(unsigned face=0;SUCCEEDED(hr)&&face<6;++face)for(UINT level=0;SUCCEEDED(hr)&&level<(*out)->GetLevelCount();++level){
+   auto side=static_cast<D3DCUBEMAP_FACES>(face);ComPtr<IDirect3DSurface9> surface,backing;
+   hr=(*out)->GetCubeMapSurface(side,level,&surface);
+   if(SUCCEEDED(hr))hr=shadow->GetCubeMapSurface(side,level,&backing);
+   if(SUCCEEDED(hr))hr=surface->SetPrivateData(surfaceShadowTag,backing.Get(),sizeof(IUnknown*),D3DSPD_IUNKNOWN);
+  }
+  if(FAILED(hr)){(*out)->Release();*out=nullptr;}
+ }
+ return Finish(hr,out,usage,convert);
 }
 HRESULT STDMETHODCALLTYPE VB(IDirect3DDevice9* d,UINT bytes,DWORD usage,DWORD f,D3DPOOL p,IDirect3DVertexBuffer9** out,HANDLE* handle){
  // Buffers in DEFAULT are lockable without DYNAMIC. Preserve native usage.

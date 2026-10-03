@@ -26,7 +26,8 @@ int main(){
     for(const char* native:{"eu_handgun","as_handgun","unl_shotgun","bp1_expl_shotgun","eu_ar_shotgun","as_ar_shotgun","unl_best_buy_shotgun","unl_har_shotgun","unl_lar_shotgun","knife"})
         if(FindGunOptic(native))return 38;
     if(OpticNeedsScene({}))return 39;
-    GunOptic gun{d,Identity(),2};
+    auto fallback=*d;fallback.euRifleBrackets=false;
+    GunOptic gun{&fallback,Identity(),2};
     CameraInput source{Identity(),.01f,1000};source.world.values[3]={d->center.x,d->center.y,d->center.z-.2f,1};
     auto eye=MakeEyeCamera(source,{}, {},{-1,1,1,-1});if(!eye)return 2;
     std::array<EyeCamera,2> eyes{*eye,*eye};eyes[1].world.values[3][0]+=.064f;
@@ -82,7 +83,7 @@ int main(){
     if(CompositeGunOptic(pixels,{},512,512,gun,eyes[0],*offAxis,0,false))return 25;
     std::vector<DWORD> baseline(512*512),hud(512*512);baseline[5]=hud[5]=0xffaabbcc;hud[512*300+256]=0x80800000;
     IsolateOpticHud(hud,baseline,512,512);if(hud.empty()||hud[5]||hud[512*300+256]!=0x80800000)return 26;
-    gun={d,Identity(),2};pixels.assign(pixels.size(),0xff112233);std::fill(hud.begin(),hud.end(),0xff123456);
+    gun={&fallback,Identity(),2};pixels.assign(pixels.size(),0xff112233);std::fill(hud.begin(),hud.end(),0xff123456);
     if(!CompositeGunOptic(pixels,scope,512,512,gun,original[0],*view,0,false,hud)||pixels.front()!=0xff112233)return 27;
     bool native=false;for(auto c:pixels){native|=c==0xff123456;if(c==0xffffdc70)return 28;}if(!native)return 29;
     hud=baseline;IsolateOpticHud(hud,baseline,512,512);if(!hud.empty())return 30;
@@ -99,6 +100,30 @@ int main(){
         bool worldVisible=false;for(auto c:pixels)worldVisible|=c==0xff336699;if(!worldVisible)return 37;
         bool red=false;for(auto c:pixels){red|=c==(rgba?0xff4040ff:0xffff4040);if(c==0xff00ffff)return 34;}
         if(!red)return 35;
+    }
+    // Only the EU rifle/shared attachment sight uses blue brackets. Captured
+    // rangefinder pixels must not leak into it, in either pixel channel order.
+    for(const auto& profile:GunOpticDefinitions()){
+        const std::string_view name=profile.name;
+        if(profile.euRifleBrackets!=(name=="eu_ar_rifle"||name=="eu_ar_rocket"))return 40;
+    }
+    for(const char* name:{"eu_ar_rifle","eu_ar_rocket"})for(bool rgba:{false,true}){
+        const auto* p=FindGunOptic(name);gun={p,Identity(),p->magnification};eyes=original;
+        for(auto& e:eyes)e.world.values[3]={p->center.x,p->center.y,p->center.z-.08f,1};
+        const auto v=MakeOpticView(gun,eyes);if(!v)return 41;
+        pixels.assign(pixels.size(),0xff112233);hud.assign(pixels.size(),0xff00ff00);
+        auto without=pixels;
+        if(!CompositeGunOptic(pixels,scope,512,512,gun,eyes[0],*v,0,rgba,hud))return 42;
+        CompositeGunOptic(without,scope,512,512,gun,eyes[0],*v,0,rgba);
+        if(pixels!=without||pixels.front()!=0xff112233)return 43;
+        bool red=false,blue=false;
+        for(auto c:pixels){
+            red|=c==(rgba?0xff4040ff:0xffff4040);
+            const unsigned r=(c>>(rgba?0:16))&255,g=(c>>8)&255,b=(c>>(rgba?16:0))&255;
+            blue|=b>r+30&&g>160;
+            if(c==0xff00ff00)return 44;
+        }
+        if(!red||!blue)return 45;
     }
     puts("Weapon-specific optics, eye relief, monocular alignment, magnification, aperture clipping, reticle colors and rigid-frame invariance passed.");
 }

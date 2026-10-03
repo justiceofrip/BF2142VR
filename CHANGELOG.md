@@ -1,5 +1,25 @@
 # BFVR Changelog
 
+## BF2142 VR 0.2.0-beta.4-hotfix.2 (2026-10-03)
+
+- Preserve native managed cube/volume texture layouts in the fast D3D9Ex path,
+  including volume row/slice pitch and every cube face/mip. This addresses the
+  repeated water stripes without changing map assets or shaders.
+- Give the EU assault rifle and its shared attachment sight blue split brackets
+  with a red center. Artwork stays inside the existing sight aperture; omit the
+  native rangefinder. Keep scope magnification and bore zero unchanged.
+- Both architecture builds, all 76 native tests and the GPU optics checks pass.
+  Cube/volume GPU uploads, subresources, mip chains and reset checks pass.
+  Desktop water improvement is observed; headset confirmation is pending.
+- Repair the recognized malformed Carbone Island water reflection during setup
+  or update. Rebuild a valid cube from the owner's map image, retaining visible
+  ripple detail and matching face edges. Preserve other map entries and keep
+  reversible backups; unfamiliar reflection assets are left alone.
+  Desktop comparison accepted: water looks better and the dotted line stays
+  gone. Exact-package fresh install, upgrade, repair, rollback and uninstall
+  checks pass. Headset confirmation is pending. Missing authored reflection
+  views remain an approximation.
+
 ## BF2142 VR 0.2.0-beta.4-hotfix.1 (2026-10-03)
 
 - Replace the launcher illustration with the requested Battlefield 2142 walker

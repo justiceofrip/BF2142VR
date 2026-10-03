@@ -460,3 +460,9 @@ target_compile_definitions(BF2142VRMenuGpuSmoke PRIVATE WIN32_LEAN_AND_MEAN NOMI
 target_compile_options(BF2142VRMenuGpuSmoke PRIVATE /W4 /permissive-)
 set_property(TARGET BF2142VRMenuGpuSmoke PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 target_link_libraries(BF2142VRMenuGpuSmoke PRIVATE BFVRStereoMath BF2142Voice minhook d3d9 d3d11 d3d12 dxgi d3dcompiler user32 gdi32)
+
+# Water cube/volume upload regression; manual hidden GPU check.
+add_executable(BF2142VRNativeExWaterTextureSmoke NativeExWaterTextureSmoke.cpp NativeExResources.cpp)
+target_link_libraries(BF2142VRNativeExWaterTextureSmoke PRIVATE minhook d3d9 d3dcompiler user32)
+target_compile_definitions(BF2142VRNativeExWaterTextureSmoke PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+target_compile_options(BF2142VRNativeExWaterTextureSmoke PRIVATE /W4 /permissive-)

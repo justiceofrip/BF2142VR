@@ -1,8 +1,8 @@
 # Battlefield 2142 VR — beta.4
 
-**[Download the VR launcher / installer](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.4-hotfix.1/BF2142VRSetup.exe)** — choose BF2142.exe, then **Install / Update**. Connect your headset and click **Play VR**.
+**[Download the VR launcher / installer](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.4-hotfix.2/BF2142VRSetup.exe)** — choose BF2142.exe, then **Install / Update**. Connect your headset and click **Play VR**.
 
-One launcher provides **Check for updates**, **Repair**, **Save error report** and **Report on GitHub**. Updates verify signed file hashes and preserve settings/backups. Reports stay local until you review and attach them. [ZIP, release notes and validation](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-hotfix.1).
+One launcher provides **Check for updates**, **Repair**, **Save error report** and **Report on GitHub**. Updates verify signed file hashes and preserve settings/backups. Reports stay local until you review and attach them. [ZIP, release notes and validation](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-hotfix.2).
 
 Beta.4 merges the accepted GPU menu/ADS work, stock/unlock sights, scope HUD fixes, weapon shimmer repair, corrected hands, more reliable swaps and left-hand crates while holding a gun. Native crate deployment briefly pauses gun fire before restoring it. See [changelog](CHANGELOG.md) and [installer details](docs/INSTALLER_UPDATER.md).
 

@@ -4,6 +4,7 @@ import argparse,contextlib,ctypes,hashlib,io,json,os,shutil,struct,sys,uuid,zipf
 from ctypes import wintypes as w
 import RepairWeaponMeshes as weapons
 import WeaponRepairWorker as repair_worker
+import WaterReflectionRepair as water_repair
 import RemoveInteriorBackfaces as interiors
 import ThinShellBackfaces as separation
 import ExportBodyEquipment as equipment
@@ -11,7 +12,7 @@ import ExportLobbyScene as lobby
 from PIL import Image
 
 APP='BF2142VR'
-VERSION='0.2.0-beta.4-hotfix.1'
+VERSION='0.2.0-beta.4-hotfix.2'
 INTRO_MOVIES=tuple('mods/bf2142/Movies/'+name+'.bik' for name in ('Dice','EA','Intro','Legal','Legal_na'))
 STOCK='1a9903113df3fa5b24282ce8d2adbf54ddb58160155b28dea09f26fe85b782f9'
 LEGACY_COMPLETE='e5d605ed915adac29c57840835d900bbc68a3c3ea4a2c7f7077000f6db8c144d'
@@ -211,7 +212,7 @@ def mutations(root,m):
     if Path(m['game']).resolve()!=game or m.get('app')!=APP:raise ValueError('Install state belongs to a different game folder')
     rows=[]
     for row in m['changes']:
-        if row['target'] not in [WEAPONS,'BF2142.exe',*INTRO_MOVIES]:raise ValueError('Unrecognized game-file change')
+        if row['target'] not in [WEAPONS,water_repair.TARGET,'BF2142.exe',*INTRO_MOVIES]:raise ValueError('Unrecognized game-file change')
         target=child(game,row['target']);backup=child(root,row['backup']);current=sha(target) if target.exists() else None
         if sha(backup)!=row['original']:raise ValueError('Backup verification failed; no files restored')
         if current is not None and current not in (row['original'],row['installed']):raise ValueError('Another mod changed '+row['target']+'. Automatic restore stopped; original backup is preserved.')
@@ -244,6 +245,8 @@ def install(game,payload):
         build_assets(game,stage,original)
         (stage/'backups').mkdir();shutil.copy2(child(game,WEAPONS),stage/'backups/Weapons_client.zip')
         changes=[{'target':WEAPONS,'backup':'backups/Weapons_client.zip','original':original,'installed':COMPLETE}]
+        water=water_repair.stage(game,stage,child,sha)
+        if water:changes.append(water)
         if exe!=patched:
             (stage/'backups/BF2142.exe').write_bytes(exe);(stage/'generated/BF2142.exe').write_bytes(patched)
             changes.append({'target':'BF2142.exe','backup':'backups/BF2142.exe','original':hashlib.sha256(exe).hexdigest(),'installed':hashlib.sha256(patched).hexdigest()})
@@ -254,7 +257,7 @@ def install(game,payload):
             child(stage,backup).parent.mkdir(parents=True,exist_ok=True)
             shutil.copy2(source,child(stage,backup))
             changes.append({'target':movie,'backup':backup,'original':sha(source),'installed':None})
-        m={'app':APP,'version':VERSION,'build':'renderer-beta4-hotfix1','game':str(game),'status':'prepared','changes':changes}
+        m={'app':APP,'version':VERSION,'build':'renderer-beta4-hotfix2','game':str(game),'status':'prepared','changes':changes}
         write_json(stage/'install.json',m);running(game)
         for row in changes:
             if sha(child(game,row['target']))!=row['original']:raise ValueError('Game files changed during setup')
@@ -263,7 +266,7 @@ def install(game,payload):
             refresh_settings(final)
             for row in changes:
                 if row['target'] in INTRO_MOVIES:child(game,row['target']).unlink()
-                else:replace_copy(final/'generated'/Path(row['target']).name,child(game,row['target']))
+                else:replace_copy(child(final,water_repair.GENERATED) if row['target']==water_repair.TARGET else final/'generated'/Path(row['target']).name,child(game,row['target']))
             m['status']='installed';write_json(final/'install.json',m)
         except BaseException:
             restore(final,m);raise
@@ -295,6 +298,7 @@ def install_lock(game):
 
 
 def rollback_weapon_update(game,root,state):
+    water_repair.rollback(game,root,state,child,sha,replace_copy)
     change=state.get('weapon')
     if change is None:return
     before,after=change.get('before',''),change.get('after','')
@@ -359,7 +363,7 @@ def update(game,payload):
             dest=child(stage,row['backup']);dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(backup,dest)
         settings=child(final,'BF2142VR.ini')
         if settings.exists():shutil.copy2(settings,stage/'BF2142VR.ini')
-        updated=dict(m,version=VERSION,build='renderer-beta4-hotfix1',status='prepared',transaction=token)
+        updated=dict(m,version=VERSION,build='renderer-beta4-hotfix2',status='prepared',transaction=token)
         updated['changes']=[dict(row) for row in m['changes']]
         weapon_row=next(row for row in updated['changes'] if row['target']==WEAPONS)
         generated=stage/'generated/Weapons_client.zip'
@@ -370,16 +374,26 @@ def update(game,payload):
             if sha(rollback)!=weapon_row['installed']:raise ValueError('Weapon changed during update staging')
             transaction['weapon']={'before':weapon_row['installed'],'after':generated_hash}
             weapon_row['installed']=generated_hash
+        water=water_repair.stage(game,stage,child,sha)
+        if water:
+            if any(row['target']==water_repair.TARGET for row in updated['changes']):
+                raise ValueError('Recorded water repair differs; original backup retained')
+            updated['changes'].append(water)
+            transaction['water']={'before':water['original'],'after':water['installed']}
         write_json(stage/'install.json',updated)
         running(game)
         if not all(current==row['installed'] for row,_,_,current in mutations(final,m)):
             raise ValueError('Game files changed during update')
+        if 'water' in transaction and sha(child(game,water_repair.TARGET))!=transaction['water']['before']:
+            raise ValueError('Map changed during update')
         write_json(journal,transaction)
         final.rename(previous);moved=True
         stage.rename(final);activated=True
         refresh_settings(final);payload_files(final)
         if 'weapon' in transaction:
             replace_copy(final/'generated/Weapons_client.zip',child(game,WEAPONS))
+        if 'water' in transaction:
+            replace_copy(child(final,water_repair.GENERATED),child(game,water_repair.TARGET))
         mutations(final,updated)
         updated['status']='installed';write_json(final/'install.json',updated)
         journal.unlink()

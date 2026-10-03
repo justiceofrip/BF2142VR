@@ -12,7 +12,7 @@ constexpr OpticDefinition definitions[]={
     // Inset from the bezel. A reflex sight overlays only its dot, with no
     // magnified replay or zoomed rectangle surrounding the gun.
     {"eu_mg",{0,.08563f,-.1332f},.0123f,.0104f,true,.59f,1.f},
-    {"eu_ar_rifle",{0,.095f,-.081f},.0114f,.0137f,false,.484f,2.f},
+    {"eu_ar_rifle",{0,.095f,-.081f},.0114f,.0137f,false,.484f,2.f,false,false,true},
     {"as_ar_rifle",{-.0012f,.0815f,-.069f},.0098f,.0098f,false,.484f,2.f},
     {"eu_sni",{0,.0974f,-.073f},.0210f,.0084f,true,.312f,4.f},
     {"as_sni",{.0008f,.091f,-.225f},.0118f,.0118f,false,.312f,4.f},
@@ -35,7 +35,7 @@ constexpr OpticDefinition definitions[]={
     {"eu_aa",{-.07075f,.0778f,.0665f},.0310f,.0110f,true,.484f,2.f},
     {"as_aa",{-.16296f,.06845f,.0980f},.0300f,.0225f,true,.484f,2.f},
     // These are separate GenericFireArm objects, not the parent rifle name.
-    {"eu_ar_rocket",{0,.095f,-.081f},.0114f,.0137f,false,.484f,2.f},
+    {"eu_ar_rocket",{0,.095f,-.081f},.0114f,.0137f,false,.484f,2.f,false,false,true},
     {"as_ar_rocket",{-.0012f,.0815f,-.069f},.0098f,.0098f,false,.484f,2.f},
     {"unl_har_rocket",{0,.09568f,-.0169f},.0120f,.0120f,false,.41f,2.5f},
     {"unl_lar_rocket",{-.03435f,.08228f,-.0169f},.0100f,.0100f,false,.484f,1.5f},
@@ -62,6 +62,17 @@ std::optional<V> Project(V p,const M& view,const M& proj,unsigned w,unsigned h){
 }
 std::uint32_t Blend(std::uint32_t a,std::uint32_t b,float t){
     std::uint32_t p=0xff000000;for(unsigned s=0;s<24;s+=8){const float x=float((a>>s)&255),y=float((b>>s)&255);p|=std::uint32_t(std::clamp(x+(y-x)*t,0.f,255.f))<<s;}return p;
+}
+// Draw in the existing bore-zero/glass coordinates, never in the main HUD.
+// Soft coverage keeps the thin paired rails readable at different eye sizes.
+float EuBrackets(float dx,float dy,const OpticDefinition& d,float line){
+    const float x=std::abs(dx)/d.halfWidth,y=std::abs(dy)/d.halfHeight;
+    const float sx=line/d.halfWidth,sy=line/d.halfHeight;
+    const auto stroke=[](float distance,float width){return std::clamp(1.f-std::abs(distance)/width,0.f,1.f);};
+    const float h=(x>.12f&&x<.46f)?stroke(y-.024f,sy):0;
+    const float v=(y>.12f&&y<.46f)?stroke(x-.024f,sx):0;
+    const float hc=y<.065f?stroke(x-.46f,sx):0,vc=x<.065f?stroke(y-.46f,sy):0;
+    return std::max({h,v,hc,vc})*std::clamp((std::max(x,y)-.10f)/.15f,.35f,1.f);
 }
 std::uint32_t Sample(const std::vector<DWORD>& p,unsigned w,unsigned h,float u,float v){
     if(u<0||v<0||u>1||v>1)return 0xff080b0e;
@@ -138,7 +149,12 @@ size_t CompositeGunOptic(std::vector<DWORD>& pixels,const std::vector<DWORD>& sc
         const bool cross=(std::abs(dx)<line && std::abs(dy)<d.halfHeight*.45f && std::abs(dy)>line*3) ||
             (std::abs(dy)<line && std::abs(dx)<d.halfWidth*.45f && std::abs(dx)>line*3);
         const bool hasHud=!d.redDot && nativeHud.size()==pixels.size();
-        if(hasHud){
+        if(d.euRifleBrackets){
+            // Explicit artwork replaces the native 2D rangefinder, retaining
+            // the same aim point, world image, magnification and aperture.
+            color=Blend(color,rgba?0xffffdc70:0xff70dcff,EuBrackets(dx,dy,d,line));
+            if(center)color=rgba?0xff4040ff:0xffff4040;
+        }else if(hasHud){
             // Native 800x600 UI coordinates: central 400x300 contains the
             // stock scope reticle, compass, rangefinder and stabilizer.
             const float hu=.5f+(su-.5f)*.5f,hv=.5f+(sv-.5f)*.5f;
