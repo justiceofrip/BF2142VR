@@ -117,15 +117,21 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual((self.game/setup.WEAPONS).read_bytes(),b'foreign change')
         self.assertTrue((self.game/'.BF2142VR-update.json').exists())
 class RunningProcessTests(unittest.TestCase):
-    def state(self,value):
+    def state(self,value,code=259,query_ok=True):
         class Kernel:
             def WaitForSingleObject(inner,handle,timeout):
                 self.assertEqual((handle,timeout),(123,0));return value
+            def GetExitCodeProcess(inner,handle,output):
+                self.assertEqual(handle,123);output._obj.value=code;return query_ok
         return setup.process_is_active(Kernel(),123)
     def test_exited_retained_object_does_not_block_update(self):
         self.assertFalse(self.state(0))
     def test_live_process_still_blocks_update(self):
         self.assertTrue(self.state(258))
+    def test_final_exit_code_with_unsignaled_handle_is_exited(self):
+        self.assertFalse(self.state(258,0))
+    def test_failed_exit_query_is_not_ignored(self):
+        with self.assertRaises(OSError):self.state(258,0,False)
     def test_failed_probe_cannot_authorize_update(self):
         with self.assertRaises(OSError):self.state(0xffffffff)
 

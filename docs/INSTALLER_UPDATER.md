@@ -12,9 +12,9 @@ running processes. Healthy alpha/beta installations can be updated without a
 manual uninstall. A corrupted rollback backup or changes by another mod stop
 automatic replacement; originals are not guessed or overwritten.
 
-The launcher uses an original vector walker illustration and a dark BF2142-inspired
-interface. Reclamation setup is linked visibly at https://battlefield2142.co/.
-No third-party game images are bundled.
+The launcher uses Battlefield 2142 walker artwork selected by the project owner
+and the original title-logo styling, with EA/DICE credited in the launcher.
+Reclamation setup is linked visibly at https://battlefield2142.co/.
 
 ## Validation and reports
 

@@ -1,5 +1,14 @@
 # BFVR Changelog
 
+## BF2142 VR 0.2.0-beta.4-hotfix.1 (2026-10-03)
+
+- Replace the launcher illustration with the requested Battlefield 2142 walker
+  artwork and original title logo.
+- Avoid blocking installation on already-exited game process objects that remain
+  visible in the Windows snapshot. A live or unqueryable process still blocks
+  modification of its installation.
+- Gameplay binaries and accepted weapon geometry are unchanged from beta.4.
+
 ## BF2142 VR 0.2.0-beta.4 (2026-10-03)
 
 Accepted gameplay and rendering work merged into the main VR build:

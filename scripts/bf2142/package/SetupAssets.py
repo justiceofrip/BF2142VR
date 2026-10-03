@@ -11,7 +11,7 @@ import ExportLobbyScene as lobby
 from PIL import Image
 
 APP='BF2142VR'
-VERSION='0.2.0-beta.4'
+VERSION='0.2.0-beta.4-hotfix.1'
 INTRO_MOVIES=tuple('mods/bf2142/Movies/'+name+'.bik' for name in ('Dice','EA','Intro','Legal','Legal_na'))
 STOCK='1a9903113df3fa5b24282ce8d2adbf54ddb58160155b28dea09f26fe85b782f9'
 LEGACY_COMPLETE='e5d605ed915adac29c57840835d900bbc68a3c3ea4a2c7f7077000f6db8c144d'
@@ -46,7 +46,14 @@ def process_is_active(kernel, handle):
     # process handle is exited even if its cached image name still resolves.
     state=kernel.WaitForSingleObject(handle,0)
     if state==0:return False
-    if state==258:return True
+    if state==258:
+        # Some graphics-driver teardown leaves an unsignaled process object
+        # after its exit code is final. Match .NET Process.HasExited here.
+        code=w.DWORD()
+        if not kernel.GetExitCodeProcess(handle,ctypes.byref(code)):
+            raise OSError('Cannot query the game exit status')
+        return code.value==259  # STILL_ACTIVE
+
     raise OSError('Cannot determine whether the game has exited')
 
 
@@ -57,6 +64,7 @@ def running(game):
     k.CreateToolhelp32Snapshot.argtypes=[w.DWORD,w.DWORD];k.CreateToolhelp32Snapshot.restype=w.HANDLE
     k.Process32FirstW.argtypes=[w.HANDLE,ctypes.POINTER(Entry)];k.Process32NextW.argtypes=[w.HANDLE,ctypes.POINTER(Entry)]
     k.OpenProcess.argtypes=[w.DWORD,w.BOOL,w.DWORD];k.OpenProcess.restype=w.HANDLE
+    k.GetExitCodeProcess.argtypes=[w.HANDLE,ctypes.POINTER(w.DWORD)];k.GetExitCodeProcess.restype=w.BOOL
     k.WaitForSingleObject.argtypes=[w.HANDLE,w.DWORD];k.WaitForSingleObject.restype=w.DWORD
     k.CloseHandle.argtypes=[w.HANDLE];k.QueryFullProcessImageNameW.argtypes=[w.HANDLE,w.DWORD,w.LPWSTR,ctypes.POINTER(w.DWORD)]
     snap=k.CreateToolhelp32Snapshot(2,0)
@@ -246,7 +254,7 @@ def install(game,payload):
             child(stage,backup).parent.mkdir(parents=True,exist_ok=True)
             shutil.copy2(source,child(stage,backup))
             changes.append({'target':movie,'backup':backup,'original':sha(source),'installed':None})
-        m={'app':APP,'version':VERSION,'build':'renderer-beta4','game':str(game),'status':'prepared','changes':changes}
+        m={'app':APP,'version':VERSION,'build':'renderer-beta4-hotfix1','game':str(game),'status':'prepared','changes':changes}
         write_json(stage/'install.json',m);running(game)
         for row in changes:
             if sha(child(game,row['target']))!=row['original']:raise ValueError('Game files changed during setup')
@@ -351,7 +359,7 @@ def update(game,payload):
             dest=child(stage,row['backup']);dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(backup,dest)
         settings=child(final,'BF2142VR.ini')
         if settings.exists():shutil.copy2(settings,stage/'BF2142VR.ini')
-        updated=dict(m,version=VERSION,build='renderer-beta4',status='prepared',transaction=token)
+        updated=dict(m,version=VERSION,build='renderer-beta4-hotfix1',status='prepared',transaction=token)
         updated['changes']=[dict(row) for row in m['changes']]
         weapon_row=next(row for row in updated['changes'] if row['target']==WEAPONS)
         generated=stage/'generated/Weapons_client.zip'

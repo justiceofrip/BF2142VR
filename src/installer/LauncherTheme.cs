@@ -61,39 +61,30 @@ public sealed partial class SetupForm {
  [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd,int attribute,ref int value,int size);
 }
 
-// Original vector artwork; no game images or downloaded art is bundled.
+// BF2142 walker reference image supplied by the project owner for this launcher.
 sealed class BattlefieldBanner : Control {
- public BattlefieldBanner(){SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);}
+ readonly Image walker,logo;
+ public BattlefieldBanner(){walker=LoadArtwork("Walker");logo=LoadArtwork("Logo");SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);}
+ static Bitmap LoadArtwork(string name){using var stream=typeof(BattlefieldBanner).Assembly.GetManifestResourceStream("BF2142.Installer."+name+".png")??throw new IOException(name+" artwork missing.");using var image=Image.FromStream(stream);return new Bitmap(image);}
+ protected override void Dispose(bool disposing){if(disposing){walker.Dispose();logo.Dispose();}base.Dispose(disposing);}
  protected override void OnPaint(PaintEventArgs e) {
   var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
   using var fill=new LinearGradientBrush(ClientRectangle,Color.FromArgb(33,57,70),Color.FromArgb(12,24,31),0f);g.FillRectangle(fill,ClientRectangle);
   using var grid=new Pen(Color.FromArgb(20,140,190,205));
   for(int x=0;x<Width;x+=40)g.DrawLine(grid,x,0,x,Height);for(int y=0;y<Height;y+=40)g.DrawLine(grid,0,y,Width,y);
-  // Cold industrial horizon with a distant command ship.
-  using var horizon=new SolidBrush(Color.FromArgb(18,35,44));
-  g.FillPolygon(horizon,new PointF[]{new(Width*.51f,108),new(Width*.61f,97),new(Width*.75f,105),new(Width*.78f,111),new(Width*.69f,121),new(Width*.58f,119)});
-  var saved=g.Save();g.TranslateTransform(Width-253,8);g.ScaleTransform(.92f,.92f);
-  using var armor=new SolidBrush(Color.FromArgb(54,85,99));using var edge=new Pen(Color.FromArgb(92,144,162),1.2f);using var shadow=new SolidBrush(Color.FromArgb(25,47,59));using var lamp=new SolidBrush(Color.FromArgb(247,181,74));
-  void Plate(Brush brush,params PointF[] p){g.FillPolygon(brush,p);g.DrawPolygon(edge,p);}
-  Plate(shadow,new(84,70),new(120,72),new(129,101),new(108,116),new(76,107));
-  Plate(armor,new(49,21),new(130,17),new(148,35),new(143,66),new(105,87),new(66,75),new(42,48));
-  Plate(shadow,new(40,41),new(75,45),new(73,82),new(36,73));
-  Plate(armor,new(32,32),new(43,27),new(52,72),new(40,91),new(26,81));
-  Plate(armor,new(143,36),new(175,49),new(180,81),new(156,90),new(140,70));
-  Plate(shadow,new(163,47),new(214,50),new(215,60),new(167,61));
-  Plate(shadow,new(161,66),new(208,69),new(207,78),new(166,79));
-  Plate(armor,new(75,103),new(97,108),new(81,137),new(69,158),new(44,159),new(61,127));
-  Plate(armor,new(105,112),new(126,100),new(155,121),new(150,145),new(132,152),new(126,129));
-  Plate(shadow,new(137,143),new(154,139),new(163,162),new(130,164),new(123,159));
-  Plate(shadow,new(43,151),new(70,150),new(77,164),new(32,166),new(30,162));
-  g.FillRectangle(lamp,94,35,29,5);g.FillRectangle(lamp,128,35,5,5);
-  using var hatch=new Pen(Color.FromArgb(77,113,129));g.DrawLine(hatch,60,25,83,46);g.DrawLine(hatch,83,46,134,42);g.DrawLine(hatch,101,50,99,75);g.Restore(saved);
+  // Preserve the supplied artwork and blend it into the launcher header.
+  // This is UI composition; the embedded source image stays unchanged.
+  var art=new Rectangle(Width-352,-18,280,210);
+  g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.DrawImage(walker,art);
+  using var veil=new SolidBrush(Color.FromArgb(65,9,28,39));g.FillRectangle(veil,new Rectangle(Width-420,0,420,Height));
+  using var fade=new LinearGradientBrush(new Rectangle(Width-422,0,235,Height),Color.FromArgb(255,16,31,40),Color.FromArgb(0,16,31,40),0f);g.FillRectangle(fade,Width-422,0,235,Height);
+  using var bottom=new LinearGradientBrush(new Rectangle(Width-420,Height-48,420,48),Color.Transparent,Color.FromArgb(230,12,24,31),90f);g.FillRectangle(bottom,Width-420,Height-48,420,48);
   using var white=new SolidBrush(Color.FromArgb(225,236,238));using var ice=new SolidBrush(Color.FromArgb(135,200,214));using var orange=new SolidBrush(Color.FromArgb(244,174,63));
-  using var small=new Font("Bahnschrift",9,FontStyle.Bold);using var title=new Font("Bahnschrift",29,FontStyle.Bold);using var number=new Font("Bahnschrift",43,FontStyle.Bold);using var vr=new Font("Bahnschrift",15,FontStyle.Bold);
-  g.DrawString("WELCOME BACK, SOLDIER",small,ice,28,18);g.DrawString("BATTLEFIELD",title,white,24,41);g.DrawString("2142",number,white,23,80);
-  g.FillRectangle(orange,191,106,52,27);using var dark=new SolidBrush(Color.FromArgb(12,21,27));g.DrawString("VR",vr,dark,199,106);
+  using var small=new Font("Bahnschrift",9,FontStyle.Bold);using var vr=new Font("Bahnschrift",15,FontStyle.Bold);
+  g.DrawString("WELCOME BACK, SOLDIER",small,ice,28,18);g.DrawImage(logo,new Rectangle(28,44,330,100));
+  g.FillRectangle(orange,382,74,52,27);using var dark=new SolidBrush(Color.FromArgb(12,21,27));g.DrawString("VR",vr,dark,390,74);
   using var line=new Pen(Color.FromArgb(91,153,173));g.DrawLine(line,28,157,Width-28,157);
-  g.DrawString("VIRTUAL REALITY  /  BETA",small,ice,260,116);
+  g.DrawString("VIRTUAL REALITY  /  BETA",small,ice,382,116);
  }
 }
 
