@@ -40,6 +40,16 @@ int wmain(int argc,wchar_t** argv){
  }
  unsigned painted=0;for(auto color:eyes[0])painted+=color!=0xff18202a;CHECK(painted>200&&eyes[0]!=eyes[1]);
  if(argc>2&&!ex){std::ofstream file(std::filesystem::path(argv[2]),std::ios::binary);file<<"P6\n1600 900\n255\n";for(auto c:eyes[0]){const char rgb[]={char(c>>16),char(c>>8),char(c)};file.write(rgb,3);}}
+ // The offhand prop is visible with an otherwise empty inventory layer and
+ // follows the tracked palm, independent of the body equipment anchor.
+ HeldEquipment held;strcpy_s(held.name.data(),49,"unl_hub_ammo");held.pose={{-.16f,1.35f,-.38f},{0,0,0,1}};
+ InventoryNames hidden{};std::vector<DWORD> heldPixels[2];
+ for(int e=0;e<2;++e){
+  CHECK(SUCCEEDED(d->Clear(0,nullptr,D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER,0xff18202a,0,0)));CHECK(SUCCEEDED(d->BeginScene()));
+  CHECK(body.DrawGpu(d.Get(),request.views[e],camera->projection,1,placement,hidden,3,&held));CHECK(SUCCEEDED(d->EndScene()));
+  CHECK(SUCCEEDED(capture.Read(d.Get(),DXGI_FORMAT_B8G8R8A8_UNORM,heldPixels[e])));
+ }
+ unsigned propPixels=0;for(auto color:heldPixels[0])propPixels+=color!=0xff18202a;CHECK(propPixels>200&&heldPixels[0]!=heldPixels[1]);
  D3DVIEWPORT9 full{0,0,1600,900,0,1};d->SetViewport(&full);d->SetRenderState(D3DRS_MULTISAMPLEMASK,0xffffffff);
  WristMenuGpu wrist;WristFrame f;f.visible=true;f.panel={{0,0,-.35f},{0,0,0,1}};shared::SharedPresentationView eye{};eye.pose.orientationW=1;
  CHECK(SUCCEEDED(d->Clear(0,nullptr,D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER,0xff18202a,0,0)));CHECK(SUCCEEDED(d->BeginScene()));CHECK(wrist.Draw(d.Get(),f,eye,camera->projection,1));CHECK(SUCCEEDED(d->EndScene()));std::vector<DWORD> wristPixels;CHECK(SUCCEEDED(capture.Read(d.Get(),DXGI_FORMAT_B8G8R8A8_UNORM,wristPixels)));unsigned letters=0;for(auto c:wristPixels)letters+=((c>>16)&255)>150;CHECK(letters>100);

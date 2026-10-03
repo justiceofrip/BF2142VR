@@ -27,6 +27,13 @@ def copy_pe(source,target):
     # edit executable sections or arbitrary paths in the binary.
     repo=Path(__file__).resolve().parents[3]
     prefixes=[str(repo).encode()+b'\\',repo.as_posix().encode()+b'/']
+    # Accepted checkpoints may have been built in another checkout. Discover
+    # only null-terminated Opus __FILE__ paths in read-only data below.
+    import re
+    for match in re.finditer(rb'[A-Za-z]:[\\/][^\x00\r\n]{1,512}?[\\/]third_party[\\/]opus-1\.6\.1[\\/]',raw):
+        prefix=re.split(rb'third_party[\\/]opus-1\.6\.1',match.group())[0]
+        if prefix not in prefixes:prefixes.append(prefix)
+
     for i in range(sections):
         at=section_table+i*40
         name=bytes(raw[at:at+8]).rstrip(b'\0')
@@ -52,10 +59,12 @@ def copy_pe(source,target):
     assert all(any(a<=i<b for a,b in edits) for i,(a,b) in enumerate(zip(old,raw)) if a!=b)
     target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
 
-def stage(checkpoint,tools,python_home,python_env,dest):
+def stage(checkpoint,tools,python_home,python_env,dest,launcher=None):
     repo=Path(__file__).resolve().parents[3];package=Path(__file__).parent;assets=package.parent
     if dest.exists():raise ValueError('Destination must be new')
     dest.mkdir(parents=True)
+    if launcher is None:raise ValueError('Build the unified launcher first')
+    shutil.copy2(launcher,dest/'BF2142VRSetup.exe')
     for name in ['BF2142VRLauncher.exe','BF2142VRClient.dll']:copy_pe(checkpoint/'x86'/name,dest/'runtime/x86'/name)
     copy_pe(checkpoint/'x64/BFVRPresenter.exe',dest/'runtime/x64/BFVRPresenter.exe')
     for name in ['assets','runtime']:shutil.copytree(checkpoint/'x64'/name,dest/'runtime/x64'/name)
@@ -95,9 +104,9 @@ account data or maps are distributed. Local setup-generated game assets remain
 subject to the original game's ownership and are not public mod source.
 ''')
     source_dir=dest/'source-tools';source_dir.mkdir()
-    for name in ['RepairDecisionPlan.py','RepairWeaponMeshes.py','CompleteWeaponSurfaces.py','RemoveInteriorBackfaces.py','ExportBodyEquipment.py','ExportLobbyScene.py']:shutil.copy2(assets/name,source_dir/name)
+    for name in ['RepairDecisionPlan.py','RepairWeaponMeshes.py','CompleteWeaponSurfaces.py','RemoveInteriorBackfaces.py','SeparateWeaponBackfaces.py','PlaneSeparatedBackfaces.py','ThinShellBackfaces.py','ExportBodyEquipment.py','ExportLobbyScene.py']:shutil.copy2(assets/name,source_dir/name)
     for name in ['SetupAssets.py','WeaponRepairWorker.py','WeaponRepairHashes.py','WeaponRepairPlans.py']:shutil.copy2(package/name,source_dir/name)
-    (dest/'PACKAGE CHECKS.txt').write_text('BF2142 VR 0.2.0-beta.4-test.8\nSee release CHECKS.txt for exact payload validation.\nIPC 26 / pose v4. See CHECKS.txt for headset validation limits.\n')
+    (dest/'PACKAGE CHECKS.txt').write_text('BF2142 VR 0.2.0-beta.4\nSee release CHECKS.txt for exact payload validation.\nIPC 26 / pose v4. See CHECKS.txt for headset validation limits.\n')
     # Reject this build's private input locations in either path spelling.
     private_roots=[repo.parent,checkpoint,tools,python_home,python_env,Path.home()]
     forbidden=sorted({str(p.resolve()).lower().replace('\\','/') for p in private_roots})
@@ -110,10 +119,11 @@ subject to the original game's ownership and are not public mod source.
             if text.encode() in lower or text.encode('utf-16le') in lower:raise ValueError('Private build path in '+rel)
         if path.suffix.lower() in ['.pdb','.dmp','.bik','.bundledmesh'] or path.name in ['Weapons_client.zip','BodyEquipment.bin','LobbyScene.bin','install.json']:raise ValueError('Private or developer artifact: '+rel)
         files[rel]=sha(path)
-    (dest/'payload.json').write_text(json.dumps({'version':'0.2.0-beta.4-test.8','build':'renderer-beta4-test8','files':files},indent=2))
+    (dest/'payload.json').write_text(json.dumps({'version':'0.2.0-beta.4','build':'renderer-beta4','files':files},indent=2))
     print('Staged',len(files),'files;',sum(x.stat().st_size for x in dest.rglob('*') if x.is_file()),'bytes:',dest)
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ['checkpoint','tools','python-home','python-env','destination']:p.add_argument('--'+name,type=Path,required=True)
-    a=p.parse_args();stage(a.checkpoint,a.tools,a.python_home,a.python_env,a.destination)
+    p.add_argument('--launcher',type=Path,required=True)
+    a=p.parse_args();stage(a.checkpoint,a.tools,a.python_home,a.python_env,a.destination,a.launcher)

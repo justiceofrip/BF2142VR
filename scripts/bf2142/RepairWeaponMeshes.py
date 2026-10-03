@@ -108,6 +108,31 @@ class Mesh:
         return bytes(out)
 
 def position(v):return struct.unpack_from("<3f",v)
+
+def expand_first_person_bounds(mesh):
+    """Enclose encoded FP positions without shrinking bounds or touching world LODs.
+
+    Native vertex packing uses the union of recorded bounds as signed 16-bit
+    coordinate scale. An inner-face offset beyond an extremum can otherwise
+    wrap to the opposite side of the gun. Include unused vertices as well:
+    the engine packs the whole vertex buffer, not only visible triangles.
+    """
+    changed=0
+    for index,lod in enumerate(mesh.lods[0]):
+        old=mesh.bounds[index]
+        if not all(math.isfinite(x) for x in old[:6]):raise ValueError('Invalid weapon bounds')
+        low=list(old[:3]);high=list(old[3:6])
+        if any(a>b for a,b in zip(low,high)):raise ValueError('Inverted weapon bounds')
+        for material in lod:
+            for vertex in material['vertices']:
+                p=position(vertex)
+                if not all(math.isfinite(x) for x in p):raise ValueError('Nonfinite weapon position')
+                for axis in range(3):
+                    low[axis]=min(low[axis],p[axis]);high[axis]=max(high[axis],p[axis])
+        new=tuple(low+high)+(old[-1],)
+        changed+=new!=old;mesh.bounds[index]=new
+    return changed
+
 def inside_vertex(v):
     out=bytearray(v)
     struct.pack_into("<3f",out,12,*(-x for x in struct.unpack_from("<3f",v,12)))

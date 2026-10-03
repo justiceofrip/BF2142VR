@@ -14,7 +14,7 @@ public:
 private:
     bool initialized=false,gripHeld=false,gripTracked=false;
     float bodyYaw=0;
-    LONGLONG lastTime=0,keyUntil=0;
+    LONGLONG lastTime=0,keyUntil=0,grabPressUntil=0,selectionTime=0;
     unsigned pendingKey=0,pendingItem=0;
 };
 }

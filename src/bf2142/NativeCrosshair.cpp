@@ -6,7 +6,8 @@
 #include <MinHook.h>
 namespace bfvr::bf2142 {
 namespace {
-bool hidden=true;thread_local unsigned opticReplayDepth=0,hudDrawDepth=0;
+bool hidden=true;thread_local bool adsTicketsHidden=false;
+thread_local unsigned opticReplayDepth=0,hudDrawDepth=0;
 thread_local bool replayArtwork=false;
 BYTE* widgetImage=nullptr;
 using CullDraw=void(__thiscall*)(void*,void*,void*,void*,void*,void*);
@@ -31,17 +32,27 @@ bool ScopeWidget(const char* name){
      "EuSoldierAACullNode","PacSoldierAACullNode"})if(!std::strcmp(name,known))return true;
  return false;
 }
-bool ScopeNode(void* node){
+enum class HudNode { Other, Scope, Tickets };
+HudNode ClassifyNode(void* node){
  __try {
-  if(!widgetImage||Read<const BYTE*>(node)!=widgetImage+0x5bb4f8)return false;
-  const char* name=Read<const char*>(node,0x18);if(!name)return false;
+  if(!widgetImage||Read<const BYTE*>(node)!=widgetImage+0x5bb4f8)return HudNode::Other;
+  const char* name=Read<const char*>(node,0x18);if(!name)return HudNode::Other;
   char bounded[64]{};unsigned i=0;
   for(;i<sizeof(bounded)-1&&name[i];++i)bounded[i]=name[i];
-  return !name[i]&&ScopeWidget(bounded);
- }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+  if(name[i])return HudNode::Other;
+  if(ScopeWidget(bounded))return HudNode::Scope;
+  // Hide only the stock top conquest/coop ticket bar. Its parent also owns
+  // map UI; Titan health and commander widgets have separate native roots.
+  if(!std::strcmp(bounded,"TicketInfoConquestCullNode"))return HudNode::Tickets;
+  return HudNode::Other;
+ }__except(EXCEPTION_EXECUTE_HANDLER){return HudNode::Other;}
 }
 void __fastcall CullDrawHook(void* self,void*,void* a,void* b,void* c,void* d,void* e){
- if(hudDrawDepth&&ScopeNode(self)){
+ const auto kind=hudDrawDepth?ClassifyNode(self):HudNode::Other;
+ // Apply identically to the base HUD and scope replay, so subtraction cannot
+ // turn a hidden ticket bar into spurious scope artwork.
+ if(kind==HudNode::Tickets&&adsTicketsHidden)return;
+ if(kind==HudNode::Scope){
   if(!opticReplayDepth)return;
   // An allocated capture alone is not evidence of scope artwork. A hidden
   // or unknown node keeps the existing fallback aiming mark on the GPU path.
@@ -108,6 +119,7 @@ bool InstallNativeOpticHud(){
  }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
 }
 void SetCrosshairHidden(bool value){hidden=value;}
+void SetAdsTicketsHidden(bool value){adsTicketsHidden=value;}
 CrosshairScope::CrosshairScope():CrosshairScope(nullptr){}
 CrosshairScope::CrosshairScope(const void* module,bool optic){
  // Native Flash can execute outside HudHook, and a replay can nest Flash.

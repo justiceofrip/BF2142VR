@@ -10,7 +10,7 @@ stereo::Vec3 Transform(const stereo::Pose& p,stereo::Vec3 v){const auto q=p.orie
  return {p.position.x+v.x+q.w*t.x+q.y*t.z-q.z*t.y,p.position.y+v.y+q.w*t.y+q.z*t.x-q.x*t.z,p.position.z+v.z+q.w*t.z+q.x*t.y-q.y*t.x};}
 }
 bool BodyEquipment::DrawGpu(IDirect3DDevice9* d,const shared::SharedPresentationView& eye,const stereo::Matrix4& projection,
- float scale,const BodyInventoryResult& body,const InventoryNames& names,int equipped){
+ float scale,const BodyInventoryResult& body,const InventoryNames& names,int equipped,const HeldEquipment* held){
  if(!d||!body.anchorValid||models.empty()||!std::isfinite(scale)||scale<=0)return false;
  const auto& p=eye.pose;const auto a=stereo::MakeRelativePose({{p.positionX,p.positionY,p.positionZ},{p.orientationX,p.orientationY,p.orientationZ,p.orientationW}},body.anchor);
  if(!a)return false;for(const auto& row:projection.values)for(float v:row)if(!std::isfinite(v))return false;
@@ -45,11 +45,18 @@ bool BodyEquipment::DrawGpu(IDirect3DDevice9* d,const shared::SharedPresentation
  set(d->SetSamplerState(0,D3DSAMP_MAXMIPLEVEL,0));set(d->SetSamplerState(0,D3DSAMP_MIPMAPLODBIAS,0));
  set(d->SetSamplerState(0,D3DSAMP_MINFILTER,D3DTEXF_LINEAR));set(d->SetSamplerState(0,D3DSAMP_MAGFILTER,D3DTEXF_LINEAR));set(d->SetSamplerState(0,D3DSAMP_MIPFILTER,D3DTEXF_LINEAR));
  set(d->SetSamplerState(0,D3DSAMP_ADDRESSU,D3DTADDRESS_WRAP));set(d->SetSamplerState(0,D3DSAMP_ADDRESSV,D3DTADDRESS_WRAP));set(d->SetSamplerState(0,D3DSAMP_SRGBTEXTURE,FALSE));
- for(unsigned slotIndex=0;slotIndex<BodySlots().size()&&ok;++slotIndex){
-  const auto item=BodySlots()[slotIndex].item;if(int(item)==equipped||!names[item][0])continue;
-  const std::string name(names[item].begin(),std::find(names[item].begin(),names[item].end(),char(0)));
+ for(unsigned slotIndex=0;slotIndex<BodySlots().size()+(held?1u:0u)&&ok;++slotIndex){
+  const bool inHand=slotIndex==BodySlots().size();
+  const auto item=inHand?0:BodySlots()[slotIndex].item;if(!inHand&&(int(item)==equipped||!names[item][0]))continue;
+  const auto& modelName=inHand?held->name:names[item];
+  const std::string name(modelName.begin(),std::find(modelName.begin(),modelName.end(),char(0)));
   Model* model=nullptr;for(auto& m:models)if(m.name==name||m.name==name+"_rifle"){model=&m;break;}if(!model)continue;
-  const auto placement=PlaceBodyEquipment(slotIndex,model->low,model->high);if(placement.scale<=0)continue;
+  auto placement=PlaceBodyEquipment(inHand?3:slotIndex,model->low,model->high);if(placement.scale<=0)continue;
+  auto anchor=a;
+  if(inHand){
+   anchor=stereo::MakeRelativePose({{p.positionX,p.positionY,p.positionZ},{p.orientationX,p.orientationY,p.orientationZ,p.orientationW}},held->pose);
+   if(!anchor)continue;placement.slot=5;placement.position={0,-.12f,0};
+  }
   set(d->SetRenderState(D3DRS_TEXTUREFACTOR,int(slotIndex)==body.hovered?0xff80d8ff:0xffffffff));
   for(auto& m:model->materials){
    if(!m.gpu){
@@ -60,7 +67,7 @@ bool BodyEquipment::DrawGpu(IDirect3DDevice9* d,const shared::SharedPresentation
     set(m.gpu->UnlockRect(0));m.gpu->SetAutoGenFilterType(D3DTEXF_LINEAR);m.gpu->GenerateMipSubLevels();
    }
    std::vector<Vertex> vertices;vertices.reserve(m.vertices.size());
-   for(const auto& v:m.vertices){auto t=Transform(*a,placement.Transform({v.x,v.y,v.z}));vertices.push_back({t.x*scale,t.y*scale,-t.z*scale,v.u,v.v});}
+   for(const auto& v:m.vertices){auto t=Transform(*anchor,placement.Transform({v.x,v.y,v.z}));vertices.push_back({t.x*scale,t.y*scale,-t.z*scale,v.u,v.v});}
    set(d->SetTexture(0,m.gpu.Get()));if(ok)set(d->DrawIndexedPrimitiveUP(D3DPT_TRIANGLELIST,0,UINT(vertices.size()),UINT(m.indices.size()/3),m.indices.data(),D3DFMT_INDEX16,vertices.data(),sizeof(Vertex)));
   }
  }

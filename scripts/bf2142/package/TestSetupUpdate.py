@@ -23,7 +23,7 @@ class UpdateTests(unittest.TestCase):
         for p in reversed(self.patches):p.stop()
         self.temp.cleanup()
     def assets(self,game,stage,original):
-        (stage/'generated').mkdir();(stage/'generated/Weapons_client.zip').write_bytes(self.weapon)
+        (stage/'generated').mkdir();(stage/'generated/Weapons_client.zip').write_bytes(getattr(self,'next_weapon',self.weapon))
     def assert_old(self):
         self.assertEqual((self.root/'runtime.txt').read_text(),'old runtime')
         self.assertEqual((self.root/'backups/Weapons_client.zip').read_bytes(),self.original)
@@ -77,4 +77,56 @@ class UpdateTests(unittest.TestCase):
         setup.write_json(self.game/'.BF2142VR-update.json',{'app':setup.APP,'transaction':'../elsewhere'})
         with self.assertRaises(ValueError):setup.recover_update(self.game)
         self.assert_old()
+    def test_updated_weapon_archive_keeps_stock_uninstall_backup(self):
+        self.next_weapon=b'separated repaired skins'
+        setup.update(self.game,self.payload)
+        self.assertEqual((self.game/setup.WEAPONS).read_bytes(),self.next_weapon)
+        state=json.loads((self.root/'install.json').read_text())
+        self.assertEqual(state['changes'][0]['installed'],setup.sha(self.game/setup.WEAPONS))
+        self.assertEqual((self.root/'backups/Weapons_client.zip').read_bytes(),self.original)
+        setup.restore(self.root,state)
+        self.assertEqual((self.game/setup.WEAPONS).read_bytes(),self.original)
+    def test_failure_after_archive_replacement_rolls_back_runtime_and_archive(self):
+        self.next_weapon=b'separated repaired skins'
+        write=setup.write_json
+        def fail_commit(path,value):
+            if path.name=='install.json' and value.get('transaction') and value.get('status')=='installed':
+                raise OSError('commit failure')
+            return write(path,value)
+        with patch.object(setup,'write_json',side_effect=fail_commit):
+            with self.assertRaises(OSError):setup.update(self.game,self.payload)
+        self.assert_old()
+        self.assertFalse((self.game/'.BF2142VR-update.json').exists())
+    def prepare_interrupted_weapon(self):
+        token=self.interrupted(activate=True)
+        (self.root/'update-rollback').mkdir()
+        (self.root/'update-rollback/Weapons_client.zip').write_bytes(self.weapon)
+        (self.game/setup.WEAPONS).write_bytes(b'new separated skins')
+        setup.write_json(self.game/'.BF2142VR-update.json',{'app':setup.APP,'transaction':token,
+            'weapon':{'before':self.row['installed'],'after':setup.sha(self.game/setup.WEAPONS)}})
+        return token
+    def test_interrupted_archive_replacement_restores_previous(self):
+        token=self.prepare_interrupted_weapon()
+        setup.recover_update(self.game)
+        self.assert_old()
+        self.assertTrue((self.game/('.BF2142VR-interrupted-'+token)).exists())
+    def test_interrupted_archive_foreign_change_is_preserved(self):
+        self.prepare_interrupted_weapon()
+        (self.game/setup.WEAPONS).write_bytes(b'foreign change')
+        with self.assertRaises(ValueError):setup.recover_update(self.game)
+        self.assertEqual((self.game/setup.WEAPONS).read_bytes(),b'foreign change')
+        self.assertTrue((self.game/'.BF2142VR-update.json').exists())
+class RunningProcessTests(unittest.TestCase):
+    def state(self,value):
+        class Kernel:
+            def WaitForSingleObject(inner,handle,timeout):
+                self.assertEqual((handle,timeout),(123,0));return value
+        return setup.process_is_active(Kernel(),123)
+    def test_exited_retained_object_does_not_block_update(self):
+        self.assertFalse(self.state(0))
+    def test_live_process_still_blocks_update(self):
+        self.assertTrue(self.state(258))
+    def test_failed_probe_cannot_authorize_update(self):
+        with self.assertRaises(OSError):self.state(0xffffffff)
+
 if __name__=='__main__':unittest.main()

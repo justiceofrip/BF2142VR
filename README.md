@@ -1,8 +1,10 @@
-# Battlefield 2142 VR — beta.4-test.8 experimental branch
+# Battlefield 2142 VR — beta.4
 
-**[Download the installer / updater](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.4-test.8/BF2142VRSetup.exe)** — select BF2142.exe and click **Install / Update**. Later updates and repairs preserve your settings and original backups. [Full ZIP and checks](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-test.8) are also available.
+**[Download the VR launcher / installer](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.4/BF2142VRSetup.exe)** — choose BF2142.exe, then **Install / Update**. Connect your headset and click **Play VR**.
 
-Test.8 uses the active OpenXR runtime’s recommended eye size (within the 32-bit renderer’s bounds), disables the added BF2142 FXAA blur, and moves ordinary stereo frames over GPU shared textures. It also fixes the reproduced high-resolution upload memory growth behind the failed login tests. The owner accepted clear, smooth Quest 3/SteamVR gameplay at a 2064×2208 source and 90 Hz; performance varies by scene and hardware. ADS still has a slower CPU fallback and is the next follow-up. Includes test.7’s resumable, verified installer repairs.
+One launcher provides **Check for updates**, **Repair**, **Save error report** and **Report on GitHub**. Updates verify signed file hashes and preserve settings/backups. Reports stay local until you review and attach them. [ZIP, release notes and validation](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4).
+
+Beta.4 merges the accepted GPU menu/ADS work, stock/unlock sights, scope HUD fixes, weapon shimmer repair, corrected hands, more reliable swaps and left-hand crates while holding a gun. Native crate deployment briefly pauses gun fire before restoring it. See [changelog](CHANGELOG.md) and [installer details](docs/INSTALLER_UPDATER.md).
 
 A PC VR port based on [BFVR by JayBiggsGMG and the BFVR contributors](https://github.com/JayBiggsGMG/BFVR-Battlefield-1942-VR-Mod). Play bot matches or join compatible multiplayer servers alongside desktop players.
 
@@ -10,7 +12,7 @@ A PC VR port based on [BFVR by JayBiggsGMG and the BFVR contributors](https://gi
 
 | Download | Who needs it? |
 | --- | --- |
-| [BF2142-VR-0.2.0-beta.3.zip](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.3/BF2142-VR-0.2.0-beta.3.zip) | VR players: ladder/input fixes, quality update and reversible setup. Includes the remote-player IK receiver. |
+| [BF2142-VR-0.2.0-beta.3.zip](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.3/BF2142-VR-0.2.0-beta.3.zip) | Older VR release; use the beta.4 launcher above for current fixes. |
 | [BF2142-Flat-0.2.0-beta.1.zip](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.1/BF2142-Flat-0.2.0-beta.1.zip) | Monitor players: run the included EXE to join the community test server with tracked-player visuals. No SteamVR, headset or separate .NET installation. |
 
 VR players do **not** install the flat addon too. Unmodified desktop clients can play on a compatible server, but need the addon to see VR gestures and use our proximity voice. The server also needs the VR server adapter and community bridge. This is a beta, with remaining animation and compatibility issues.
@@ -19,11 +21,11 @@ VR players do **not** install the flat addon too. Unmodified desktop clients can
 
 You need your own working **BF2142 v1.51** installation on Windows x64. Set up Reclamation/OpenSpy separately and confirm you can log in. VR has primarily been tested with Quest 3 controllers through Steam Link/SteamVR. Remaster and other weapon packs are not supported by this installer.
 
-1. Close BF2142, open the test.8 installer EXE, select `BF2142.exe`, and click **Install / Update**. The full ZIP and `Setup.cmd` remain an offline alternative.
-2. Connect your headset to SteamVR. Use **Battlefield 2142 VR Beta** / installed `Play VR.cmd` for singleplayer.
+1. Close BF2142, open BF2142VRSetup.exe, select `BF2142.exe`, and click **Install / Update**. The full ZIP and `Setup.cmd` remain an offline alternative.
+2. Connect your headset to SteamVR. Open **Battlefield 2142 VR** and click **Play VR**. Use the same launcher for **Check for updates** and **Repair**.
 3. The separate [community helper](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.1) still selects its beta.1 runtime. Normal servers are selectable in-game from the updated Play VR launcher.
 
-**Updating from alpha or an earlier beta:** use the test.8 installer’s **Install / Update** button. Healthy installations retain settings and original backups without a manual uninstall. If another mod changed game files or a backup is damaged, setup stops and preserves them. For a flat-addon update, use the new EXE instead of an older playtest EXE.
+**Updating from alpha or an earlier beta:** use the launcher’s **Install / Update** button. Healthy installations retain settings and original backups without a manual uninstall. If another mod changed game files or a backup is damaged, setup stops and preserves them. For a flat-addon update, use the new EXE instead of an older playtest EXE.
 
 - [Full installation instructions](scripts/bf2142/package/START%20HERE.txt) / [controls](scripts/bf2142/package/CONTROLS.txt) / [troubleshooting](scripts/bf2142/package/TROUBLESHOOTING.txt)
 - [Flat addon and Reclamation Hub integration](docs/FLAT_ADDON.md)
@@ -43,7 +45,7 @@ You need your own working **BF2142 v1.51** installation on Windows x64. Set up R
 - Community join helper, signed/versioned downloads and encrypted pose/audio bridge.
 - Proximity audio and physical shoulder interaction for native squad radio.
 
-The latest observer arm/recoil and holster-haptic corrections have automated coverage but have not had another headset/observer session. The owner authorized this beta without that final test. Earlier builds were exercised in two-client IK and outside-network crossplay sessions. The owner confirmed proximity voice worked with the second `vrtester` client; separate-PC microphone routing and voice quality still need broader testing. Read the [known limits](docs/BF2142_BETA_READINESS.md).
+The current render, optic, hand, holster and offhand-crate build was accepted in a headset test on October 3, 2026. This does not establish every weapon/headset combination. Earlier builds were exercised in two-client IK and outside-network crossplay sessions. The owner confirmed proximity voice worked with the second `vrtester` client; separate-PC microphone routing and voice quality still need broader testing. Read the [known limits](docs/BF2142_BETA_READINESS.md).
 
 ## For contributors and BF2 ports
 

@@ -131,6 +131,15 @@ int main(){
     if(!firing.rightReady||!firing.supportReady||!Same(firing.value->rightFromWeapon,CaptureHandBindings(b)->rightFromWeapon))return 104;
     // An observation gap cannot count as a stable firing-grip interval.
     firing={};firing.Update(b,1000);firing.Update(b,2000);if(firing.rightReady)return 105;
+    // PAC launchers use a stable wide side handle, not a rifle fore-end.
+    auto wide=b;wide[7]=wide[33];wide[7].values[3][0]-=.4164f;wide[7].values[3][2]+=.1335f;
+    HandBindingCache rifleGate,launcherGate;
+    for(unsigned t=0;t<=900;t+=50){rifleGate.Update(wide,t);launcherGate.Update(wide,t,true,true);}
+    if(rifleGate.supportReady||!launcherGate.supportReady)return 122;
+    if(!Same(launcherGate.value->leftFromWeapon,CaptureHandBindings(wide)->leftFromWeapon))return 123;
+    launcherGate={};wide[7].values[3][2]-=.3f;
+    for(unsigned t=0;t<=900;t+=50)launcherGate.Update(wide,t,true,true);
+    if(launcherGate.supportReady)return 124;
     // Finger posing is isolated to the free hand, keeps lengths and wrist,
     // restores the authored curl exactly, and rejects corrupt data atomically.
     auto fingers=Rig();for(int finger=0;finger<5;++finger)for(int j=0;j<4;++j)

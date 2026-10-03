@@ -1,60 +1,36 @@
-BATTLEFIELD 2142 VR 0.2.0-beta.4-test.8 - EXPERIMENTAL TEST BUILD
+BATTLEFIELD 2142 VR 0.2.0-beta.4
 
-Requires your own working stock BF2142 v1.51 on Windows x64.
-Set up Reclamation/OpenSpy separately and confirm you can log in.
-VR already includes the remote IK receiver. Do not also install the flat addon.
-Remaster/other weapon packs are not supported by this installer.
+Requires your own working BF2142 v1.51 + Reclamation installation on Windows x64.
+Reclamation setup and multiplayer: https://battlefield2142.co/
+Confirm the normal game works first. VR includes the remote IK receiver;
+VR players do not also install the flat addon. Custom weapon packs unsupported.
 
-INSTALL / UPDATE
-Recommended: download BF2142VRSetup.exe from this release, open it, choose
-BF2142.exe once, and click Install / Update. Keep the BF2142 VR Installer
-shortcut for later updates. Repair checks/downloads damaged mod files and
-rebuilds locally generated assets. No separate Python or .NET install needed.
+QUICK START
+1. Open BF2142VRSetup.exe, choose your BF2142.exe, click Install / Update.
+2. Connect the headset and start your OpenXR runtime (for example SteamVR).
+3. Open the Battlefield 2142 VR shortcut and click Play VR.
 
-The updater checks a signed preview-channel feed. It downloads changed mod
-files only, preserves VR settings and original backups, and keeps the previous
-runtime alongside the game. Close BF2142 before updating. It does not install
-or download Battlefield itself, Reclamation, maps, or account information.
+Use that same launcher for Check for updates or Repair. Check verifies the
+signed release and hashes of installed mod files, not just its version label.
+Close the game before installing. Settings and original backups are preserved;
+do not restore stock files or uninstall before each normal update.
+No separate Python or .NET installation is required.
 
-Offline alternative: extract the entire ZIP to a new folder, close BF2142,
-run Setup.cmd and select BF2142.exe. Updating a healthy existing VR installation
-no longer requires a manual uninstall. Do not overwrite an old extracted ZIP.
-If the old install metadata/backups are damaged or another mod changed game
-files, setup stops and retains them rather than guessing what to overwrite.
+OFFLINE ZIP
+Extract the complete ZIP to a new folder. Run Setup.cmd and select BF2142.exe.
+The installed launcher and desktop shortcut offer Play VR and later updates.
+Installed Play VR.cmd remains a direct launch option.
 
-Weapon repairs are isolated and verified. Completed repairs are cached locally
-so an interrupted attempt can resume. A failing weapon is retried once; setup
-never silently skips it. Previous releases remain available on GitHub.
+IF SETUP FAILS
+Keep the backups and installation folder. Retry Install / Update; verified
+weapon repairs are reused. Save error report in the launcher, review the text,
+then use Report on GitHub and attach it. Nothing uploads automatically.
+Do not share game archives, account files, generated models or WeaponCache.
 
-Connect your headset through SteamVR, then use Play VR or the game shortcut.
+Uninstall.cmd restores recorded original files and retains settings/backups.
+If another mod changed a file, setup/uninstall stops to preserve it.
 
-COMMUNITY MULTIPLAYER
-This hotfix updates the installed Play VR runtime. The separate community
-join helper/flat addon remains at beta.1 and selects its own signed runtime.
-Use the previous community download for that path; this ZIP does not bundle it.
-Normal servers can be selected in-game; custom gestures/voice need the matching
-server adapter and bridge. The community test server may be offline.
-
-CONTROLS
-Look directly at your left wrist for 0.4 seconds, then point/click the small
-DEPLOY button with the right controller
-to open spawn/loadout. Right-stick click recenters. B opens the game menu;
-VR CONTROLS opens settings.
-Read CONTROLS.txt for body slots, aiming, vehicles and menus.
-Voice worked with the second vrtester client; wider device testing remains.
-
-ROLLBACK
-Close the game and run installed Uninstall.cmd. It restores only recorded VR
-changes and retains settings/verified backups. If another mod changed a file,
-uninstall stops to protect it. Move the uninstalled folder aside before using
-the earlier installer. Keep your old ZIP for rollback.
-Community caches live separately under LOCALAPPDATA/BF2142VR/Community.
-Older signed server revisions are rejected; authorized rollback requires a
-new signed descriptor selecting an earlier payload.
-
-Desktop Preview.cmd is optional synthetic tracking, not VR.
-Latest arm/haptic fixes have automated coverage, not final headset acceptance.
-See RELEASE NOTES.txt and the release CHECKS.txt.
-
-Source/credits: https://github.com/justiceofrip/BF2142VR
-Based on BFVR by JayBiggsGMG and contributors. Licenses included.
+Read CONTROLS.txt and TROUBLESHOOTING.txt for controls, VR and multiplayer.
+The separate flat/community helper uses its own runtime. Custom gestures and
+voice require the matching server adapter/bridge; ordinary servers are in-game.
+This launcher does not download Battlefield, Reclamation or extra maps.

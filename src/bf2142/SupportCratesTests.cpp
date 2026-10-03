@@ -28,6 +28,31 @@ int main(){
  // A deliberate right-hand grab preempts a pending left throw immediately.
  s.equipped=3;s.ammo[4]={true,1,1};s.leftGrip=false;next();s.leftGrip=true;CHECK(next().busy);
  s.equipped=4;CHECK(next().leftCrate);s.rightGrab=true;f=next();CHECK(!f.busy&&!f.holster&&!f.fire);s.rightGrab=false;
+ // Buffer a brief early squeeze, but never grab from a long-held grip.
+ const auto slot=BodySlots()[3];
+ const auto resetGrab=[&](){policy.Reset();s.active=s.leftCrates=s.leftTracked=true;s.owner=7;s.equipped=3;
+  s.rightGrab=s.leftGrip=false;s.ammo[4]={true,1,1};s.left.position=slot.offset;s.left.position.x-=.5f;next();next();};
+ resetGrab();s.leftGrip=true;CHECK(!next().busy);
+ for(int i=0;i<8;++i)CHECK(!next().busy);
+ s.left.position=slot.offset;f=next();CHECK(f.select==4&&f.selectionTime==s.time);
+ resetGrab();s.leftGrip=true;next();for(int i=0;i<13;++i)next();
+ s.left.position=slot.offset;CHECK(!next().busy);s.leftGrip=false;next();s.leftGrip=true;CHECK(next().busy);
+ // Release cancels the buffer; the padded radius remains tightly bounded.
+ resetGrab();s.leftGrip=true;next();s.leftGrip=false;next();s.left.position=slot.offset;CHECK(!next().busy);
+ s.left.position.x-=slot.radius+.04f;s.leftGrip=true;CHECK(!next().busy);
+ s.left.position.x+=.02f;CHECK(next().select==4);
+ // Unready inventory cannot be grabbed, even with a buffered grip.
+ resetGrab();s.ammo[4]={false,1,1};s.leftGrip=true;next();s.left.position=slot.offset;f=next();CHECK(!f.busy&&f.unavailable[4]);
+ s.ammo[4]={true,1,0};f=next();CHECK(!f.busy&&f.unavailable[4]);
+ // Every interruption cancels the intent. A held squeeze must not re-arm it.
+ for(int cancel=0;cancel<6;++cancel){
+  resetGrab();s.leftGrip=true;next();
+  switch(cancel){case 0:s.leftTracked=false;break;case 1:++s.owner;break;case 2:s.rightGrab=true;break;
+   case 3:s.leftCrates=false;break;case 4:s.active=false;break;case 5:s.time+=300000000;break;}
+  CHECK(!next().busy);s.leftTracked=s.leftCrates=s.active=true;s.rightGrab=false;
+  s.left.position=slot.offset;CHECK(!next().busy);
+  s.leftGrip=false;next();s.leftGrip=true;CHECK(next().busy);
+ }
  // Reproduce crate -> empty -> immediate rifle draw at different headset rates.
  for(int hz:{72,90,144,240}){
   SupportCrates crates;WeaponGrip hands;SupportObservation o=s;o.owner=900+hz;o.time=1000000000;o.equipped=3;o.leftGrip=false;o.leftTracked=true;o.active=true;o.rightGrab=false;o.ammo[4]={true,1,1};
@@ -44,6 +69,28 @@ int main(){
   right.pressed=right.slotGrab=o.rightGrab=true;c=frame();CHECK(!c.busy&&!c.holster&&hands.ResolveSupport(c,o.time));
   o.rightGrab=right.slotGrab=false;o.equipped=3;
   for(int i=0;i<hz*2;++i){c=frame();CHECK(!c.busy&&!c.holster&&hands.ResolveSupport(c,o.time));}
+ }
+ // A rifle stays selected and usable for as long as the offhand box is held.
+ for(int hz:{72,90,144,240}){
+  SupportCrates q;SupportObservation o=s;o.owner=1000+hz;o.equipped=3;o.time=1000000000;
+  o.keepWeapon=true;o.active=o.leftCrates=o.leftTracked=true;o.rightGrab=o.leftGrip=false;
+  o.ammo[4]={true,1,1};o.left.position=BodySlots()[3].offset;
+  const auto step=[&](){o.time+=1000000000/hz;return q.Update(o);};step();o.leftGrip=true;auto c=step();
+  CHECK(c.preview&&c.busy&&!c.blockFire&&!c.select&&!c.leftCrate);
+  for(int i=0;i<hz;++i){c=step();CHECK(c.preview&&!c.blockFire&&!c.select);}
+  o.leftGrip=false;c=step();const auto release=o.left.position;
+  CHECK(c.select==4&&c.blockFire&&!c.fire&&!c.throwNow);
+  o.equipped=4;o.throwReady=false;c=step();CHECK(c.leftCrate&&!c.preview&&!c.fire);
+  o.left.position={4,5,6};o.throwReady=true;c=step();CHECK(c.throwNow&&c.fire&&c.throwPose.position.x==release.x);
+  CHECK(!q.Update(o).throwNow);o.ammo[4]={true,0,0};c=step();CHECK(c.select==3&&c.blockFire&&!c.holster&&!c.fire);
+  o.equipped=3;c=step();CHECK(!c.busy&&!c.blockFire&&!c.holster&&!c.select);
+  for(int i=0;i<hz;++i)CHECK(!step().busy);
+  // A deliberate grab and every focus/tracking/owner interruption cancel it.
+  for(int interrupt=0;interrupt<4;++interrupt){
+   q.Reset();o.equipped=3;o.keepWeapon=true;o.leftGrip=o.rightGrab=false;o.active=o.leftTracked=true;o.ammo[4]={true,1,1};o.left.position=BodySlots()[3].offset;step();o.leftGrip=true;CHECK(step().preview);
+   if(interrupt==0)o.rightGrab=true;else if(interrupt==1)o.leftTracked=false;else if(interrupt==2)o.active=false;else ++o.owner;
+   c=step();CHECK(!c.preview&&!c.fire&&!c.select&&!c.busy);
+  }
  }
  CHECK(!SupportCrateWeapon("unl_grenade_frag"));puts("Support grab, throw, native cooldown, empty hands and interruption guards passed.");return 0;
 }

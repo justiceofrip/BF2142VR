@@ -1,5 +1,100 @@
 # BFVR Changelog
 
+## BF2142 VR 0.2.0-beta.4 (2026-10-03)
+
+Accepted gameplay and rendering work merged into the main VR build:
+- GPU transfer for menus/spawn and supported ADS, with scope HUD/reticle fixes.
+- Stock and unlock optic coverage, including SMG dots and launcher sights.
+- Hide the Conquest ticket counter while aiming; keep minimap and health.
+- Correct repair-added inner weapon surfaces to reduce light/dark shimmer.
+  Preserve original exteriors and animation parts; fix PAC pistol mesh bounds.
+- Correct empty-hand finger roll and widen the PAC launcher support-grip gate.
+- More reliable holster selection: buffered grabs, grip hysteresis, bounded
+  retries only while the requested item is not equipped; preserve fire mode.
+- Hold a medical/ammo crate in the left hand while using an equipped gun.
+  Release deploys it through the native item, briefly pauses gun fire, then
+  restores the previous gun. Native ammo/cooldowns remain authoritative.
+
+One launcher: Play VR, Check for updates, Install / Update, Repair, and reports.
+Checking compares installed mod files with the publisher-signed release hashes.
+Updates preserve settings, original backups and verified repair progress.
+Save error report exports installation diagnostics with common personal paths
+and credentials redacted. Report on GitHub opens a draft; nothing auto-uploads.
+
+Owner accepted the current headset test on 2026-10-03; the initial PAC grip/swap
+report cleared in the same session. This is not validation of every gun/headset.
+The held offhand crate preview is local; observers see normal native deployment.
+The separate flat/community helper retains its existing release/runtime.
+This does not guarantee every headset or long-session behavior. No game files, maps or texture pack are included.
+See CHECKS.txt in the release for exact package validation.
+
+## Unreleased BF2142 interaction candidate (2026-10-03)
+
+- Keep an equipped gun usable while holding a left-hand med/ammo box. A local
+  prop follows the palm until release; native deployment briefly owns firing,
+  then restores the previous gun. Native ammunition/cooldowns remain authoritative.
+  Empty-hand throws retain empty-hand completion; deliberate right grabs cancel.
+- Retry missed weapon selection at bounded intervals only while the live native
+  inventory reports a different item. Acknowledgement closes the gesture;
+  active-slot grabs cannot cycle fire mode. Add grip release hysteresis and
+  preserve pending grabs across repeated samples of the same XR frame.
+- Accept the authored wider PAC AA/AT launcher support handle without changing
+  the firing-hand binding or weakening the rifle deploy-pose check.
+- Both architecture builds and all 76 native tests pass, including multi-rate
+  crate lifecycle and input-API ordering checks. Offhand GPU rendering passes
+  stereo/state restoration/reset checks. Headset confirmation is pending.
+- PAC pistol rear-sight protrusion fix was accepted by the owner in VR.
+  Separate thin-shell geometry candidate retains all exterior surfaces and
+  bounds protection; residual shimmer still requires a new headset check.
+  No release or installer geometry change is published by this candidate.
+
+## Unreleased BF2142 repaired-mesh bounds correction (2026-10-03)
+
+- Expand first-person mesh bounds after moving repair-added surfaces. Prevent
+  signed 16-bit position overflow that turns the PAC pistol's underside into a
+  tall dark plate near its rear sight. Keep its original sight geometry intact.
+- Preserve original exterior, textures, animation parts and world geometry.
+  Include regressions for out-of-range unused vertices and installer upgrade
+  identities. CPU reproduction passes; owner confirmed the PAC pistol fix in VR.
+- Slight residual surface shimmer remains open. No public release change.
+
+## Unreleased BF2142 hand and holster candidate (2026-10-03)
+
+- Accept a deliberate right-hand squeeze up to 200 ms before entering a
+  holster. Acquire once on entry, including when the squeeze is already held;
+  cancel on release, tracking loss, menu interruption or expiry. A long-held
+  fist cannot sweep through slots and repeatedly switch weapons.
+- Straighten and curl empty-hand fingers around a consistent anatomical hinge
+  to reduce the right-hand knuckle/tip twist inherited from gun animations.
+  Preserve segment lengths, wrist transforms, weapon grip and pistol support.
+- Keep single-delivery native selection, active-slot fire-mode protection,
+  native firing/equip timing and the accepted ADS ticket filter unchanged.
+- Both architecture builds and all 76 native tests pass. Owner accepted the
+  hands in VR; holster reliability remains unconfirmed. No public release change.
+
+## Unreleased BF2142 weapon surface correction (2026-10-03)
+
+- Separate repair-added inner weapon surfaces inward by 0.5 mm to prevent
+  light/dark surface flicker. Preserve original exterior vertices, completed
+  sides, scope materials, rig attributes and world models across all 28 repairs.
+- Update the installer repair identities and upgrade existing repaired archives
+  with a verified rollback copy. Preserve the original uninstall backup.
+- The smooth-normal correction passed desktop checks but further VR testing
+  still found flicker. A separate per-face geometry candidate improves it;
+  slight residual flicker and the PAC sight remain under evaluation. The
+  installer geometry below is not a final headset-validated fix. Not published.
+
+## Unreleased BF2142 kit-grab and ADS ticket candidate (2026-10-03)
+
+- Hide the stock top conquest/coop ticket counter while aiming through a VR
+  optic; restore it at hip and in menus. Minimap, health/ammo, scope artwork,
+  Titan health and commander UI retain their existing behavior.
+- Allow squeezing up to 250 ms before reaching a ready left-hand ammo/medkit
+  slot, with 3.5 cm extra grab tolerance for crates only. Release, tracking loss,
+  owner changes and right-hand grabs cancel the allowance. Native availability,
+  throw velocity, release/fire timing and empty-hand completion are unchanged.
+- Private candidate; headset validation pending. No public release change.
+
 ## Unreleased BF2142 full stock-sight coverage (2026-10-02)
 
 - Complete the stock optical-zoom roster: 24 profiles, including unlock rifles,

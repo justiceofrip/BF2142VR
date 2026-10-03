@@ -12,6 +12,7 @@ class WeaponGrip {
 public:
     bool Update(const WeaponGripInput&) noexcept;
     bool Held() const noexcept {return held;}
+    bool Pressed() const noexcept {return previousPressed;}
     bool ResolveSupport(const SupportFrame&,std::int64_t time) noexcept;
     void Reset() noexcept {*this={};}
     void Holster(std::int64_t time) noexcept {held=false;autoEquipUntil=time+1500000000;}

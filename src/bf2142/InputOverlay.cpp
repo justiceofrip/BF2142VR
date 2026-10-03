@@ -7,7 +7,8 @@ namespace {
 bool NewSelection(const InputOverlayState& s,const EquipmentSelection& c){
     const auto& old=s.consumedSelection;
     return c.owner&&c.gesture>0&&c.item>=1&&c.item<=9&&
-        (old.owner!=c.owner||old.gesture!=c.gesture||old.item!=c.item);
+        (old.owner!=c.owner||old.gesture!=c.gesture||old.item!=c.item||
+         (!s.selectionFinished&&(!c.allowed||c.attempt>old.attempt)));
 }
 LONG AddMotion(LONG a,LONG b) {return static_cast<LONG>(std::clamp<LONGLONG>(LONGLONG(a)+b,LONG_MIN,LONG_MAX));}
 }
@@ -18,7 +19,7 @@ void OverlayDeviceState(InputOverlayState& s,bool keyboard,DWORD bytes,void* dat
         for(size_t i=0;i<c.keys.size();++i){s.physicalKeys[i]=c.blockedPhysicalKeys[i]?0:keys[i];keys[i]=s.physicalKeys[i]|c.keys[i];}
         if(NewSelection(s,c.selection)){
             if(c.selection.allowed)keys[c.selection.item+1]|=0x80;
-            s.consumedSelection=c.selection;
+            s.consumedSelection=c.selection;s.selectionFinished=!c.selection.allowed;
         }
     }
     if(!keyboard && (bytes==sizeof(DIMOUSESTATE) || bytes==sizeof(DIMOUSESTATE2))) {
@@ -62,9 +63,9 @@ void OverlayDeviceEvents(InputOverlayState& s,bool keyboard,DWORD stride,DIDEVIC
         }
         if(NewSelection(s,c.selection)){
             const DWORD scan=c.selection.item+1;
-            if(!c.selection.allowed){if(!peek)s.consumedSelection=c.selection;}
+            if(!c.selection.allowed){if(!peek){s.consumedSelection=c.selection;s.selectionFinished=true;}}
             else if(released&&append(scan,0x80|physicalKeys[scan])){
-                if(!peek){s.consumedSelection=c.selection;s.selectionRelease=scan;}
+                if(!peek){s.consumedSelection=c.selection;s.selectionRelease=scan;s.selectionFinished=false;}
             }
         }
     } else {

@@ -40,7 +40,7 @@ The portable packaging helper builds the standalone setup utility with Python 3.
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Build-PlayerPackage.ps1
 ```
 
-Run both native builds first. Output is a new build/player-candidate/BF2142 VR Beta folder with a payload hash manifest. Existing staging folders are never overwritten. The helper emits a candidate for validation, not a public release. Record the exact package hash and finish the release checklist before publishing. Toolchain paths are removed from distributed PE debug filenames; native executable code is preserved.
+Run both native builds and Build-Installer.ps1 first. Output is a new build/player-candidate/BF2142 VR Beta folder with a payload hash manifest. Existing staging folders are never overwritten. The helper emits a candidate for validation, not a public release. Record the exact package hash and finish the release checklist before publishing. Toolchain paths are removed from distributed PE debug filenames; native executable code is preserved.
 
 ## Run your build
 
@@ -69,7 +69,7 @@ The online join EXE is produced after its signed payload ZIPs, avoiding a self-r
 ## Installer / live updater
 
 See [INSTALLER_UPDATER.md](INSTALLER_UPDATER.md). Build the standalone Windows
-UI with .NET 10 using Build-Installer.ps1 after the player payload is staged.
+UI with .NET 10 using Build-Installer.ps1 before staging the player payload.
 Players need neither .NET nor Python. The update channel serves a signed
 file manifest, with content-addressed release assets. Keep the ECDSA private
 publishing key outside source and release folders. No game assets belong in

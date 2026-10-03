@@ -44,12 +44,27 @@ try {
   if(-not $NoShortcut){
    try {
     $shell=New-Object -ComObject WScript.Shell
-    $linkPath=Join-Path ([Environment]::GetFolderPath('Desktop')) 'Battlefield 2142 VR Beta.lnk'
+    $linkPath=Join-Path ([Environment]::GetFolderPath('Desktop')) 'Battlefield 2142 VR.lnk'
     $link=$shell.CreateShortcut($linkPath)
-    $ps=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $expected='-NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $installed 'tools\Player.ps1')+'" -Action Play'
-    if((Test-Path -LiteralPath $linkPath) -and ($link.TargetPath -ne $ps -or $link.Arguments -ne $expected)){Write-Warning 'An existing Beta shortcut was left untouched. Use Play VR.cmd in the game''s BF2142VR folder.'}
-    else {$link.TargetPath=$ps;$link.Arguments=$expected;$link.WorkingDirectory=$installed;$link.Description='Battlefield 2142 VR Beta';$icon=Join-Path $installed 'generated\BF2142VR.ico';if(Test-Path -LiteralPath $icon){$link.IconLocation=$icon};$link.Save()}
+    $launcher=Join-Path $installed 'BF2142VRSetup.exe'
+    $cache=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'BF2142VR\Updater'
+    [void][IO.Directory]::CreateDirectory($cache)
+    $stream=[IO.File]::OpenRead($launcher);$hasher=[Security.Cryptography.SHA256]::Create()
+    try {$hash=([BitConverter]::ToString($hasher.ComputeHash($stream))).Replace('-','')} finally {$stream.Dispose();$hasher.Dispose()}
+    $cached=Join-Path $cache ('BF2142VR-'+$hash.Substring(0,16)+'.exe')
+    if(-not [IO.File]::Exists($cached)){[IO.File]::Copy($launcher,$cached)}
+    else {
+     $stream=[IO.File]::OpenRead($cached);$hasher=[Security.Cryptography.SHA256]::Create()
+     try {$cacheHash=([BitConverter]::ToString($hasher.ComputeHash($stream))).Replace('-','')} finally {$stream.Dispose();$hasher.Dispose()}
+     if($cacheHash -ne $hash){throw 'Cached VR launcher was modified. Use the downloaded launcher to repair it.'}
+    }
+
+    $launcher=$cached
+
+    # Start once to retain a versioned launcher outside the install directory.
+    # Subsequent updates can replace the runtime without locking this UI.
+    $link.TargetPath=$launcher;$link.Arguments='--game "'+$GameDir+'"';$link.WorkingDirectory=$GameDir;$link.Description='Battlefield 2142 VR launcher and updater';$link.Save()
+
    } catch {Write-Warning 'Could not create the desktop shortcut. Use Play VR.cmd in the game''s BF2142VR folder.'}
   }
   Write-Host "Ready: $installed\Play VR.cmd"

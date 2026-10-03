@@ -282,7 +282,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     const bool gripTracked=(right.flags&gripFlags)==gripFlags;
     if(!settings.toggleWeaponGrip || (accepted && gameplay && !showMenu && !mounted && !inventoryValid))weaponGrip.Reset();
     bool held=weaponGrip.Update({settings.toggleWeaponGrip && inventoryValid && gripTracked && !command.recenter,
-        std::isfinite(right.squeezeValue)&&right.squeezeValue>.65f,body.selected>=0,inventoryOwner,sample.predictedDisplayTime,equippedItem});
+        std::isfinite(right.squeezeValue)&&right.squeezeValue>(weaponGrip.Pressed()?.35f:.65f),body.selected>=0,inventoryOwner,sample.predictedDisplayTime,equippedItem});
     RadioObservation radioObs;radioObs.active=inventoryValid&&body.anchorValid&&!command.recenter&&foregroundPid==GetCurrentProcessId();
     radioObs.leftAvailable=!supportFrame.busy;radioObs.owner=inventoryOwner;radioObs.anchor=body.anchor;radioObs.sample=sample;
     radioFrame=shoulderRadio.Update(radioObs);
@@ -291,6 +291,11 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     if(radioFrame.click)InterlockedIncrement(&b->hapticRadioLeftSequence);
     SupportObservation obs;obs.active=inventoryValid&&body.anchorValid&&!command.recenter;
     obs.rightGrab=body.selected>=0;obs.leftCrates=settings.leftSupportCrates;obs.owner=inventoryOwner;obs.time=sample.predictedDisplayTime;
+    obs.throwReady=NativeSupportLaunchReady();
+    const std::string_view equippedName=equippedItem>0&&equippedItem<10?inventoryNames[equippedItem].data():"";
+    for(const auto suffix:{"_rifle","_handgun","_sni","_smg","_mg","_av","_aa","_rocket"}){
+        const std::string_view end=suffix;if(equippedName.size()>=end.size()&&equippedName.substr(equippedName.size()-end.size())==end)obs.keepWeapon=held&&bodyActive&&bodyEquipment.ModelCount()>0;
+    }
     obs.equipped=equippedItem;obs.names=inventoryNames;obs.anchor=body.anchor;obs.left=Pose(sample.hands[0].gripPose);
     obs.leftTracked=!radioFrame.held&&(sample.hands[0].flags&gripFlags)==gripFlags;
     obs.leftGrip=std::isfinite(sample.hands[0].squeezeValue)&&sample.hands[0].squeezeValue>.65f;
@@ -310,7 +315,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
         InterlockedIncrement(&b->hapticEquipmentRightSequence);
     if(leftEquipmentCue.Update(equipmentFocused&&obs.leftTracked&&obs.leftCrates,supportFrame.hovered,
         supportFrame.busy&&!wasCrateBusy,sample.predictedDisplayTime))InterlockedIncrement(&b->hapticEquipmentLeftSequence);
-    if(supportFrame.busy){
+    if(supportFrame.blockFire){
         command.buttons[0]=supportFrame.fire?0x80:0;command.buttons[1]=0;
         command.blockedPhysicalButtons[0]=command.blockedPhysicalButtons[1]=1;
         if(supportFrame.select>0&&supportFrame.select<10)
@@ -343,6 +348,8 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     voice::PublishControls(voice::VoicePreferences(settings),accepted&&gameplay&&!showMenu&&!command.recenter&&runtimeFocus.value_or(false)&&foregroundPid==GetCurrentProcessId(),radioFrame.pressed);
     wristMenu.Apply(command,showMenu);
     if(desktop)BlockDesktopHotkeys(command);
+    if(command.selection.gesture>0&&sample.predictedDisplayTime>=command.selection.gesture)
+        command.selection.attempt=unsigned((sample.predictedDisplayTime-command.selection.gesture)/180000000);
     if(accepted)PublishControllerCommand(command,true);else {ClearControllerCommand();ClearNativeHands();}
     return true;
 }
@@ -690,7 +697,10 @@ bool ReadStereoMarkerFrame(EyeCamera* head,EyeCamera* eye) {
 bool IsSecondStereoEye() { return insideRender && activeEye>0; }
 bool IsScopeRender() {return insideRender && activeEye==2;}
 bool StereoHudBegin(bool standaloneMenu) {
-    if (!enabled || !gameDevice || uiCapture.Active() || IsScopeRender()) return false;
+    if (!enabled || !gameDevice) {SetAdsTicketsHidden(false);return false;}
+    if (uiCapture.Active() || IsScopeRender()) return false;
+    GunOptic ticketOptic;
+    SetAdsTicketsHidden(insideRender && activeEye>=0 && activeEye<2 && !menuPointer.Active() && ReadNativeOptic(&ticketOptic));
     if(!insideRender && (!standaloneMenu || !lastRenderer || !NativeWorldActive(lastRenderer) || (!diagnostic && !menuPointer.MenuVisible())))return false;
     // A native Flash/HUD boundary is positive evidence of UI. While paused it
     // can execute without NativeRender; capture just that batch, never the full
@@ -703,8 +713,12 @@ bool StereoHudBegin(bool standaloneMenu) {
         bodyGpuDrawn=true;stereo::Matrix4 projection{};
         if(ReadNativeWeaponProjection(&projection)){
             if(bodyActive){
-                auto visible=inventoryNames;for(int i=1;i<10;++i)if(supportFrame.unavailable[i])visible[i]={};
-                bodyEquipment.DrawGpu(gameDevice,request.views[activeEye],projection,settings.worldScale,bodyFrame,visible,NativeWeaponHeld()?equippedItem:0);
+                auto visible=inventoryNames;for(int i=1;i<10;++i)if(supportFrame.unavailable[i]||(supportFrame.busy&&supportFrame.crateItem==i))visible[i]={};
+                HeldEquipment heldCrate{};const HeldEquipment* prop=nullptr;
+                if(supportFrame.preview&&supportFrame.crateItem>0&&supportFrame.crateItem<10){
+                    heldCrate.name=inventoryNames[supportFrame.crateItem];heldCrate.pose=supportFrame.heldPose;prop=&heldCrate;
+                }
+                bodyEquipment.DrawGpu(gameDevice,request.views[activeEye],projection,settings.worldScale,bodyFrame,visible,NativeWeaponHeld()?equippedItem:0,prop);
             }
             wristGpu.Draw(gameDevice,wristFrame,request.views[activeEye],projection,settings.worldScale);
         }
@@ -776,6 +790,7 @@ void StereoPresent(IDirect3DDevice9* device) {
     } catch (...) { Fail("stereo presentation allocation or runtime exception"); }
 }
 void StereoReset() {
+    SetAdsTicketsHidden(false);
     menuOverlayGpu.Reset();gpuOptics.Reset();gpuFrames.Reset();gpuReady=false;gpuAttempted=false;gpuPair=false;gpuMenuBlocked=false;
     renderTime.Reset();opticHudReady=false;opticHudPixels.clear();opticHudBaseline.clear();
     RestoreFramePacing();

@@ -28,6 +28,44 @@ int main(){
   for(int f=1;f<5;++f){const int tip=wrist+4+4*f;CHECK(curled[tip].values[3][0]*(wrist==7?1.f:-1.f)>.02f);}
   curls.fill(0);auto open=bones;CHECK(PoseEmptyFingers(open,wrist,At(),curls));CHECK(Same(open[wrist],curled[wrist]));
  }
+ // Distal segments near 180 degrees must not independently roll inside out
+ // when opened. Exercise mirrored anatomical hinges and bent controller curls.
+ for(int wrist:{7,33})for(float curl:{0.f,.5f,1.f}){
+  auto bones=Rig();bones[wrist]=At();
+  for(int f=0;f<5;++f){
+   const int base=wrist+1+4*f;
+   for(int j=0;j<4;++j)bones[base+j]=At(0,-.09f-j*.025f,(f-2)*.015f);
+   if(f==0)continue;
+   // A small out-of-plane deviation in a folded fingertip used to select a
+   // very different shortest arc than its parent and invert skin orientation.
+   bones[base+3]=At(.0001f,-.1149f,(f-2)*.015f+.0004f);
+   for(int j=0;j<3;++j){
+    float x=bones[base+j+1].values[3][0]-bones[base+j].values[3][0];
+    float y=bones[base+j+1].values[3][1]-bones[base+j].values[3][1];
+    float z=bones[base+j+1].values[3][2]-bones[base+j].values[3][2];
+    const float n=std::sqrt(x*x+y*y+z*z);x/=n;y/=n;z/=n;
+    // Local +Y points along left fingers, -Y along right fingers.
+    const float sign=wrist==7?1.f:-1.f;x*=sign;y*=sign;z*=sign;
+    const float q=std::sqrt(x*x+y*y);CHECK(q>.1f);
+    bones[base+j].values[0]={y/q,-x/q,0,0};bones[base+j].values[1]={x,y,z,0};
+    bones[base+j].values[2]={-x*z/q,-y*z/q,q,0};
+   }
+  }
+  auto posed=bones;std::array<float,5> curls{};curls.fill(curl);CHECK(PoseEmptyFingers(posed,wrist,At(),curls));
+  for(int f=1;f<5;++f){const int base=wrist+1+4*f;
+   for(int j=0;j<3;++j){
+    CHECK(InverseRigid(posed[base+j]));
+    float dot=0,before=0,after=0;
+    for(int k=0;k<3;++k){
+     dot+=posed[base].values[2][k]*posed[base+j].values[2][k];
+     before+=std::pow(bones[base+j+1].values[3][k]-bones[base+j].values[3][k],2.f);
+     after+=std::pow(posed[base+j+1].values[3][k]-posed[base+j].values[3][k],2.f);
+    }
+    CHECK(dot>.99f);CHECK(std::abs(before-after)<.000001f);
+   }
+  }
+  CHECK(Same(bones[wrist],posed[wrist])&&Same(bones[54],posed[54]));
+ }
  const auto native=Rig();HandFrame f;f.head=native[0];f.torso=At();f.leftValid=f.rightValid=true;f.weaponHeld=true;f.fingerPoses=true;
  f.leftGrip=At(-.25f,1.25f,.32f);f.rightGrip=At(.22f,1.3f,.38f);f.leftAim=f.leftGrip;f.rightAim=f.rightGrip;
  f.bindings=CaptureHandBindings(native);f.leftPalm=CaptureControllerHand(native,7);f.rightPalm=CaptureControllerHand(native,33);f.handReference=&native;f.leftCurls.fill(.4f);f.rightCurls.fill(.7f);

@@ -3,6 +3,7 @@ param(
     [string]$X86Build = '',
     [string]$X64Build = '',
     [string]$Destination = '',
+    [string]$Launcher = '',
     [string]$Python = ''
 )
 $ErrorActionPreference = 'Stop'
@@ -11,6 +12,8 @@ if (-not $X86Build) { $X86Build = Join-Path $repo 'build\bf2142-x86' }
 if (-not $X64Build) { $X64Build = Join-Path $repo 'build\bf2142-x64' }
 if (-not $Destination) { $Destination = Join-Path $repo 'build\player-candidate\BF2142 VR Beta' }
 if (Test-Path -LiteralPath $Destination) { throw 'Choose a new destination; candidates are never overwritten.' }
+if (-not $Launcher) { $Launcher = Join-Path $repo 'build\installer-publish\BF2142VRSetup.exe' }
+if (-not (Test-Path -LiteralPath $Launcher -PathType Leaf)) { throw 'Build-Installer.ps1 must run first.' }
 $packageSource = Join-Path $repo 'scripts\bf2142\package'
 $assetsSource = Join-Path $repo 'scripts\bf2142'
 $work = Join-Path $repo ('build\package-tools-' + [guid]::NewGuid().ToString('N'))
@@ -50,6 +53,6 @@ Copy-Item -LiteralPath (Join-Path $X64Build 'BFVRPresenter.exe') -Destination (J
 foreach ($name in @('assets','runtime')) {
     Copy-Item -LiteralPath (Join-Path $X64Build $name) -Destination (Join-Path $checkpoint "x64\$name") -Recurse
 }
-Invoke-Native $pythonExe @((Join-Path $packageSource 'StagePlayer.py'),'--checkpoint',$checkpoint,'--tools',(Join-Path $work 'dist\SetupAssets'),'--python-home',(Split-Path -Parent $Python),'--python-env',$venv,'--destination',$Destination)
+Invoke-Native $pythonExe @((Join-Path $packageSource 'StagePlayer.py'),'--checkpoint',$checkpoint,'--tools',(Join-Path $work 'dist\SetupAssets'),'--python-home',(Split-Path -Parent $Python),'--python-env',$venv,'--destination',$Destination,'--launcher',$Launcher)
 Write-Output "Candidate staged: $Destination"
 Write-Output 'Complete the package release checklist before publishing; this helper does not create a public release.'

@@ -7,6 +7,7 @@
 #include <wrl/client.h>
 namespace bfvr::bf2142 {
 using InventoryNames=std::array<std::array<char,49>,10>;
+struct HeldEquipment {stereo::Pose pose{};std::array<char,49> name{};};
 class BodyEquipment {
 public:
     bool Load(const std::wstring& file) noexcept;
@@ -15,7 +16,7 @@ public:
     // Called inside the native scene, before HUD isolation. Uses the native
     // full-resolution multisample target and restores every device state.
     bool DrawGpu(IDirect3DDevice9*, const shared::SharedPresentationView&,const stereo::Matrix4& projection,
-        float scale,const BodyInventoryResult&,const InventoryNames&,int equipped);
+        float scale,const BodyInventoryResult&,const InventoryNames&,int equipped,const HeldEquipment* held=nullptr);
     void ResetGpu(){device=nullptr;gpuDepth.Reset();for(auto& m:models)for(auto& t:m.materials)t.gpu.Reset();}
     float FaceOpacity(std::string_view name,const stereo::Matrix4& gun,const std::array<stereo::Matrix4,2>& eyes) const;
     size_t ModelCount() const {return models.size();}

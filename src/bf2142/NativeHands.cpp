@@ -158,7 +158,9 @@ void Apply(void* soldier){
     
     // Restore the accepted v16 binding/animation path. Do not replace the
     // native arm/finger pose with a cached weapon-relative ADS pose.
-    const bool wasReady=bindings.supportReady;if(!canopy)bindings.Update(native,GetTickCount64(),!NativeWeaponAds(target.weapon));
+    std::array<char,49> name{};const bool named=WeaponName(target.weapon,&name);
+    const bool wideLauncher=named&&(std::string_view(name.data())=="as_av"||std::string_view(name.data())=="as_aa");
+    const bool wasReady=bindings.supportReady;if(!canopy)bindings.Update(native,GetTickCount64(),!NativeWeaponAds(target.weapon),wideLauncher);
     if(fingersValid)palms.Update(native,!canopy&&bindings.rightReady);
     if(!wasReady && bindings.supportReady)logMessage("Authored firing/support grips settled after weapon draw; controller aim preserved.");
     // Express the same level, recoil-free world frame in skeleton space.
@@ -174,7 +176,7 @@ void Apply(void* soldier){
     if(!Tracked(right))return;
     const auto rg=Compose(trackingCamera,s,Pose(right.gripPose)),ra=Compose(trackingCamera,s,Pose(right.aimPose));if(!rg||!ra)return;
     f.weaponHeld=NativeWeaponHeld()&&!canopy;f.rightGrip=*rg;f.rightAim=*ra;f.rightValid=true;f.knifeGrip=Kind(target.weapon)==MotionKind::Knife;
-    std::array<char,49> name{};f.pistolGrip=WeaponName(target.weapon,&name)&&PistolWeapon(name.data());
+    f.pistolGrip=named&&PistolWeapon(name.data());
     f.leftPalm=palms.left;f.rightPalm=palms.right;
     if(palms.left&&palms.right)f.handReference=&palms.reference;
     if(f.knifeGrip&&!fingersValid)return;
@@ -550,11 +552,15 @@ bool ReadSupportAmmo(std::uint64_t owner,int item,SupportAmmo* out){
         *out={true,rounds,deployable};return true;
     }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
 }
+bool NativeSupportLaunchReady(){
+    FirePose p;AcquireSRWLockShared(&sampleLock);p=firePose;ReleaseSRWLockShared(&sampleLock);
+    return GetTickCount64()-p.tick<100&&IsLocalTrackedWeapon(p.weapon)&&CrateName(p.weapon);
+}
 void PublishNativeSupport(const SupportFrame& f){
     Sample s;FirePose p;AcquireSRWLockShared(&sampleLock);s=current;p=firePose;ReleaseSRWLockShared(&sampleLock);
     CrateThrow next{};
     if(f.throwNow&&s.enabled&&IsLocalTrackedWeapon(p.weapon)&&CrateName(p.weapon)&&GetTickCount64()-p.tick<100){
-        auto hand=Pose(s.input.hands[0].gripPose);const auto origin=Compose(p.tracking,s,hand);
+        auto hand=f.throwPose;const auto origin=Compose(p.tracking,s,hand);
         hand.position.x+=f.throwVelocity.x;hand.position.y+=f.throwVelocity.y;hand.position.z+=f.throwVelocity.z;
         const auto destination=Compose(p.tracking,s,hand);
         if(origin&&destination){

@@ -43,6 +43,13 @@ int main(){
     grip.Holster(grab.time);grab.equipped=7;grab.time+=20000000;CHECK(!grip.Update(grab));
     grab.pressed=false;grab.time+=20000000;grip.Update(grab);grab.pressed=true;grab.slotGrab=true;grab.time+=20000000;CHECK(grip.Update(grab));
     grab.owner++;grab.time+=20000000;CHECK(grip.Update(grab)); // new soldier starts normally
+    // Buffered entry has no new squeeze edge; it still draws exactly once.
+    grip.Reset();grab={true,false,false,77,1000000000,3};grip.Update(grab);
+    grab.pressed=true;grab.time+=16000000;CHECK(!grip.Update(grab));
+    grab.slotGrab=true;grab.time+=16000000;CHECK(grip.Update(grab));
+    grab.slotGrab=false;grab.time+=16000000;CHECK(grip.Update(grab));
+    grab.pressed=false;grab.time+=16000000;CHECK(grip.Update(grab));
+    grab.pressed=true;grab.time+=16000000;CHECK(!grip.Update(grab));
     GrenadeTrajectory trajectory{{0,1.5f,.2f},{0,4,20},5.3955f};
     const auto t=GrenadePoint(trajectory,1);CHECK(t&&std::abs(t->z-20.2f)<.0001f&&std::abs(t->y-(5.5f-2.69775f))<.0001f);
     CHECK(!GrenadePoint(trajectory,-1));trajectory.gravity=std::numeric_limits<float>::quiet_NaN();CHECK(!GrenadePoint(trajectory,1));trajectory.gravity=5.3955f;

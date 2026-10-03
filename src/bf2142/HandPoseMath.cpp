@@ -101,12 +101,26 @@ bool PoseEmptyFingers(HandBones& bones,int wrist,const M& palm,const std::array<
         const int base=wrist+1+finger*4;
         V along=Sub(Pos(bones[base]),Pos(bones[wrist]));along=Unit(Sub(along,Mul(inward,Dot(along,inward))));
         if(Length(along)<.5f)return false;
+        // Use one anatomical hinge for the entire finger. Independent shortest
+        // arcs from a tightly curled grip can flip distal roll when a segment
+        // is nearly opposite the open direction (especially the right hand).
+        V hinge=Unit(Cross(along,inward));
+        const M baseOpen=Multiply(bones[base],RotateFromTo(Sub(Pos(bones[base+1]),Pos(bones[base])),along));
+        if(Dot(hinge,Row(baseOpen,2))<0)hinge=Mul(hinge,-1);
         V position=Pos(bones[base]);constexpr float bend[]={1.15f,2.65f,3.35f};
         for(int joint=0;joint<3;++joint){
             const int b=base+joint;const V source=Sub(Pos(bones[b+1]),Pos(bones[b]));const float length=Length(source);
             if(!std::isfinite(length)||length<.002f||length>.10f)return false;
             const float angle=curl*bend[joint];const V direction=Add(Mul(along,std::cos(angle)),Mul(inward,std::sin(angle)));
-            out[b]=Multiply(bones[b],RotateFromTo(source,direction));SetPos(out[b],position);position=Add(position,Mul(direction,length));
+            const V sourceY=Unit(source);
+            const V sourceZ=Unit(Sub(Row(bones[b],2),Mul(sourceY,Dot(Row(bones[b],2),sourceY))));
+            if(Length(sourceZ)<.5f)return false;
+            const V sourceX=Cross(sourceY,sourceZ),targetX=Cross(direction,hinge);
+            M from=Identity(),to=Identity();
+            from.values[0]={sourceX.x,sourceX.y,sourceX.z,0};from.values[1]={sourceY.x,sourceY.y,sourceY.z,0};from.values[2]={sourceZ.x,sourceZ.y,sourceZ.z,0};
+            to.values[0]={targetX.x,targetX.y,targetX.z,0};to.values[1]={direction.x,direction.y,direction.z,0};to.values[2]={hinge.x,hinge.y,hinge.z,0};
+            const auto inverse=InverseRigid(from);if(!inverse)return false;
+            out[b]=Multiply(bones[b],Multiply(*inverse,to));SetPos(out[b],position);position=Add(position,Mul(direction,length));
         }
         const auto inverse=InverseRigid(bones[base+2]);if(!inverse)return false;
         out[base+3]=Multiply(bones[base+3],Multiply(*inverse,out[base+2]));SetPos(out[base+3],position);

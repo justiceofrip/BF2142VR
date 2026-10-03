@@ -5,15 +5,19 @@ from ctypes import wintypes as w
 import RepairWeaponMeshes as weapons
 import WeaponRepairWorker as repair_worker
 import RemoveInteriorBackfaces as interiors
+import ThinShellBackfaces as separation
 import ExportBodyEquipment as equipment
 import ExportLobbyScene as lobby
 from PIL import Image
 
 APP='BF2142VR'
-VERSION='0.2.0-beta.4-test.8'
+VERSION='0.2.0-beta.4'
 INTRO_MOVIES=tuple('mods/bf2142/Movies/'+name+'.bik' for name in ('Dice','EA','Intro','Legal','Legal_na'))
 STOCK='1a9903113df3fa5b24282ce8d2adbf54ddb58160155b28dea09f26fe85b782f9'
-COMPLETE='e5d605ed915adac29c57840835d900bbc68a3c3ea4a2c7f7077000f6db8c144d'
+LEGACY_COMPLETE='e5d605ed915adac29c57840835d900bbc68a3c3ea4a2c7f7077000f6db8c144d'
+UNBOUNDED_COMPLETE='008dddbf4b9e87f1d108b66d0626bde6468d9a5e7a3d7b04329ac6c71b0ed2b3'
+SMOOTH_COMPLETE='00af68ba109d7a814b89ea0e720a01c575bd6e4319e8e73b32b91dcfaf4ecb8b'
+COMPLETE='d17d482faed629a31872c3a0e9df7698ced9204fd3242e4fab51bc4ec9d81235'
 WEAPONS='mods/bf2142/Objects/Weapons_client.zip'
 
 def sha(path):
@@ -37,6 +41,15 @@ def child(root,relative):
         if part.exists() and (part.is_symlink() or part.is_junction()):raise ValueError('Linked installation paths are unsupported')
     return target
 
+def process_is_active(kernel, handle):
+    # A retained Windows process object may outlive the game. A signaled
+    # process handle is exited even if its cached image name still resolves.
+    state=kernel.WaitForSingleObject(handle,0)
+    if state==0:return False
+    if state==258:return True
+    raise OSError('Cannot determine whether the game has exited')
+
+
 def running(game):
     k=ctypes.WinDLL('kernel32',use_last_error=True)
     class Entry(ctypes.Structure):
@@ -44,6 +57,7 @@ def running(game):
     k.CreateToolhelp32Snapshot.argtypes=[w.DWORD,w.DWORD];k.CreateToolhelp32Snapshot.restype=w.HANDLE
     k.Process32FirstW.argtypes=[w.HANDLE,ctypes.POINTER(Entry)];k.Process32NextW.argtypes=[w.HANDLE,ctypes.POINTER(Entry)]
     k.OpenProcess.argtypes=[w.DWORD,w.BOOL,w.DWORD];k.OpenProcess.restype=w.HANDLE
+    k.WaitForSingleObject.argtypes=[w.HANDLE,w.DWORD];k.WaitForSingleObject.restype=w.DWORD
     k.CloseHandle.argtypes=[w.HANDLE];k.QueryFullProcessImageNameW.argtypes=[w.HANDLE,w.DWORD,w.LPWSTR,ctypes.POINTER(w.DWORD)]
     snap=k.CreateToolhelp32Snapshot(2,0)
     if snap==w.HANDLE(-1).value:raise OSError('Cannot check running games')
@@ -51,9 +65,11 @@ def running(game):
     try:
         while ok:
             if e.szExeFile.lower()=='bf2142.exe':
-                h=k.OpenProcess(0x1000,False,e.th32ProcessID)
+                h=k.OpenProcess(0x101000,False,e.th32ProcessID)
                 if not h:raise RuntimeError('Close BF2142 before setup or uninstall')
                 try:
+                    if not process_is_active(k,h):
+                        ok=k.Process32NextW(snap,ctypes.byref(e));continue
                     buf=ctypes.create_unicode_buffer(32768);n=w.DWORD(len(buf))
                     if not k.QueryFullProcessImageNameW(h,0,buf,ctypes.byref(n)):raise OSError('Cannot identify running game')
                     if Path(buf.value).resolve()==(game/'BF2142.exe').resolve():raise RuntimeError('Close this BF2142 session before setup or uninstall')
@@ -85,7 +101,7 @@ def validate_game(game):
     for name in ['Weapons_client.zip','Vehicles_client.zip','Vehicles_server.zip','Common_client.zip']:
         if not (objects/name).is_file():raise ValueError('Missing stock game archive: '+name)
     original=sha(objects/'Weapons_client.zip')
-    if original not in (STOCK,COMPLETE):raise ValueError('This beta needs the stock BF2142 weapon archive. Use a clean v1.51 installation; Remaster and other weapon packs are not supported yet.')
+    if original not in (STOCK,LEGACY_COMPLETE,UNBOUNDED_COMPLETE,SMOOTH_COMPLETE,COMPLETE):raise ValueError('This beta needs the stock BF2142 weapon archive. Use a clean v1.51 installation; Remaster and other weapon packs are not supported yet.')
     patched=bytearray(data);flags=struct.unpack_from('<H',data,p+22)[0];struct.pack_into('<H',patched,p+22,flags|0x20)
     return original,data,bytes(patched)
 
@@ -107,6 +123,14 @@ def decode(raw,size):
 
 def build_assets(game,stage,original):
     objects=child(game,'mods/bf2142/Objects');source=objects/'Weapons_client.zip';target=stage/'generated/Weapons_client.zip';target.parent.mkdir()
+    if original in (UNBOUNDED_COMPLETE,SMOOTH_COMPLETE):
+        manifest=json.loads(child(game,APP+'/install.json').read_text(encoding='utf-8'))
+        rows=mutations(child(game,APP),manifest)
+        row=next((r for r in rows if r[0]['target']==WEAPONS),None)
+        if row is None or row[0]['original'] not in (STOCK,LEGACY_COMPLETE):
+            raise ValueError('This older private repair needs its verified original weapon backup. Keep all backups and restore the original installation first.')
+        source=row[2];original=row[0]['original']
+
     if original==COMPLETE:shutil.copy2(source,target)
     else:
         found=set()
@@ -115,10 +139,17 @@ def build_assets(game,stage,original):
                 data=src.read(item);name=Path(item.filename).stem.lower()
                 if name in weapons.NAMES and item.filename.lower().endswith('.bundledmesh'):
                     print('Preparing weapon',len(found)+1,'/',len(weapons.NAMES),name,flush=True)
-                    cache_root=Path(os.environ.get('LOCALAPPDATA',Path.home()/'AppData/Local'))/'BF2142VR/WeaponCache'
-                    cache_root.mkdir(parents=True,exist_ok=True)
-                    cache=child(cache_root,COMPLETE)
-                    data=repair_worker.repair_cached(data,name,cache,repair_worker.worker_command());found.add(name)
+                    if original==LEGACY_COMPLETE:
+                        data,_=separation.repair(data)
+                        profile=repair_worker.PROFILES[name]
+                        if len(data)!=profile['size'] or hashlib.sha256(data).hexdigest()!=profile['result']:
+                            raise ValueError('Weapon separation differs from accepted model: '+name)
+                    else:
+                        cache_root=Path(os.environ.get('LOCALAPPDATA',Path.home()/'AppData/Local'))/'BF2142VR/WeaponCache'
+                        cache_root.mkdir(parents=True,exist_ok=True)
+                        cache=child(cache_root,COMPLETE)
+                        data=repair_worker.repair_cached(data,name,cache,repair_worker.worker_command())
+                    found.add(name)
                     print('Repairing weapon',len(found),'/',len(weapons.NAMES),name,flush=True)
                 out.writestr(item,data)
         if found!=weapons.NAMES:raise ValueError('Incomplete weapon repair')
@@ -215,7 +246,7 @@ def install(game,payload):
             child(stage,backup).parent.mkdir(parents=True,exist_ok=True)
             shutil.copy2(source,child(stage,backup))
             changes.append({'target':movie,'backup':backup,'original':sha(source),'installed':None})
-        m={'app':APP,'version':VERSION,'build':'renderer-beta4-test8','game':str(game),'status':'prepared','changes':changes}
+        m={'app':APP,'version':VERSION,'build':'renderer-beta4','game':str(game),'status':'prepared','changes':changes}
         write_json(stage/'install.json',m);running(game)
         for row in changes:
             if sha(child(game,row['target']))!=row['original']:raise ValueError('Game files changed during setup')
@@ -255,6 +286,21 @@ def install_lock(game):
         kernel.CloseHandle(handle)
 
 
+def rollback_weapon_update(game,root,state):
+    change=state.get('weapon')
+    if change is None:return
+    before,after=change.get('before',''),change.get('after','')
+    if any(len(h)!=64 or any(c not in '0123456789abcdef' for c in h) for h in (before,after)):
+        raise ValueError('Invalid weapon update journal')
+    target=child(game,WEAPONS)
+    current=sha(target) if target.exists() else None
+    if current==before:return
+    if current!=after:raise ValueError('Weapon archive changed externally during update; backups retained')
+    backup=child(root,'update-rollback/Weapons_client.zip')
+    if sha(backup)!=before:raise ValueError('Weapon update rollback backup differs')
+    replace_copy(backup,target)
+
+
 def recover_update(game):
     journal=child(game,'.BF2142VR-update.json')
     if not journal.exists():return
@@ -268,6 +314,7 @@ def recover_update(game):
             if m.get('status')=='installed':
                 mutations(final,m);journal.unlink();return
             if not previous.exists():raise ValueError('Interrupted update is missing its rollback runtime')
+            rollback_weapon_update(game,final,state)
             failed=child(game,'.BF2142VR-interrupted-'+token)
             final.rename(failed)
         elif previous.exists():raise ValueError('Conflicting interrupted update; preserve both installation folders')
@@ -292,6 +339,7 @@ def update(game,payload):
     previous=child(game,'.BF2142VR-previous-'+token)
     journal=child(game,'.BF2142VR-update.json')
     moved=False;activated=False
+    transaction={'app':APP,'transaction':token}
     try:
         for rel in manifest['files']:
             dest=child(stage,rel);dest.parent.mkdir(parents=True,exist_ok=True)
@@ -303,15 +351,28 @@ def update(game,payload):
             dest=child(stage,row['backup']);dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(backup,dest)
         settings=child(final,'BF2142VR.ini')
         if settings.exists():shutil.copy2(settings,stage/'BF2142VR.ini')
-        updated=dict(m,version=VERSION,build='renderer-beta4-test8',status='prepared',transaction=token)
+        updated=dict(m,version=VERSION,build='renderer-beta4',status='prepared',transaction=token)
+        updated['changes']=[dict(row) for row in m['changes']]
+        weapon_row=next(row for row in updated['changes'] if row['target']==WEAPONS)
+        generated=stage/'generated/Weapons_client.zip'
+        generated_hash=sha(generated)
+        if generated_hash!=weapon_row['installed']:
+            rollback=child(stage,'update-rollback/Weapons_client.zip');rollback.parent.mkdir()
+            shutil.copy2(child(game,WEAPONS),rollback)
+            if sha(rollback)!=weapon_row['installed']:raise ValueError('Weapon changed during update staging')
+            transaction['weapon']={'before':weapon_row['installed'],'after':generated_hash}
+            weapon_row['installed']=generated_hash
         write_json(stage/'install.json',updated)
         running(game)
         if not all(current==row['installed'] for row,_,_,current in mutations(final,m)):
             raise ValueError('Game files changed during update')
-        write_json(journal,{'app':APP,'transaction':token})
+        write_json(journal,transaction)
         final.rename(previous);moved=True
         stage.rename(final);activated=True
-        refresh_settings(final);payload_files(final);mutations(final,updated)
+        refresh_settings(final);payload_files(final)
+        if 'weapon' in transaction:
+            replace_copy(final/'generated/Weapons_client.zip',child(game,WEAPONS))
+        mutations(final,updated)
         updated['status']='installed';write_json(final/'install.json',updated)
         journal.unlink()
         print('Updated Battlefield 2142 VR: '+str(final),flush=True)
@@ -319,7 +380,9 @@ def update(game,payload):
         return final
     except BaseException:
         if moved:
-            if activated:final.rename(stage)
+            if activated:
+                rollback_weapon_update(game,final,transaction)
+                final.rename(stage)
             previous.rename(final)
         if journal.exists():journal.unlink()
         raise

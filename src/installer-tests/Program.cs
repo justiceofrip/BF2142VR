@@ -36,11 +36,21 @@ try {
  Refuse(()=>store.RemoveStage(root),"unsafe cleanup");
  var freshHandler=new FakeHttp(content);using var freshFeed=new ReleaseFeed(freshHandler);var freshStore=new UpdateStore(Path.Combine(root,"reuse"),freshFeed);string installed=Path.Combine(root,"installed");Directory.CreateDirectory(installed);
  foreach(var file in updated.Files){string dest=ReleaseFeed.Inside(installed,file.Path);Directory.CreateDirectory(Path.GetDirectoryName(dest)!);File.WriteAllBytes(dest,content[file.Url]);}
+ Check(InstalledRelease.Check(installed,updated.Version,updated).Damaged.Length==0,"signed installation intact");
+ File.WriteAllText(Path.Combine(installed,"tools","Player.ps1"),"broken");
+ var damaged=InstalledRelease.Check(installed,updated.Version,updated);Check(damaged.SameVersion&&damaged.Damaged.SequenceEqual(new[]{"tools/Player.ps1"}),"same-version tampering detected");
+ Check(!InstalledRelease.Check(installed,"old",updated).SameVersion,"new release distinguished from repair");
+ File.WriteAllBytes(Path.Combine(installed,"tools","Player.ps1"),content[changed.Url]);
  string reused=await freshStore.Acquire(updated,installed,progress,CancellationToken.None);Check(freshHandler.Requests==0,"reuse verified installed files");freshStore.RemoveStage(reused);
  content[files[0].Url]=Encoding.UTF8.GetBytes("truncated");var badStore=new UpdateStore(Path.Combine(root,"bad"),freshFeed);await RefuseAsync(()=>badStore.Acquire(release,null,progress,CancellationToken.None),"truncated download");
  Check(Directory.GetDirectories(Path.Combine(root,"bad"),"payload-*").Length==0,"failed stage removed");
  using var cancelled=new CancellationTokenSource();cancelled.Cancel();await RefuseAsync(()=>freshStore.Acquire(updated,null,progress,cancelled.Token),"cancel");
 }finally{Directory.Delete(root,true);}
+var report=Diagnostics.CreateReport("v1","v2","password=secret123\nBearer abc.def\nname@example.com\nC:\\Users\\Somebody\\Game\\file.py\nexit 0xC0000005", "Verified mesh abcdef1234", @"D:\PrivateGame");
+foreach(string secret in new[]{"secret123","abc.def","name@example.com","Somebody"})Check(!report.Contains(secret),"report removes "+secret);
+Check(report.Contains("0xC0000005")&&report.Contains("Verified mesh abcdef1234"),"diagnostics retain actionable error/hash");
+Check(Diagnostics.IssueUrl("v1 & injected","report.txt").StartsWith("https://github.com/justiceofrip/BF2142VR/issues/new?title="),"issue destination fixed");
+Check(!Diagnostics.IssueUrl("v1 & injected","report.txt").Contains(" & "),"issue fields escaped");
 Console.WriteLine($"PASS: {checks} installer feed/cache/update checks");
 sealed class FakeHttp(Dictionary<string,byte[]> files):HttpMessageHandler {
  public int Requests;

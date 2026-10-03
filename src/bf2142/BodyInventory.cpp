@@ -27,11 +27,11 @@ BodyInventoryResult BodyInventory::Update(bool enabled,const shared::SharedContr
         shared::kControllerHandFlagGripOrientationValid|shared::kControllerHandFlagGripPositionTracked|shared::kControllerHandFlagGripOrientationTracked;
     const auto& right=sample.hands[1];
     const auto normalized=stereo::MakeRelativePose(stereo::Pose{{0,0,0},{0,0,0,1}},head);
-    const bool pressed=(right.flags&shared::kControllerHandFlagSqueezeActive)&&std::isfinite(right.squeezeValue)&&right.squeezeValue>.65f;
+    const bool pressed=(right.flags&shared::kControllerHandFlagSqueezeActive)&&std::isfinite(right.squeezeValue)&&right.squeezeValue>(gripHeld?.35f:.65f);
     if(!enabled || !(sample.flags&shared::kControllerSampleFlagSessionFocused) || !normalized || sample.predictedDisplayTime<=0){
         // Keep torso heading through a brief menu/tracking interruption; cancel
         // all interaction edges. Recenter/respawn explicitly resets the anchor.
-        gripTracked=false;pendingKey=0;keyUntil=0;lastTime=0;return result;
+        gripTracked=false;pendingKey=0;keyUntil=0;grabPressUntil=0;lastTime=0;return result;
     }
     const auto q=normalized->orientation;
     // Flatten the actual forward vector, not UI Euler yaw. The latter changes
@@ -40,7 +40,7 @@ BodyInventoryResult BodyInventory::Update(bool enabled,const shared::SharedContr
     const float horizontal=std::hypot(forwardX,forwardZ);
     const float yaw=horizontal>.2f?std::atan2(-forwardX,-forwardZ):bodyYaw;
     const LONGLONG now=sample.predictedDisplayTime;
-    const bool gap=!lastTime || now<=lastTime || now-lastTime>250000000;
+    const bool gap=!lastTime || now<lastTime || now-lastTime>250000000;
     const float dt=gap?0:std::min(.05f,float(now-lastTime)*1.e-9f);lastTime=now;
     if(!initialized){initialized=true;bodyYaw=yaw;}
     // Looking down at a holster or reaching it must not rotate it out of reach.
@@ -57,10 +57,10 @@ BodyInventoryResult BodyInventory::Update(bool enabled,const shared::SharedContr
     const auto neck=rotate(q,{0,-.12f,.08f}),upright=rotate(result.anchor.orientation,{0,-.12f,.08f});
     result.anchor.position.x+=neck.x-upright.x;result.anchor.position.y+=neck.y-upright.y;result.anchor.position.z+=neck.z-upright.z;
     result.anchorValid=true;
-    if((right.flags&tracked)!=tracked){gripTracked=false;pendingKey=0;keyUntil=0;gripHeld=false;return result;}
+    if((right.flags&tracked)!=tracked){gripTracked=false;pendingKey=0;keyUntil=0;grabPressUntil=0;gripHeld=false;return result;}
     const auto hand=stereo::MakeRelativePose(result.anchor,Pose(right.gripPose));
-    if(!hand){gripTracked=false;pendingKey=0;keyUntil=0;gripHeld=false;return result;}
-    if(gap || !gripTracked){gripHeld=pressed;pendingKey=0;keyUntil=0;}
+    if(!hand){gripTracked=false;pendingKey=0;keyUntil=0;grabPressUntil=0;gripHeld=false;return result;}
+    if(gap || !gripTracked){gripHeld=pressed;pendingKey=0;keyUntil=0;grabPressUntil=0;}
     gripTracked=true;
     float best=1;
     for(unsigned i=0;i<slots.size();++i){
@@ -70,18 +70,24 @@ BodyInventoryResult BodyInventory::Update(bool enabled,const shared::SharedContr
         const float distance=(dx*dx+dy*dy+dz*dz)/(slot.radius*slot.radius);
         if(std::isfinite(distance)&&distance<best){best=distance;result.hovered=int(i);}
     }
-    if(pressed && !gripHeld && result.hovered>=0){
+    // A squeeze begun just before entering a holster is the same intentional
+    // grab. Consume it once; a held grip must never sweep across several slots.
+    if(!pressed)grabPressUntil=0;
+    if(pressed&&!gripHeld)grabPressUntil=now+200000000;
+    if(pressed && grabPressUntil && now<=grabPressUntil && result.hovered>=0){
+        grabPressUntil=0;
         result.selected=result.hovered;
         // Selecting the already equipped slot cycles its native fire mode.
         // A holstered VR gun is still equipped in BF2142: grab it without a key.
         pendingItem=slots[result.hovered].item;
         pendingKey=pendingItem==unsigned(equippedItem)?0:scanCodes[pendingItem];
-        keyUntil=now+120000000;
+        selectionTime=now;keyUntil=now+900000000;
     }
     gripHeld=pressed;
-    // End the selection pulse as soon as the game acknowledges the new item.
-    if(pendingItem==unsigned(equippedItem))pendingKey=0;
-    if(now<keyUntil){result.key=pendingKey;if(result.key)result.selectionTime=keyUntil-120000000;}else pendingKey=0;
+    // Stop retries on acknowledgement or inventory removal. The native input
+    // adapter also checks the live equipped slot immediately before delivery.
+    if(pendingItem==unsigned(equippedItem)||pendingItem>=inventory.size()||!inventory[pendingItem])pendingKey=0;
+    if(now<keyUntil){result.key=pendingKey;if(result.key)result.selectionTime=selectionTime;}else pendingKey=0;
     return result;
 }
 }

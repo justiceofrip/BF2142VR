@@ -1,5 +1,150 @@
 # BFVR AI and Developer Handoff
 
+## Accepted beta.4 merge (2026-10-03)
+
+Supersedes the pending-headset status in the earlier private candidate notes.
+Owner reported crates with a gun working, shimmer apparently fixed, then all
+interactions working after an initial PAC grip/old-weapon transition report.
+No further native edits were made after that acceptance. Preserve that runtime.
+ThinShellBackfaces + PlaneSeparatedBackfaces are now the installer geometry
+path. Their output must match the accepted 28 per-mesh identities and complete
+archive hash. Keep original surfaces and world LODs untouched. Legacy public
+completed archives can be upgraded directly. Older private smooth-offset
+archives require their verified stock/legacy backup; never offset them twice.
+
+Launcher keeps a versioned copy outside the mutable runtime directory. Signed
+feed schema/channel remain compatible with existing updaters. Check hashes
+against the signed release, never trust only an installed version string.
+Diagnostics collect launcher/setup text only, redact common personal data,
+and are exported by the user. GitHub button opens a draft, never submits or
+uploads. No account, game, generated-asset or microphone collection.
+
+## Offhand crates and acknowledged selection (2026-10-03, private candidate)
+
+SupportCrates can defer equipping a crate while a supported gun is held. The
+local body-equipment GPU renderer draws its held preview; native support grip
+is consumed, while gun trigger input stays native. Release caches the left pose
+and velocity, then selects the crate. Wait for a fresh tracked crate fire pose
+before issuing the native throw, and restore the prior gun after ammo depletion.
+This deliberately pauses gun firing during deployment. It does not fire inactive
+inventory objects or alter fire timers, ammo, server logic or wire protocol.
+The preview is local; remote clients see existing native deployment behavior.
+Right-hand grabs, focus/tracking/owner loss cancel the operation. Preserve the
+one-shot empty-hand holster for grabs begun without a gun.
+
+BodyInventory now retains unacknowledged intent for up to 900 ms, with one input
+attempt per 180 ms. Never renew the gesture timestamp each frame. DirectInput
+state/event paths share attempt ownership; ControllerInput re-reads the actual
+native equipped slot on delivery. Once acknowledged, InputOverlay latches that
+gesture complete even if a stale later sample says otherwise. This supersedes
+the former single-attempt policy below; never retry active-slot selection.
+Repeated XR timestamps are not tracking gaps. Grip hysteresis releases below
+0.35 after pressing above 0.65, consistently in inventory and WeaponGrip.
+
+HandBindingCache permits up to 48 cm lateral separation only for as_av/as_aa.
+Owned stand-animation inspection establishes their 41.6 cm side handle; the
+rifle limit remains 30 cm. Forward, distance, stable-draw and ADS checks remain.
+Do not modify authored grip positions or the accepted hand solver for this fix.
+
+Both builds, full 76-test suite, and the native Ex equipment GPU smoke pass.
+Actual in-headset interactions remain unconfirmed. A private thin-shell mesh
+candidate limits per-face inset against the nearest opposing surface of the
+same rigid part; sub-quantization inner faces are discarded, exteriors retained.
+9 synthetic geometry tests and all 28 owned-mesh preservation/bounds checks pass.
+Do not promote that mesh algorithm into installer repair identities until the
+headset shimmer comparison succeeds. Preserve the accepted pistol bounds fix.
+
+## Repaired weapon bounds and PAC pistol protrusion (2026-10-03)
+
+The private per-face candidate left LOD bounds unchanged after moving added
+vertices. Owned GPU capture confirms the native signed-short position scale
+uses the union of recorded mesh extents. The PAC pistol has 21 out-of-range
+vertices: packing its offset magazine underside wraps negative Y upward and
+reproduces the reported tall dark plate by the rear sight. Donor sight trimming
+did not fix it; restore those surfaces. This is a bounds error, not damaged art.
+
+expand_first_person_bounds includes every encoded vertex (even unused ones),
+expands without shrinking existing extents, retains part counts, and leaves
+world LOD geometry/bounds unchanged. Apply after the last position change.
+Both smooth-normal source and private per-face candidates are corrected;
+installer identities/upgrade input recognize the prior unbounded source output.
+CPU packed-position reproduction is clean; owner confirmed the PAC pistol in VR.
+This does not establish that the separate faint shimmer is resolved.
+
+## Local hand roll and early holster grabs (2026-10-03, private candidate)
+
+BodyInventory retains an intentional right squeeze for at most 200 ms before
+slot contact, then consumes that intent once. This is separate from the existing
+120 ms selection publication and stable SelectionTime. WeaponGrip must accept
+the resulting one-shot slotGrab even without a new squeeze edge on that frame.
+Never renew a selection gesture each sample or retry it by repeating slot keys:
+that previously toggled fire mode and restarted native equip transitions.
+Release, invalid tracking/focus and time discontinuities cancel pending intent.
+
+PoseEmptyFingers uses a common anatomical hinge for each non-thumb finger,
+mapping both segment direction and bend axis rather than unrelated shortest
+arcs at every joint. A deeply curled, slightly nonplanar right finger can otherwise
+twist when opened. Preserve original lengths and bone-to-segment alignment,
+the thumb path, wrist/weapon transforms and pistol cup placement. Changes are
+local empty/free-hand posing; this does not replace remote-player IK.
+Mirrored folded-finger, early-grab/cancellation and subsequent-swap regressions
+pass with the full 76-test suite and both builds. Owner accepted the empty-hand
+appearance in VR; holster reliability remains unconfirmed. Retain that runtime.
+
+## Repair-added weapon surface flicker (2026-10-03)
+
+Status update: the smooth-normal installer correction described below was
+desktop-clean but still shimmered in VR. A private candidate translating each
+reverse triangle along its geometric face normal substantially improved the
+headset result; residual shimmer and PAC sight completion are under evaluation.
+Do not publish the current installer correction as a fully validated solution.
+
+Live desktop comparisons isolated the EU sniper light/dark flicker to repair-
+added reverse surfaces. Original plus donor exterior surfaces were clean;
+separately biasing inner draws reduced but did not eliminate the artifact.
+Native index-buffer capture verified the tested original/reverse ranges were
+not reordered. Shader/shadow changes did not resolve that comparison.
+
+SeparateWeaponBackfaces runs after the existing completion/interior-removal
+plans. It verifies paired-vertex provenance, then moves only added inner
+positions 0.0005 m along their inward normals. Exterior vertices, material and
+index data, UV/normal/part attributes, transparent materials and world LODs
+remain unchanged. Do not replace this with global depth/culling changes or
+ship the private primitive-count diagnostic. Owner confirmed the corrected
+EU sniper clean using the normal renderer with all surfaces retained.
+All 28 stock repair meshes pass invariants; that is not 28 headset tests.
+
+The accepted archive identity changes. Setup accepts the previous completed
+archive as a known upgrade input and verifies all new per-weapon outputs.
+Archive-changing updates keep a separate verified rollback copy, journal its
+before/after identities, and preserve the original uninstall backup. Prepared
+updates roll back the archive before restoring the old runtime. External file
+changes fail closed with backups and journal retained. Nothing is published.
+
+## Kit acquisition and ADS tickets (2026-10-03, private candidate)
+
+SupportCrates keeps a pending intentional press for 250 ms and expands only
+eligible crate slot radii by 0.035 m. It does not auto-grab from a long-held grip.
+An interruption/reset, release or disabled left-crate setting cancels that
+intent. SelectionTime still begins once at actual acquisition, not the earlier
+press; changing it every frame previously restarted native selection delays.
+Never relax native deployability or the existing one-shot throw/holster path.
+
+NativeCrosshair classifies the existing signature-verified stock cull node once
+per draw. Only TicketInfoConquestCullNode gains aimed suppression, on both base
+HUD and optic replay. Do not suppress TicketInfo or OtherMapItems: they parent
+unrelated UI. Titan health, commander nodes and similarly named custom roots
+pass unchanged. No persistent node visibility/alpha or native HUD state writes.
+StereoHudBegin derives this render-thread state from the current local native
+optic, clears it for non-gameplay/menu draws and StereoReset, and preserves it
+across nested Flash replay. Ticket nodes never count as valid scope artwork.
+
+NativeCrosshairTests checks exact-node filtering, both replay paths, restoration,
+scope-reticle preservation and unrelated nodes. SupportCratesTests covers early
+grip, expiry, cancellation, radius bounds and native cooldown guards. The real
+StereoSession GPU fixture asserts ticket state across optic/menu/pause/reset
+transitions. These checks do not establish headset acceptance.
+
 ## Full stock sight audit and candidate (2026-10-02)
 
 The owner requested all stock/default and unlock sights, without discovering

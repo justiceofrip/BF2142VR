@@ -1,6 +1,8 @@
 #pragma once
 namespace bfvr::bf2142 {
 void SetCrosshairHidden(bool hidden);
+// Render-thread presentation state; does not change native HUD/gameplay values.
+void SetAdsTicketsHidden(bool hidden);
 bool InstallNativeOpticHud();
 // Scoped presentation-only state; original values restored after each HUD draw.
 class CrosshairScope {

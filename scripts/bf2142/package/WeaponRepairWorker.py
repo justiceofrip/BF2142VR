@@ -17,6 +17,7 @@ def accepted(path, profile):
 def repair_one(name, source, output):
     import RepairWeaponMeshes as weapons
     import RemoveInteriorBackfaces as interiors
+    import ThinShellBackfaces as separation
     from RepairDecisionPlan import DecisionPlan
     from WeaponRepairPlans import PLANS
     profile = PROFILES[name]
@@ -30,6 +31,7 @@ def repair_one(name, source, output):
     print('Applying verified repair plan: ' + name, flush=True)
     data, _ = weapons.repair(data, name, surface_plan=DecisionPlan(surface))
     data, _ = interiors.repair(data, plan=DecisionPlan(inside))
+    data, _ = separation.repair(data)
     if len(data) != profile['size'] or digest(data) != profile['result']:
         raise ValueError('Weapon repair differs from accepted model: ' + name)
     with output.open('xb') as f:

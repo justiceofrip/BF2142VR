@@ -4,10 +4,10 @@
 #include "stereo/DirectionalLocomotion.h"
 #include <array>
 namespace bfvr::bf2142 {
-// One body-slot gesture, consumed by either DirectInput API exactly once.
-// The native inventory is checked again at consumption, not just at XR polling.
+// A body-slot gesture can retry an unacknowledged selection. Each attempt is
+// consumed by only one DirectInput API; live inventory is checked at delivery.
 struct EquipmentSelection {
-    std::uint64_t owner=0;LONGLONG gesture=0;unsigned item=0;bool allowed=false;
+    std::uint64_t owner=0;LONGLONG gesture=0;unsigned item=0;bool allowed=false;unsigned attempt=0;
 };
 struct ControllerCommand {
     EquipmentSelection selection{};

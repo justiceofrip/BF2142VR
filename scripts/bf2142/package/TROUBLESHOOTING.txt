@@ -1,6 +1,8 @@
-BATTLEFIELD 2142 VR - TEST BUILD TROUBLESHOOTING
+BATTLEFIELD 2142 VR - TROUBLESHOOTING
 
 SETUP STOPS
+Use Save error report in the launcher to export installation diagnostics.
+Review the file before attaching it with Report on GitHub. Nothing auto-uploads.
 Use BF2142VRSetup.exe and select BF2142.exe, or extract the whole ZIP first.
 Close the game before Install / Update or Repair.
 This package recognizes stock v1.51 weapons and the accepted BFVR repair. It
@@ -31,13 +33,13 @@ session. Avoid treating missing tracking as a new standing-height reference.
 
 CRASH OR BAD RENDERING
 Save the exact error and what you were doing. Reports should include version
-0.2.0-beta.4-test.8, headset/runtime, GPU, game mod, map and the failed action.
+0.2.0-beta.4, headset/runtime, GPU, game mod, map and the failed action.
 Client/presenter logs are under BF2142VR/runtime/x86/logs. Optional branding
 messages are under BF2142VR/logs. Check logs before sharing them for any personal
 paths or account information. Do not post credentials, original game archives,
 install.json or the backups/generated folders.
 The VR client requests native geometry MSAA; see BLUR / JAGGIES
-Test.8 queries the active OpenXR runtime's recommended eye size when Play VR
+Play VR queries the active OpenXR runtime's recommended eye size when Play VR
 starts. Connect the headset first. Restart the game after changing runtime
 resolution. The 32-bit renderer caps the source at 3072 per axis / 8 MP per eye.
 The game video-menu resolution does not control this source. Texture quality
@@ -46,4 +48,4 @@ is included. BF2142 added FXAA defaults off; native MSAA defaults to 8x with
 supported fallback. For lower GPU cost set WorldMSAASamples=4 or 2 in
 BF2142VR.ini, then restart. Wireless stream quality can also limit clarity.
 If runtime resolution lookup fails, the launcher retains the 1600x900 fallback.
-ADS still costs more than unscoped rendering; that is a separate follow-up.
+Supported ADS optics now use GPU transfer; an extra scene view still has a rendering cost.

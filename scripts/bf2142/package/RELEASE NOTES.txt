@@ -1,20 +1,27 @@
-BF2142 VR v0.2.0-beta.4-test.8 - renderer and installer update
+BF2142 VR v0.2.0-beta.4
 
-Play VR now queries the active OpenXR runtime's recommended eye resolution,
-bounded to 3072 pixels per axis and 8 megapixels per eye for the 32-bit game.
-The desktop window remains compact, with corrected menu/text/mouse mapping.
-The BF2142-specific added FXAA filter defaults off; native geometry MSAA stays.
-Native D3D9Ex GPU eye transfer avoids ordinary world-frame CPU readback.
-Managed texture layout/reset fixes address the observed black ground strips
-and broken map labels. Reused CPU staging textures fix reproduced upload
-memory growth; the high-resolution Sign In and map test then succeeded.
+Accepted gameplay and rendering work merged into the main VR build:
+- GPU transfer for menus/spawn and supported ADS, with scope HUD/reticle fixes.
+- Stock and unlock optic coverage, including SMG dots and launcher sights.
+- Hide the Conquest ticket counter while aiming; keep minimap and health.
+- Correct repair-added inner weapon surfaces to reduce light/dark shimmer.
+  Preserve original exteriors and animation parts; fix PAC pistol mesh bounds.
+- Correct empty-hand finger roll and widen the PAC launcher support-grip gate.
+- More reliable holster selection: buffered grabs, grip hysteresis, bounded
+  retries only while the requested item is not equipped; preserve fire mode.
+- Hold a medical/ammo crate in the left hand while using an equipped gun.
+  Release deploys it through the native item, briefly pauses gun fire, then
+  restores the previous gun. Native ammo/cooldowns remain authoritative.
 
-Includes the previous verified repair instructions, isolated weapon workers,
-resumable cache, one bounded retry, signed updater and original-file backups.
-Use BF2142VRSetup.exe -> Install / Update. Do not revert to stock each time.
-The reporting PC's intermittent native installer crash still needs confirmation.
+One launcher: Play VR, Check for updates, Install / Update, Repair, and reports.
+Checking compares installed mod files with the publisher-signed release hashes.
+Updates preserve settings, original backups and verified repair progress.
+Save error report exports installation diagnostics with common personal paths
+and credentials redacted. Report on GitHub opens a draft; nothing auto-uploads.
 
-The owner accepted clear, smooth Quest 3/SteamVR gameplay at 2064x2208/8x MSAA
-and a 90 Hz runtime. This does not promise a fixed FPS or validate every headset.
-ADS still invokes a slower CPU fallback; optic HUD placement also needs further
-work. This release does not claim those follow-up fixes. No texture pack included.
+Owner accepted the current headset test on 2026-10-03; the initial PAC grip/swap
+report cleared in the same session. This is not validation of every gun/headset.
+The held offhand crate preview is local; observers see normal native deployment.
+The separate flat/community helper retains its existing release/runtime.
+This does not guarantee every headset or long-session behavior. No game files, maps or texture pack are included.
+See CHECKS.txt in the release for exact package validation.

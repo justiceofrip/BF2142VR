@@ -26,7 +26,7 @@ namespace {
 IDirect3DDevice9* device=nullptr;
 bf2142::EyeCamera currentEye{};
 unsigned renders=0,presents=0,advances=0,suppressed=0,recenters=0;
-bool menuFixture=false,worldActive=true;
+bool menuFixture=false,worldActive=true,ticketPresentationHidden=false,controlsVisible=false;
 bool nativeAaOff=false,valid=true,scopeFixture=false,reflexFixture=false,opaqueReflexFixture=false,desktopFixture=false,solidFixture=false,hiddenWeapon=false;
 std::vector<DWORD> lastDesktop;
 double expectedNativeTime=1.0/60;
@@ -77,6 +77,7 @@ bool __fastcall Scene(void*,void*,double delta,float) {
     if(solidFixture && !hiddenWeapon){D3DRECT gun{270,190,310,230};device->Clear(1,&gun,D3DCLEAR_TARGET,0xff0000ff,1,0);}
     if(bf2142::IsScopeRender()){}
     else if(bf2142::StereoHudBegin()) {
+        valid=(ticketPresentationHidden==((scopeFixture||reflexFixture||opaqueReflexFixture)&&!controlsVisible))&&valid;
         D3DRECT hud{0,0,40,20};device->Clear(1,&hud,D3DCLEAR_TARGET,0xff00ff00,1,0);
         bf2142::StereoHudEnd();
     } else valid=false;
@@ -114,6 +115,7 @@ void UpdateNativeVehicle(const VehicleSample*,const shared::SharedControllerSamp
 void RecenterNativeVehicle(){}
 void ConfigurePhysicalCamera(bool){}
 void SetCrosshairHidden(bool){}
+void SetAdsTicketsHidden(bool hidden){ticketPresentationHidden=hidden;}
 bool InstallNativeOptics(LogFunction){return true;}
 void DisableNativeOptics(){valid=false;}
 bool ReadNativeOptic(GunOptic* optic){
@@ -237,7 +239,7 @@ int wmain(int argc,wchar_t** argv) {
         valid=renders==60*passes && advances==60 && suppressed==60*passes && presents==120 && valid;
         if(menuFixture){
             // Deployment while world rendering continues must not return to CPU transport.
-            bf2142::TestOpenControls(true);
+            controlsVisible=true;bf2142::TestOpenControls(true);
             for(unsigned frame=0;frame<30;++frame){
                 valid=bf2142::RenderStereo(reinterpret_cast<void*>(1),reinterpret_cast<bf2142::NativeRender>(&Scene),expectedNativeTime,0)&&valid;
                 valid=SUCCEEDED(device->Present(nullptr,nullptr,nullptr,nullptr))&&valid;
@@ -245,10 +247,11 @@ int wmain(int argc,wchar_t** argv) {
             valid=bf2142::TestGpuPublished()==90&&renders==60*passes+60&&advances==90&&valid;
             valid=lastDesktop.size()==320*240&&lastDesktop.front()==0xff00ff00&&lastDesktop.back()==0xff102030&&valid;
             // Paused standalone Flash rendering: same GPU UI, no world replay.
-            bf2142::TestOpenControls(false);
+            controlsVisible=false;bf2142::TestOpenControls(false);
             for(unsigned frame=0;frame<30;++frame){
                 valid=SUCCEEDED(device->BeginScene())&&valid;
                 if(bf2142::TestBeginPausedMenu()){
+                    valid=!ticketPresentationHidden&&valid;
                     D3DRECT panel{30,40,100,90};valid=SUCCEEDED(device->Clear(1,&panel,D3DCLEAR_TARGET,0xff00ffff,1,0))&&valid;
                     bf2142::StereoHudEnd();
                 }else valid=false;
@@ -270,7 +273,7 @@ int wmain(int argc,wchar_t** argv) {
             valid=bf2142::TestGpuPublished()==151&&renders==61*passes+60&&advances==91&&valid;
             printf("Menu transitions: GPU publications=%u world replays=%u time advances=%u valid=%d\n",bf2142::TestGpuPublished(),renders,advances,valid);
         }
-        bf2142::StereoReset();device->Release();DestroyWindow(window);
+        bf2142::StereoReset();valid=!ticketPresentationHidden&&valid;device->Release();DestroyWindow(window);
         puts(valid?"Desktop VR GPU composite: one eye, visible HUD, native replay and no headset/presenter passed.":"Desktop VR GPU composite FAILED.");
         return valid?0:1;
     }
@@ -289,6 +292,7 @@ int wmain(int argc,wchar_t** argv) {
     for(unsigned frame=0;frame<120;++frame){
         valid=SUCCEEDED(device->BeginScene()) && valid;
         if(bf2142::StereoHudBegin(true)){
+            valid=!ticketPresentationHidden&&valid;
             D3DRECT panel{30,40,100,90};valid=SUCCEEDED(device->Clear(1,&panel,D3DCLEAR_TARGET,0xff00ffff,1,0)) && valid;
             bf2142::StereoHudEnd();
         }else valid=false;
@@ -303,7 +307,7 @@ int wmain(int argc,wchar_t** argv) {
     valid=bf2142::RenderStereo(reinterpret_cast<void*>(1),reinterpret_cast<bf2142::NativeRender>(&Scene),expectedNativeTime,0) && valid;
     valid=renders==61*passes && advances==61 && suppressed==61*passes && recenters==1 && valid;
     printf("Pause/resume: 120 standalone UI frames, world calls=%u neutral captures=%u; no duplicated scene.\n",renders,recenters);
-    bf2142::StereoReset();device->Release();DestroyWindow(window);
+    bf2142::StereoReset();valid=!ticketPresentationHidden&&valid;device->Release();DestroyWindow(window);
     puts(valid?"Complete stereo loop: distinct eyes, head translation/yaw, clean UI isolation and extra desktop Present routing passed.":"Stereo GPU integration FAILED.");
     return valid?0:1;
 }
@@ -331,4 +335,4 @@ namespace bfvr::bf2142 {void HideNativeWeaponForReplay(bool hide){hiddenWeapon=h
 
 namespace bfvr::bf2142 {void SetNativeWeaponHeld(bool){} bool NativeWeaponHeld(){return true;} bool NativeWeaponInputReady(){return true;} bool ReadNativeGrenadeTrajectory(GrenadeTrajectory*){return false;}}
 
-namespace bfvr::bf2142 {struct SupportFrame;struct SupportAmmo;void PublishNativeSupport(const SupportFrame&){} bool ReadSupportAmmo(std::uint64_t,int,SupportAmmo*){return false;}}
+namespace bfvr::bf2142 {struct SupportFrame;struct SupportAmmo;void PublishNativeSupport(const SupportFrame&){} bool NativeSupportLaunchReady(){return true;} bool ReadSupportAmmo(std::uint64_t,int,SupportAmmo*){return false;}}

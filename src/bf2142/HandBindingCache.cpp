@@ -3,14 +3,15 @@
 namespace bfvr::bf2142 {
 namespace {
 using M=stereo::Matrix4;
-bool Foregrip(const HandBindings& b){
+bool Foregrip(const HandBindings& b,bool wideLauncher){
     const auto& l=b.leftFromWeapon.values[3];const auto& r=b.rightFromWeapon.values[3];
     const float x=l[0]-r[0],y=l[1]-r[1],z=l[2]-r[2];
     const float distance=x*x+y*y+z*z;
     // A supported rifle has its off-hand forward of its firing hand. Reject
     // the rearward/sideways reach of draw and reload poses; do not invent a
     // new grip location for a particular gun or alter its right-hand aim.
-    return z>.04f && distance>=.12f*.12f && distance<.80f*.80f && std::abs(x)<.30f && std::abs(y)<.30f;
+    // PAC AA/AT launchers have a 42 cm side handle in their authored hold.
+    return z>.04f && distance>=.12f*.12f && distance<.80f*.80f && std::abs(x)<(wideLauncher?.48f:.30f) && std::abs(y)<.30f;
 }
 bool Stable(const M& a,const M& b){
     float distance=0;for(int i=0;i<3;++i){const float d=a.values[3][i]-b.values[3][i];distance+=d*d;}
@@ -19,7 +20,7 @@ bool Stable(const M& a,const M& b){
     return true;
 }
 }
-void HandBindingCache::Update(const HandBones& native,std::uint64_t now,bool allowSettlement) noexcept {
+void HandBindingCache::Update(const HandBones& native,std::uint64_t now,bool allowSettlement,bool wideLauncher) noexcept {
     const auto observed=CaptureHandBindings(native);
     if(!observed){candidateValid=rightCandidateValid=false;return;}
     if(!value){value=observed;started=now;}
@@ -38,7 +39,7 @@ void HandBindingCache::Update(const HandBones& native,std::uint64_t now,bool all
         }
     }
     if(supportReady)return;
-    if(!allowSettlement || !Foregrip(*observed)){candidateValid=false;return;}
+    if(!allowSettlement || !Foregrip(*observed,wideLauncher)){candidateValid=false;return;}
     if(gap || !candidateValid || !Stable(candidate,observed->leftFromWeapon)){
         candidate=observed->leftFromWeapon;stableSince=now;candidateValid=true;
     }

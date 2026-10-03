@@ -1,16 +1,32 @@
 # Installer and incremental updater
 
-Download `BF2142VRSetup.exe` from the test.7 release. Choose the installed
+Download `BF2142VRSetup.exe` from the beta.4 release. Choose the installed
 `BF2142.exe` once and click **Install / Update**. **Repair** verifies and restores
 mod files and regenerates the local body/lobby assets. **Play VR** launches the
-installed game. The app retains the game path and creates an installer shortcut
-for future updates. It checks the preview channel when opened; installation is
+installed game. The app retains the game path and creates one Battlefield 2142 VR launcher
+shortcut for play, updates and repairs. It checks the signed beta feed when opened; installation is
 user initiated. A working installation remains launchable when the feed is offline.
 
 Close BF2142 before updating. Changes are installed between sessions, not into
 running processes. Healthy alpha/beta installations can be updated without a
 manual uninstall. A corrupted rollback backup or changes by another mod stop
 automatic replacement; originals are not guessed or overwritten.
+
+The launcher uses an original vector walker illustration and a dark BF2142-inspired
+interface. Reclamation setup is linked visibly at https://battlefield2142.co/.
+No third-party game images are bundled.
+
+## Validation and reports
+
+Check for updates verifies the signed release and the matching installed mod
+file hashes. It distinguishes an available update from same-version corruption.
+Play remains available if the feed is offline. Save error report exports setup
+and launcher diagnostics, with common personal paths/credentials redacted.
+Report on GitHub asks where to save it and opens an issue draft. The user must
+review, attach and submit it. Nothing uploads automatically. Redaction is an
+aid, not a guarantee that arbitrary third-party error text has no personal data.
+Launcher copies use immutable content-based names outside the game runtime,
+so updating does not overwrite a running launcher. The full ZIP includes it.
 
 ## What this fixes and what remains uncertain
 
@@ -60,7 +76,8 @@ can require a newer updater when its protocol changes.
 
 ## Build and publisher workflow
 
-Build both native architectures and run all tests as in BUILD_BF2142.md. Stage a
+Build both native architectures and run all tests as in BUILD_BF2142.md.
+Build-Installer.ps1 must run before Build-PlayerPackage.ps1. Stage a
 player package with Build-PlayerPackage.ps1 using official Python 3.13.15 x64.
 Its downloaded installer is checked against the python.org SHA-256 and PSF
 signature before use. Review dependency licenses when changing any runtime pin.

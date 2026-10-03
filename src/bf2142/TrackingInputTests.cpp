@@ -307,6 +307,24 @@ int main(){
         count=0;bf2142::OverlayDeviceEvents(input,true,sizeof(e[0]),e,count,1,false,select,2,2);if(count!=1||e[0].dwData||input.selectionRelease)return 121;
         count=0;bf2142::OverlayDeviceEvents(input,true,sizeof(e[0]),e,count,1,false,select,3,3);if(count)return 122;
     }
+    // A missed native draw can retry, but each attempt belongs to only one
+    // input API; once acknowledged, stale samples cannot toggle fire mode.
+    for(bool bufferedFirst:{false,true}){
+        bf2142::InputOverlayState input{};bf2142::ControllerCommand select{};
+        select.selection={17,1000000000,2,true};unsigned presses=0;
+        const auto poll=[&](){
+            std::array<BYTE,256> keys{};DIDEVICEOBJECTDATA events[4]{};DWORD count=0;
+            const auto state=[&](){bf2142::OverlayDeviceState(input,true,256,keys.data(),select,1);presses+=(keys[DIK_2]&0x80)!=0;};
+            const auto eventsPoll=[&](){bf2142::OverlayDeviceEvents(input,true,sizeof(events[0]),events,count,4,false,select,1,1);for(DWORD i=0;i<count;++i)presses+=events[i].dwOfs==DIK_2&&(events[i].dwData&0x80)!=0;};
+            if(bufferedFirst){eventsPoll();state();}else{state();eventsPoll();}
+        };
+        poll();poll();if(presses!=1)return 123;
+        select.selection.attempt=1;poll();poll();if(presses!=2)return 124;
+        select.selection.allowed=false;poll();select.selection.allowed=true;
+        for(unsigned i=2;i<10;++i){select.selection.attempt=i;poll();}
+        if(presses!=2)return 125;
+        select.selection.gesture+=1000000000;select.selection.attempt=0;poll();if(presses!=3)return 126;
+    }
     puts("Controller focus/freshness, button release, head-relative movement, recenter, 6DoF scale and grip transforms passed.");
 }
 

@@ -18,7 +18,8 @@ int main(){
         sample.predictedDisplayTime+=16000000;hand.squeezeValue=1;r=body.Update(true,sample,head,inventory);
         if(r.selected!=int(i)||!r.key)return 2;
         sample.predictedDisplayTime+=16000000;r=body.Update(true,sample,head,inventory);if(r.selected!=-1||!r.key)return 3;
-        sample.predictedDisplayTime+=150000000;r=body.Update(true,sample,head,inventory);if(r.key||r.selected!=-1)return 4;
+        for(int retry=0;retry<5;++retry){sample.predictedDisplayTime+=150000000;r=body.Update(true,sample,head,inventory);if(!r.key||r.selected!=-1)return 4;}
+        sample.predictedDisplayTime+=150000000;r=body.Update(true,sample,head,inventory);if(r.key||r.selected!=-1)return 41;
         inventory[slot.item]=false;sample.predictedDisplayTime+=16000000;r=body.Update(true,sample,head,inventory);if(r.hovered>=0)return 5;inventory[slot.item]=true;
     }
     // Menu/focus/tracking loss cancels pending keys and suppresses held-entry grabs.
@@ -83,6 +84,45 @@ int main(){
         sample.predictedDisplayTime+=16000000;
         if(body.Update(true,sample,head,inventory,3).key)return 23;
     }
+    // An intentional early squeeze acquires once on entry, but a held fist,
+    // expired intent, released intent, or tracking interruption cannot equip.
+    const auto sidearm=BodySlots()[1];
+    const auto place=[&](bool insideSlot){hand.gripPose.positionX=insideSlot?sidearm.offset.x:2.f;
+        hand.gripPose.positionY=1.7f+sidearm.offset.y;hand.gripPose.positionZ=sidearm.offset.z;};
+    for(int cancel=0;cancel<4;++cancel){
+        body.Reset();place(false);hand.squeezeValue=0;sample.predictedDisplayTime+=16000000;
+        body.Update(true,sample,head,inventory,3);
+        hand.squeezeValue=1;sample.predictedDisplayTime+=16000000;
+        if(body.Update(true,sample,head,inventory,3).selected>=0)return 33;
+        if(cancel==1){sample.predictedDisplayTime+=210000000;body.Update(true,sample,head,inventory,3);}
+        if(cancel==2){hand.squeezeValue=0;sample.predictedDisplayTime+=16000000;body.Update(true,sample,head,inventory,3);}
+        if(cancel==3){body.Update(false,sample,head,inventory,3);}
+        place(true);sample.predictedDisplayTime+=16000000;const auto acquired=body.Update(true,sample,head,inventory,3);
+        if(cancel?(acquired.selected>=0||acquired.key):(acquired.selected!=1||acquired.key!=3))return 34;
+        if(!cancel){
+            const auto gesture=acquired.selectionTime;sample.predictedDisplayTime+=16000000;
+            const auto pending=body.Update(true,sample,head,inventory,3);
+            if(pending.selected>=0||pending.selectionTime!=gesture)return 35;
+            // Sweeping into another slot while still squeezed never switches.
+            const auto primarySlot=BodySlots()[0];hand.gripPose.positionX=primarySlot.offset.x;
+            hand.gripPose.positionY=1.7f+primarySlot.offset.y;hand.gripPose.positionZ=primarySlot.offset.z;
+            sample.predictedDisplayTime+=16000000;const auto sweep=body.Update(true,sample,head,inventory,2);
+            if(sweep.selected>=0||sweep.key)return 36;
+            // Release and a fresh grab immediately select the next weapon.
+            hand.squeezeValue=0;sample.predictedDisplayTime+=16000000;body.Update(true,sample,head,inventory,2);
+            hand.squeezeValue=1;sample.predictedDisplayTime+=16000000;const auto next=body.Update(true,sample,head,inventory,2);
+            if(next.selected!=0||next.key!=4||next.selectionTime<=gesture)return 37;
+        }
+    }
+    // Repeated eye/sample polls cannot cancel a pending grab. Grip noise below
+    // the press threshold is not a release; native acknowledgement ends it.
+    body.Reset();place(true);hand.squeezeValue=0;sample.predictedDisplayTime+=16000000;
+    body.Update(true,sample,head,inventory,3);hand.squeezeValue=1;sample.predictedDisplayTime+=16000000;
+    auto queued=body.Update(true,sample,head,inventory,3);const auto began=queued.selectionTime;
+    if(!queued.key||body.Update(true,sample,head,inventory,3).selectionTime!=began)return 38;
+    for(int i=0;i<20;++i){sample.predictedDisplayTime+=16000000;hand.squeezeValue=.5f;
+        queued=body.Update(true,sample,head,inventory,3);if(queued.selected>=0||!queued.key||queued.selectionTime!=began)return 39;}
+    sample.predictedDisplayTime+=16000000;if(body.Update(true,sample,head,inventory,2).key)return 40;
     EquipmentHaptics cue;long long now=1000000000;
     if(!cue.Update(true,0,false,now)||cue.Update(true,0,false,now))return 24;
     for(int i=0;i<24;++i){now+=16000000;if(cue.Update(true,0,false,now))return 25;}

@@ -80,7 +80,29 @@ int main(){
  {CrosshairScope optic(g,true);draw();if(optic.DrewArtwork())return 38;}
  Put(node.data(),0x14,1.f);Put(node.data(),4,static_cast<void*>(nullptr));
  {CrosshairScope optic(g,true);draw();if(optic.DrewArtwork())return 39;}
- Put(node.data(),0x18,reinterpret_cast<const char*>(1));if(ScopeNode(node.data()))return 40;
+ Put(node.data(),0x18,reinterpret_cast<const char*>(1));if(ClassifyNode(node.data())!=HudNode::Other)return 40;
+ // Tickets disappear only while aimed, in both ordinary HUD and optic replay.
+ Put(node.data(),4,reinterpret_cast<void*>(0x5678));Put(node.data(),0x18,"TicketInfoConquestCullNode");draws=0;
+ {CrosshairScope main(g);draw();}if(draws!=1)return 42;
+ SetAdsTicketsHidden(true);
+ {CrosshairScope main(g);draw();}if(draws!=1)return 43;
+ {CrosshairScope optic(g,true);{CrosshairScope flash(g);draw();}if(draws!=1||optic.DrewArtwork())return 44;}
+ draw();if(draws!=2)return 45; // Outside the VR draw scope: still native.
+ for(const char* name:{"HealthCullNode","AmmoCullNode","OtherMapItemsCullNode","MinSizeMapCullNode",
+    "TicketInfoCullNode","TicketInfoTitansCullNode","TicketTimerInfoConquestModeCullNode","TicketInfoConquestCullNodeCustom"}){
+  Put(node.data(),0x18,name);draws=0;
+  {CrosshairScope main(g);draw();}if(draws!=1)return 46;
+  {CrosshairScope optic(g,true);draw();if(draws!=2||optic.DrewArtwork())return 47;}
+ }
+ Put(node.data(),0x18,"EuSniperHudCullNode");draws=0;
+ {CrosshairScope main(g);draw();}if(draws)return 48;
+ {CrosshairScope optic(g,true);draw();if(draws!=1||!optic.DrewArtwork())return 49;}
+ Put(node.data(),0x18,"TicketInfoConquestCullNode");SetAdsTicketsHidden(false);draws=0;
+ {CrosshairScope main(g);draw();}if(draws!=1)return 50;
+ // An unrelated node with the same name must never be filtered.
+ SetAdsTicketsHidden(true);Put(node.data(),0,g+0x5bb4fc);
+ {CrosshairScope main(g);draw();}if(draws!=2)return 51;
+ SetAdsTicketsHidden(false);
  if(hudDrawDepth||opticReplayDepth||!argumentsOk)return 41;
  puts("Named crosshair lookup, cached scope-node suppression, replay visibility, empty-capture fallback and unrelated HUD preservation passed.");return 0;
 }
