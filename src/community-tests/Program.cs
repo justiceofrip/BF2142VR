@@ -55,6 +55,13 @@ static class Tests {
   var primary=Join.CreateLaunchInfo(server,payload,game,"vr","primary.ini",null,false,"primary-network.ini");
   Check(!primary.ArgumentList.Contains("--observer-profile")&&!primary.ArgumentList.Contains("--flat")&&primary.ArgumentList.Contains("--presenter"),"primary VR retains its duplicate guard and presenter");
   Check(primary.Environment["BF2142VR_NETWORK"]=="primary-network.ini"&&primary.Environment["BF2142VR_CONFIG"]=="primary.ini"&&primary.Environment["BF2142VR_VOICE_RECEIVE_ONLY"]=="0","observer configuration never leaks into a primary launch");
+  var installedVr=Join.CreateLaunchInfo(server,payload,game,"vr",settings,null,false,network,true);
+  Check(installedVr.FileName==Path.Combine(payload,"runtime","x86","BF2142VRLauncher.exe")&&installedVr.ArgumentList.Contains(Path.Combine(payload,"runtime","x64","BFVRPresenter.exe")),"community VR uses both binaries from the current installed payload");
+  Check(installedVr.ArgumentList.Contains("--headset-resolution")&&!installedVr.ArgumentList.Contains("--join-server")&&installedVr.Environment["BF2142VR_NETWORK"]==network,"current VR combines native headset sizing and authenticated multiplayer");
+  Check(installedVr.Environment["BF2142VR_GPU_TRANSFER"]=="dx9ex"&&installedVr.Environment["BF2142VR_EX_MANAGED_UPLOAD"]=="1"&&installedVr.Environment["BFVR_USER_CONFIG_PATH"]==Path.Combine(payload,"runtime","x64","UserConfig.txt"),"multiplayer preserves accepted rendering and installed settings");
+  Check(!primary.ArgumentList.Contains("--headset-resolution"),"legacy package launches retain their supported command line");
+  Throws(()=>Join.CreateLaunchInfo(server,payload,game,"flat",settings,null,false,network,true),"installed VR cannot select flat mode");
+  Throws(()=>Join.CreateLaunchInfo(server,payload,game,"vr",settings,null,true,network,true),"installed VR cannot silently select desktop simulation");
   var loopback=Join.CreateLaunchInfo(server with{Host="127.0.0.1"},payload,game,"flat",settings,profile,false,network);
   Check(loopback.ArgumentList.Contains("127.0.0.1")&&loopback.ArgumentList.Contains("--observer-profile"),"local observer remains supported");
   var flat=Join.CreateLaunchInfo(server,payload,game,"flat",settings,null,false,network);

@@ -12,7 +12,7 @@ import ExportLobbyScene as lobby
 from PIL import Image
 
 APP='BF2142VR'
-VERSION='0.2.0-beta.4-hotfix.2'
+VERSION='0.2.0-beta.4-hotfix.3'
 INTRO_MOVIES=tuple('mods/bf2142/Movies/'+name+'.bik' for name in ('Dice','EA','Intro','Legal','Legal_na'))
 STOCK='1a9903113df3fa5b24282ce8d2adbf54ddb58160155b28dea09f26fe85b782f9'
 LEGACY_COMPLETE='e5d605ed915adac29c57840835d900bbc68a3c3ea4a2c7f7077000f6db8c144d'

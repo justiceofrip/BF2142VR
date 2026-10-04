@@ -18,7 +18,8 @@ public sealed partial class SetupForm {
   var sidebar=Stack();sidebar.Padding=new Padding(0,0,24,0);body.Controls.Add(sidebar,0,0);
   sidebar.Controls.Add(Caption("ENTER THE BATTLEFIELD",Ice));
   StyleButton(play,true);play.Text="PLAY VR";play.Height=60;play.Font=new Font("Bahnschrift",19,FontStyle.Bold);sidebar.Controls.Add(play);
-  sidebar.Controls.Add(Note("Connect your headset and start your OpenXR runtime before launching.",224,43));
+  StyleButton(community);community.Text="COMMUNITY MULTIPLAYER";sidebar.Controls.Add(community);
+  sidebar.Controls.Add(Note("Our crossplay server: use Community Multiplayer. Keep this launcher open while playing.",224,65));
   installed.ForeColor=Ink;available.ForeColor=Muted;installed.Font=available.Font=new Font("Segoe UI",9);installed.MaximumSize=available.MaximumSize=new Size(236,42);
   installed.Margin=new Padding(0,12,0,5);available.Margin=new Padding(0,0,0,16);sidebar.Controls.Add(installed);sidebar.Controls.Add(available);
   foreach(var button in new[]{check,install,repair}){StyleButton(button);sidebar.Controls.Add(button);}

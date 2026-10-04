@@ -30,23 +30,34 @@ public static class Join {
   if(mode=="vr")await EnsureVrAssets(gameDir,payload,ct);
   string prefs=Settings(mode,gameDir,settings);return await Launch(manifest,payload,gameDir,mode,prefs,observer,desktop,ct);
  }
- public static ProcessStartInfo CreateLaunchInfo(ServerManifest server,string payload,string game,string mode,string settings,string? observer,bool desktop,string network){
+ public static ProcessStartInfo CreateLaunchInfo(ServerManifest server,string payload,string game,string mode,string settings,string? observer,bool desktop,string network,bool installedVr=false){
   if(mode is not("flat" or "vr"))throw new InvalidDataException("Choose flat or vr.");
+  if(installedVr&&(mode!="vr"||desktop||observer is not null))throw new InvalidDataException("Installed VR launch requires the headset mode.");
   if(!Validation.HostName(server.Host)||!Validation.Port(server.GamePort)||server.Mod.Length==0||!server.Mod.All(c=>char.IsAsciiLetterOrDigit(c)||c is '_' or '-'))throw new InvalidDataException("Invalid game server destination or mod.");
   if(observer is not null&&(mode!="flat"||desktop||string.IsNullOrWhiteSpace(observer)||!Path.IsPathFullyQualified(observer)||observer.IndexOfAny(['\r','\n'])>=0))throw new InvalidDataException("An isolated observer requires flat mode and an absolute, separate Documents path.");
   var info=new ProcessStartInfo(Path.Combine(payload,"runtime","x86","BF2142VRLauncher.exe")){UseShellExecute=false,WorkingDirectory=game};
-  foreach(var arg in new[]{"--game-dir",game,"--mod",server.Mod,"--windowed","--join-server",server.Host,"--port",server.GamePort.ToString(System.Globalization.CultureInfo.InvariantCulture)})info.ArgumentList.Add(arg);
+  foreach(var arg in new[]{"--game-dir",game,"--mod",server.Mod,"--windowed"})info.ArgumentList.Add(arg);
+  if(!installedVr)foreach(var arg in new[]{"--join-server",server.Host,"--port",server.GamePort.ToString(System.Globalization.CultureInfo.InvariantCulture)})info.ArgumentList.Add(arg);
   if(observer is not null){info.ArgumentList.Add("--observer-profile");info.ArgumentList.Add(Path.GetFullPath(observer));}
   if(mode=="flat")info.ArgumentList.Add("--flat");else if(desktop)info.ArgumentList.Add("--desktop-vr");else {info.ArgumentList.Add("--presenter");info.ArgumentList.Add(Path.Combine(payload,"runtime","x64","BFVRPresenter.exe"));}
   info.Environment["BF2142VR_NETWORK"]=network;info.Environment["BF2142VR_CONFIG"]=settings;info.Environment["BF2142VR_VOICE_RECEIVE_ONLY"]=observer is null?"0":"1";info.Environment["BFVR_DIAGNOSTICS"]="off";
+  if(installedVr){
+   info.ArgumentList.Add("--headset-resolution");
+   info.Environment["BF2142VR_GPU_TRANSFER"]="dx9ex";
+   info.Environment["BF2142VR_EX_MANAGED_UPLOAD"]="1";
+   info.Environment["BF2142VR_FRAME_PROFILE"]="0";
+   info.Environment["BF2142VR_GPU_DEBUG"]="0";
+   info.Environment["BF2142VR_MENU_TRACE"]="0";
+   info.Environment["BFVR_USER_CONFIG_PATH"]=Path.Combine(payload,"runtime","x64","UserConfig.txt");
+  }
   return info;
  }
- public static async Task<int> Launch(ServerManifest server,string payload,string game,string mode,string settings,string? observer,bool desktop,CancellationToken ct){
+ public static async Task<int> Launch(ServerManifest server,string payload,string game,string mode,string settings,string? observer,bool desktop,CancellationToken ct,bool installedVr=false){
   byte[] secret=RandomNumberGenerator.GetBytes(16);using var bridge=new BridgeClient(server,secret);using var stop=CancellationTokenSource.CreateLinkedTokenSource(ct);
   string sessions=Path.Combine(Home,"sessions");Directory.CreateDirectory(sessions);string network=Path.Combine(sessions,Guid.NewGuid()+".ini");
   try{
    File.WriteAllText(network,$"[Network]\r\nEnabled=1\r\nPort={bridge.PosePort}\r\nSecret={Convert.ToHexString(secret)}\r\nMirrorToBot=0\r\n[Voice]\r\nEnabled=1\r\nPort={bridge.VoicePort}\r\nRangeMetres=20\r\nEnemyProximity=1\r\n",Encoding.ASCII);
-   var info=CreateLaunchInfo(server,payload,game,mode,settings,observer,desktop,network);
+   var info=CreateLaunchInfo(server,payload,game,mode,settings,observer,desktop,network,installedVr);
    var transport=bridge.Run(stop.Token);using var process=Process.Start(info)??throw new IOException("Could not launch Battlefield 2142.");
    var exit=process.WaitForExitAsync(CancellationToken.None);var first=await Task.WhenAny(exit,transport);
    if(first==transport){try{await transport;}catch(OperationCanceledException)when(ct.IsCancellationRequested){}Console.WriteLine("The addon connection stopped. Close the game normally before joining again.");await exit;}

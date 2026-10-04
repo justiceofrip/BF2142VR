@@ -3,16 +3,20 @@ using System.Text.Json;
 namespace BF2142.Installer;
 internal static class Program {
  [STAThread] static void Main(string[] args) {
-  using var mutex=new Mutex(true,@"Local\BF2142VR-Installer",out bool owned);
+  if(args.Length==2&&args[0]=="--community-session"){
+   try{Environment.ExitCode=CommunityPlay.Run(args[1]).GetAwaiter().GetResult();}
+   catch(Exception error){Console.Error.WriteLine(error.Message);Environment.ExitCode=1;}return;
+  }
+  if(args.Length==2&&args[0]=="--render-preview") {
+    ApplicationConfiguration.Initialize();using var form=new SetupForm(true);form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-20000,-20000);form.Show();Application.DoEvents();using var bitmap=new Bitmap(form.Width,form.Height);form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,form.Size));bitmap.Save(Path.GetFullPath(args[1]));form.Close();return;
+   }
+   using var mutex=new Mutex(true,@"Local\BF2142VR-Installer",out bool owned);
   if(!owned&&args.Length>0){Environment.ExitCode=2;Console.Error.WriteLine("The launcher is already running.");return;}
   if(!owned){MessageBox.Show("The BF2142 VR installer is already running.","Battlefield 2142 VR");return;}
   try {
    ApplicationConfiguration.Initialize();
    if(args.Length==4&&args[0]=="--apply-offline"&&args[2]=="--game") {
     InstallService.Apply(args[1],args[3],Console.WriteLine).GetAwaiter().GetResult();return;
-   }
-   if(args.Length==2&&args[0]=="--render-preview") {
-    using var form=new SetupForm(true);form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-20000,-20000);form.Show();Application.DoEvents();using var bitmap=new Bitmap(form.Width,form.Height);form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,form.Size));bitmap.Save(Path.GetFullPath(args[1]));form.Close();return;
    }
    if(args.Length==2&&args[0]=="--game") {Application.Run(new SetupForm(false,Path.GetFullPath(args[1])));return;}
    if(args.Length==1&&args[0]=="--preview"){Application.Run(new SetupForm(true));return;}
@@ -34,6 +38,7 @@ public sealed partial class SetupForm : Form {
  readonly TacticalButton repair=new(){Text="Repair",AutoSize=true,Enabled=false};
  readonly TacticalButton check=new(){Text="Check for updates",AutoSize=true};
  readonly TacticalButton play=new(){Text="Play VR",AutoSize=true};
+ readonly TacticalButton community=new(){Text="Community multiplayer",AutoSize=true};
  readonly TacticalButton credits=new(){Text="Credits / licenses",AutoSize=true};
  readonly TacticalButton cancel=new(){Text="Cancel download",AutoSize=true,Enabled=false};
  readonly TacticalButton report=new(){Text="Save error report",AutoSize=true};
@@ -43,7 +48,7 @@ public sealed partial class SetupForm : Form {
  readonly ReleaseFeed feed=new();
  readonly UpdateStore store;
  Release? release;
- bool busy,applying;
+ bool busy,applying,playingCommunity;
  CancellationTokenSource? cancellation;
  public SetupForm(bool preview=false,string? initialGame=null) {
   Directory.CreateDirectory(dataRoot);store=new UpdateStore(dataRoot,feed);
@@ -53,7 +58,8 @@ public sealed partial class SetupForm : Form {
   issue.Click+=(_,_)=>{if(SaveReport())try{Process.Start(new ProcessStartInfo(Diagnostics.IssueUrl(release?.Version??InstallService.InstalledVersion(game.Text),reportPath!)){UseShellExecute=true});}catch(Exception e){Report(e);}};
   credits.Click+=(_,_)=>{using var box=new Form{Text="Credits and licenses",Size=new Size(780,580),StartPosition=FormStartPosition.CenterParent};var text=new TextBox{Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill};text.Text="Battlefield 2142 VR by justiceofrip. Based on BFVR by JayBiggsGMG and contributors.\r\nBattlefield 2142 walker imagery and title logo: EA / DICE. Community project; not endorsed by EA.\r\nhttps://github.com/justiceofrip/BF2142VR\r\n\r\n";foreach(var name in new[]{"License","DotnetLicense","DotnetNotices"}){using var stream=System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("BF2142.Installer."+name);if(stream is not null){using var reader=new StreamReader(stream);text.AppendText(reader.ReadToEnd()+"\r\n\r\n");}}box.Controls.Add(text);box.ShowDialog(this);};
   play.Click+=(_,_)=>{try{InstallService.Launch(game.Text);}catch(Exception e){Report(e);}};
-  FormClosing+=(_,e)=>{if(busy){e.Cancel=true;status.Text=applying?"Finishing installation safely. Please keep this window open.":"Cancel the download before closing.";}};
+  community.Click+=async(_,_)=>await PlayCommunity();
+  FormClosing+=(_,e)=>{if(playingCommunity){e.Cancel=true;status.Text="Keep the launcher open for multiplayer. Close BF2142 first.";}else if(busy){e.Cancel=true;status.Text=applying?"Finishing installation safely. Please keep this window open.":"Cancel the download before closing.";}};
   FormClosed+=(_,_)=>feed.Dispose();
   string settings=Path.Combine(dataRoot,"game-path.txt");if(File.Exists(settings))game.Text=File.ReadAllText(settings).Trim();
   if(initialGame is not null){game.Text=initialGame;UpdateStore.Atomic(Path.Combine(dataRoot,"game-path.txt"),initialGame);}
@@ -64,7 +70,23 @@ public sealed partial class SetupForm : Form {
   using var picker=new OpenFileDialog{Title="Select your installed BF2142.exe",Filter="Battlefield 2142|BF2142.exe",CheckFileExists=true};
   if(picker.ShowDialog(this)==DialogResult.OK){game.Text=Path.GetDirectoryName(picker.FileName)!;UpdateStore.Atomic(Path.Combine(dataRoot,"game-path.txt"),game.Text);}
  }
- void RefreshInstalled() {installed.Text="Installed: "+InstallService.InstalledVersion(game.Text);play.Enabled=!applying&&File.Exists(Path.Combine(game.Text,"BF2142VR","tools","Player.ps1"));}
+ void RefreshInstalled() {installed.Text="Installed: "+InstallService.InstalledVersion(game.Text);play.Enabled=community.Enabled=!busy&&!playingCommunity&&File.Exists(Path.Combine(game.Text,"BF2142VR","tools","Player.ps1"));}
+ async Task PlayCommunity() {
+  if(busy||playingCommunity)return;
+  playingCommunity=true;SetBusy(true);cancel.Enabled=false;
+  status.Text="Checking the installed build and connecting multiplayer...";
+  try{
+   var start=new ProcessStartInfo(Environment.ProcessPath??throw new IOException("Cannot find launcher.")){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};
+   start.ArgumentList.Add("--community-session");start.ArgumentList.Add(Path.GetFullPath(game.Text));
+   using var process=new Process{StartInfo=start};
+   void Line(string? text){if(text is null)return;Append(text);if(!IsDisposed)BeginInvoke(()=>status.Text=text);}
+   process.OutputDataReceived+=(_,e)=>Line(e.Data);process.ErrorDataReceived+=(_,e)=>Line(e.Data);
+   if(!process.Start())throw new IOException("Could not start multiplayer.");
+   process.BeginOutputReadLine();process.BeginErrorReadLine();await process.WaitForExitAsync();process.WaitForExit();
+   status.Text=process.ExitCode==0?"Game closed. Ready for the next session.":"Multiplayer stopped. See the launcher log below.";
+  }catch(Exception e){Report(e);}
+  finally{playingCommunity=false;SetBusy(false);}
+ }
  void SetBusy(bool value) {busy=value;browse.Enabled=game.Enabled=check.Enabled=!value;install.Enabled=repair.Enabled=!value&&release is not null;cancel.Enabled=value&&!applying;RefreshInstalled();}
  void Append(string text) {if(IsDisposed)return;if(InvokeRequired){BeginInvoke(()=>Append(text));return;}session.AppendLine(text);
   try {File.AppendAllText(Path.Combine(dataRoot,"launcher-session.log"),Diagnostics.Redact(text,game.Text,Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),dataRoot)+Environment.NewLine);} catch(IOException){} catch(UnauthorizedAccessException){}

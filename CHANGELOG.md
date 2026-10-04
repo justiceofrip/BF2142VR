@@ -1,5 +1,18 @@
 # BFVR Changelog
 
+## BF2142 VR 0.2.0-beta.4-hotfix.3 (2026-10-03)
+
+- Add Community Multiplayer to the launcher, connecting the authenticated
+  bridge with the current installed VR build and settings. This restores
+  supported-server ADS, head-directed movement and tracked shot damage when
+  previously launched without the bridge.
+- Open normal menus/login, show bridge connection status and keep the session
+  alive until game exit. Choose BF2142 VR Crossplay Test in the server browser.
+- Use an already-running SteamVR runtime for this launch only, preserving
+  headset resolution and accepted rendering. No native or server binary changes.
+- Headset multiplayer test confirmed maintained ADS, correct movement direction
+  and a successful kill with the installed runtime and bridge.
+
 ## BF2142 Flat Viewer 0.2.0-beta.2 (2026-10-03)
 
 - Dedicated desktop launcher with Play, automatic game detection, a remembered game folder and desktop shortcut.

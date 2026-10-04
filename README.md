@@ -1,8 +1,8 @@
 # Battlefield 2142 VR — beta.4
 
-**[Download the VR launcher / installer](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.4-hotfix.2/BF2142VRSetup.exe)** — choose BF2142.exe, then **Install / Update**. Connect your headset and click **Play VR**.
+**[Download the VR launcher / installer](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.4-hotfix.3/BF2142VRSetup.exe)** — choose BF2142.exe, then **Install / Update**. Connect your headset and click **Play VR**.
 
-One launcher provides **Check for updates**, **Repair**, **Save error report** and **Report on GitHub**. Updates verify signed file hashes and preserve settings/backups. Reports stay local until you review and attach them. [ZIP, release notes and validation](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-hotfix.2).
+One launcher provides **Check for updates**, **Repair**, **Save error report** and **Report on GitHub**. Updates verify signed file hashes and preserve settings/backups. Reports stay local until you review and attach them. [ZIP, release notes and validation](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-hotfix.3).
 
 **Desktop / monitor players: [Download BF2142 Flat Viewer](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-flat-beta.2/BF2142FlatViewer.exe)** — open it and click **Play**. Automatic updates, desktop shortcut, repair and readable error reports. **No headset or SteamVR required.** [ModDB-ready ZIP and instructions](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-flat-beta.2).
 
@@ -25,7 +25,7 @@ You need your own working **BF2142 v1.51** installation on Windows x64. Set up R
 
 1. Close BF2142, open BF2142VRSetup.exe, select `BF2142.exe`, and click **Install / Update**. The full ZIP and `Setup.cmd` remain an offline alternative.
 2. Connect your headset to SteamVR. Open **Battlefield 2142 VR** and click **Play VR**. Use the same launcher for **Check for updates** and **Repair**.
-3. The separate [community helper](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.1) still selects its beta.1 runtime. Normal servers are selectable in-game from the updated Play VR launcher.
+3. For **BF2142 VR Crossplay Test**, click **Community Multiplayer**, then log in and select the server in the game browser. Keep the launcher open for the authenticated VR connection. It uses your current installed build. **Play VR** remains available for singleplayer and other servers.
 
 **Updating from alpha or an earlier beta:** use the launcher’s **Install / Update** button. Healthy installations retain settings and original backups without a manual uninstall. If another mod changed game files or a backup is damaged, setup stops and preserves them. Flat players: switch from an old playtest EXE to the new Flat Viewer once; future addon and launcher updates are automatic.
 

@@ -1,5 +1,26 @@
 # BFVR AI and Developer Handoff
 
+## Installed VR community launch (2026-10-03)
+
+Plain Player.ps1 did not set BF2142VR_NETWORK. Supported-server ADS, movement
+and tracked server fire already exist but require the authenticated bridge.
+Owner confirmed all three in a live headset multiplayer test using the accepted
+hotfix.2 native runtime through Join.Launch. Preserve the native input and IK.
+
+Installer CommunityPlay verifies the installed payload with SetupAssets check,
+then uses only connection metadata from signed flat.json. It downloads no flat
+or legacy VR runtime. Signature, identity and revision checks precede caching;
+network failures may use the last reverified descriptor. Community joining.lock
+serializes sessions. The GUI retains its hidden helper, shows connection status
+and blocks updates/closing while that game is active.
+
+Join's installedVr option keeps installed settings, GPU transfer and headset
+resolution and opens normal menus. A direct-autojoin test hung before the accepted
+menu launch; causality is not established. SteamVR selection affects only the
+helper process when vrserver is already running. Generic Play VR and flat launch
+paths retain their behavior. Servers without the adapter are not covered by this
+acceptance. Never replace the current runtime with beta.1 to join multiplayer.
+
 ## Flat Viewer launcher (2026-10-03)
 
 `src/flat-launcher` is the separate desktop-only WinForms bootstrap. It shares

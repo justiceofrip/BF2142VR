@@ -109,7 +109,7 @@ subject to the original game's ownership and are not public mod source.
     source_dir=dest/'source-tools';source_dir.mkdir()
     for name in ['RepairDecisionPlan.py','RepairWeaponMeshes.py','CompleteWeaponSurfaces.py','RemoveInteriorBackfaces.py','SeparateWeaponBackfaces.py','PlaneSeparatedBackfaces.py','ThinShellBackfaces.py','ExportBodyEquipment.py','ExportLobbyScene.py']:shutil.copy2(assets/name,source_dir/name)
     for name in ['SetupAssets.py','WaterReflectionRepair.py','WeaponRepairWorker.py','WeaponRepairHashes.py','WeaponRepairPlans.py']:shutil.copy2(package/name,source_dir/name)
-    (dest/'PACKAGE CHECKS.txt').write_text('BF2142 VR 0.2.0-beta.4-hotfix.2\nSee release CHECKS.txt for exact payload validation.\nIPC 26 / pose v4. See CHECKS.txt for headset validation limits.\n')
+    (dest/'PACKAGE CHECKS.txt').write_text('BF2142 VR 0.2.0-beta.4-hotfix.3\nSee release CHECKS.txt for exact payload validation.\nIPC 26 / pose v4. See CHECKS.txt for headset validation limits.\n')
     # Reject this build's private input locations in either path spelling.
     private_roots=[repo.parent,checkpoint,tools,python_home,python_env,Path.home()]
     forbidden=sorted({str(p.resolve()).lower().replace('\\','/') for p in private_roots})
@@ -122,7 +122,7 @@ subject to the original game's ownership and are not public mod source.
             if text.encode() in lower or text.encode('utf-16le') in lower:raise ValueError('Private build path in '+rel)
         if path.suffix.lower() in ['.pdb','.dmp','.bik','.bundledmesh'] or path.name in ['Weapons_client.zip','BodyEquipment.bin','LobbyScene.bin','install.json']:raise ValueError('Private or developer artifact: '+rel)
         files[rel]=sha(path)
-    (dest/'payload.json').write_text(json.dumps({'version':'0.2.0-beta.4-hotfix.2','build':'renderer-beta4-hotfix2','files':files},indent=2))
+    (dest/'payload.json').write_text(json.dumps({'version':'0.2.0-beta.4-hotfix.3','build':'renderer-beta4-hotfix2','files':files},indent=2))
     print('Staged',len(files),'files;',sum(x.stat().st_size for x in dest.rglob('*') if x.is_file()),'bytes:',dest)
 
 if __name__=='__main__':

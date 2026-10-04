@@ -10,6 +10,12 @@ QUICK START
 2. Connect the headset and start your OpenXR runtime (for example SteamVR).
 3. Open the Battlefield 2142 VR shortcut and click Play VR.
 
+OUR COMMUNITY SERVER
+Click Community Multiplayer, log in, and join BF2142 VR Crossplay Test in the
+server browser. Keep the launcher open while playing. It connects the authenticated
+bridge for VR aiming, movement and ADS with your current installed VR build.
+Play VR remains the standalone option for singleplayer and other servers.
+
 Use that same launcher for Check for updates or Repair. Check verifies the
 signed release and hashes of installed mod files, not just its version label.
 Close the game before installing. Settings and original backups are preserved;
@@ -31,6 +37,6 @@ Uninstall.cmd restores recorded original files and retains settings/backups.
 If another mod changed a file, setup/uninstall stops to preserve it.
 
 Read CONTROLS.txt and TROUBLESHOOTING.txt for controls, VR and multiplayer.
-The separate flat/community helper uses its own runtime. Custom gestures and
+The separate flat viewer uses its own runtime. Custom gestures and
 voice require the matching server adapter/bridge; ordinary servers are in-game.
 This launcher does not download Battlefield, Reclamation or extra maps.

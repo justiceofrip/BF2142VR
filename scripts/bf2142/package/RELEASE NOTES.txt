@@ -1,3 +1,11 @@
+BF2142 VR 0.2.0-beta.4-hotfix.3
+
+- Community Multiplayer launches the installed VR build with authenticated
+  aiming, movement and ADS support on BF2142 VR Crossplay Test.
+- Log in and choose the server in the browser. Keep the launcher open.
+- Headset test confirmed hit damage, held ADS and head-directed movement.
+- Native renderer, IK, weapons and server binaries remain unchanged.
+
 BF2142 VR 0.2.0-beta.4-hotfix.2
 
 - Correct cube/volume texture uploads in the fast renderer to fix water stripes.

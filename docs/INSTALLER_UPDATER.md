@@ -1,5 +1,12 @@
 # Installer and incremental updater
 
+For **BF2142 VR Crossplay Test**, click **Community Multiplayer**, then log in
+and select the server in the game browser. Keep the launcher open while playing;
+it displays authenticated connection/reconnection status. It uses your current
+installed VR files, resolution and settings. **Play VR** remains the standalone
+launch option for singleplayer and other servers. The community server requires
+the bridge for tracked shot authority, head-directed movement and multiplayer ADS.
+
 Download `BF2142VRSetup.exe` from the beta.4 release. Choose the installed
 `BF2142.exe` once and click **Install / Update**. **Repair** verifies and restores
 mod files and regenerates the local body/lobby assets. **Play VR** launches the
