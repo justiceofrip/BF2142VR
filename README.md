@@ -4,6 +4,8 @@
 
 One launcher provides **Check for updates**, **Repair**, **Save error report** and **Report on GitHub**. Updates verify signed file hashes and preserve settings/backups. Reports stay local until you review and attach them. [ZIP, release notes and validation](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-hotfix.2).
 
+**Desktop / monitor players: [Download BF2142 Flat Viewer](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-flat-beta.2/BF2142FlatViewer.exe)** — open it and click **Play**. Automatic updates, desktop shortcut, repair and readable error reports. **No headset or SteamVR required.** [ModDB-ready ZIP and instructions](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-flat-beta.2).
+
 Beta.4 merges the accepted GPU menu/ADS work, stock/unlock sights, scope HUD fixes, weapon shimmer repair, corrected hands, more reliable swaps and left-hand crates while holding a gun. Native crate deployment briefly pauses gun fire before restoring it. See [changelog](CHANGELOG.md) and [installer details](docs/INSTALLER_UPDATER.md).
 
 A PC VR port based on [BFVR by JayBiggsGMG and the BFVR contributors](https://github.com/JayBiggsGMG/BFVR-Battlefield-1942-VR-Mod). Play bot matches or join compatible multiplayer servers alongside desktop players.
@@ -13,7 +15,7 @@ A PC VR port based on [BFVR by JayBiggsGMG and the BFVR contributors](https://gi
 | Download | Who needs it? |
 | --- | --- |
 | [BF2142-VR-0.2.0-beta.3.zip](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.3/BF2142-VR-0.2.0-beta.3.zip) | Older VR release; use the beta.4 launcher above for current fixes. |
-| [BF2142-Flat-0.2.0-beta.1.zip](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.1/BF2142-Flat-0.2.0-beta.1.zip) | Monitor players: run the included EXE to join the community test server with tracked-player visuals. No SteamVR, headset or separate .NET installation. |
+| [BF2142 Flat Viewer ZIP](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-flat-beta.2/BF2142-Flat-Viewer-0.2.0-beta.2.zip) | **Desktop players.** Extract, run BF2142FlatViewer.exe, click Play. Auto-updates and joins our community server. No headset / SteamVR needed. |
 
 VR players do **not** install the flat addon too. Unmodified desktop clients can play on a compatible server, but need the addon to see VR gestures and use our proximity voice. The server also needs the VR server adapter and community bridge. This is a beta, with remaining animation and compatibility issues.
 
@@ -25,7 +27,7 @@ You need your own working **BF2142 v1.51** installation on Windows x64. Set up R
 2. Connect your headset to SteamVR. Open **Battlefield 2142 VR** and click **Play VR**. Use the same launcher for **Check for updates** and **Repair**.
 3. The separate [community helper](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.1) still selects its beta.1 runtime. Normal servers are selectable in-game from the updated Play VR launcher.
 
-**Updating from alpha or an earlier beta:** use the launcher’s **Install / Update** button. Healthy installations retain settings and original backups without a manual uninstall. If another mod changed game files or a backup is damaged, setup stops and preserves them. For a flat-addon update, use the new EXE instead of an older playtest EXE.
+**Updating from alpha or an earlier beta:** use the launcher’s **Install / Update** button. Healthy installations retain settings and original backups without a manual uninstall. If another mod changed game files or a backup is damaged, setup stops and preserves them. Flat players: switch from an old playtest EXE to the new Flat Viewer once; future addon and launcher updates are automatic.
 
 - [Full installation instructions](scripts/bf2142/package/START%20HERE.txt) / [controls](scripts/bf2142/package/CONTROLS.txt) / [troubleshooting](scripts/bf2142/package/TROUBLESHOOTING.txt)
 - [Flat addon and Reclamation Hub integration](docs/FLAT_ADDON.md)

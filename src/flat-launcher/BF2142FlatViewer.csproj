@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AssemblyName>BF2142FlatViewer</AssemblyName><Version>0.2.0.2</Version><ApplicationManifest>app.manifest</ApplicationManifest>
+    <PublishSingleFile>true</PublishSingleFile><SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained><IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile><DebugType>none</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../community/BF2142Community.csproj" />
+    <EmbeddedResource Include="Artwork/Battlefield2142-logo.png" LogicalName="Flat.Logo.png" />
+    <EmbeddedResource Include="Artwork/Battlefield2142-walker.png" LogicalName="Flat.Walker.png" />
+    <EmbeddedResource Include="../../LICENSE" LogicalName="Flat.License" />
+    <EmbeddedResource Include="../../licenses/DOTNET-LICENSE.txt" LogicalName="Flat.DotnetLicense" />
+    <EmbeddedResource Include="../../licenses/DOTNET-THIRD-PARTY-NOTICES.txt" LogicalName="Flat.DotnetNotices" />
+  </ItemGroup>
+</Project>

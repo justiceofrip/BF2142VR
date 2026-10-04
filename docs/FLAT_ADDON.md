@@ -1,14 +1,24 @@
-# Flat addon and Reclamation Hub integration
+# BF2142 Flat Viewer — desktop players
 
-## Players
+**[Download the launcher](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-flat-beta.2/BF2142FlatViewer.exe)** · **[ModDB ZIP](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-flat-beta.2/BF2142-Flat-Viewer-0.2.0-beta.2.zip)**
 
-[Download the flat beta](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.1/BF2142-Flat-0.2.0-beta.1.zip), extract it, close BF2142 and run `BF2142-Join-Flat-0.2.0-beta.1.exe`. Choose Play on desktop, select your own BF2142.exe if asked, and use your own Reclamation/OpenSpy login. Keep the helper open until the game closes.
+1. Have a working BF2142 v1.51 + [Reclamation](https://battlefield2142.co/) installation on Windows 10/11 x64.
+2. Run `BF2142FlatViewer.exe`. It detects the game; use **Browse** to select your installed `BF2142.exe` if needed.
+3. Click **Play** and use your normal login inside BF2142.
 
-This addon renders remote VR head/arm poses, approximate finger curls and held/holstered weapon state on a normal monitor. It includes proximity voice. It uses ordinary keyboard/mouse controls and needs no SteamVR, headset, Python or separate .NET installation. **VR players already have this receiver in the full VR mod.**
+Use the **BF2142 Flat Viewer** desktop shortcut next time. Updates to the addon and launcher are automatic. The first launch downloads the signed addon. No manual DLL copying, headset, SteamVR, Python or separate .NET installation.
 
-The bundled EXE targets the community test server. Its address can change and the test server is not guaranteed to be online permanently. The flat offline EXE includes its native payload and is updated manually by downloading a new release. An online helper is also available as [BF2142-Join-Community.exe](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.1/BF2142-Join-Community.exe); it obtains a publisher-signed descriptor before selecting a cached/downloaded package.
+This addon shows VR players' head/arm movement, approximate fingers and held/holstered weapons. Desktop controls stay keyboard/mouse. **VR players already have this functionality.**
 
-The ordinary game server browser cannot install the addon automatically. A stock player can join a compatible server but sees stock animation without the addon. Joining through the helper starts the addon-enabled game. If the game is already open, close it before switching launchers.
+The launcher joins **our community crossplay server** directly and displays whether its bridge is reachable. VR gestures and proximity voice require the server adapter/bridge; the viewer does not enable these features on every Reclamation server. An unreachable server remains unavailable even with a healthy local installation.
+
+The **proximity microphone** checkbox controls broadcasting to nearby players. New launcher preferences default to muted; an existing explicit setting is preserved. Native squad/team voice remains controlled by BF2142. Minimize the launcher during play; it keeps the helper connection alive. Closing its window during a match minimizes it.
+
+**Repair** re-downloads the verified addon and retains the previous cache. **Copy error report** / **Save report** provide redacted launcher-only diagnostics. **Report on GitHub** opens a draft issue for you to review and submit. Nothing is uploaded automatically; accounts, game files and microphone audio are not collected.
+
+Close the game and viewer to uninstall. Remove the shortcut and `%LOCALAPPDATA%/BF2142VR/FlatViewer`. Shared addon files live under `%LOCALAPPDATA%/BF2142VR/Community`; retain that folder if an older community helper still uses it. The viewer does not replace game archives.
+
+The earlier beta.1 offline join EXE remains archived. It has manual updates; use this new viewer for automatic updates. The separate legacy VR community join helper still selects its older VR payload; use the main VR launcher for current VR fixes.
 
 ## Hub integration contract
 
@@ -28,7 +38,7 @@ Do not embed game passwords, private keys or server secrets. Normal OpenSpy auth
 
 A host needs the native BF2142 server adapter and community bridge; installing viewers alone does not create pose data. See [hosting](BF2142_COMMUNITY_HOSTING.md) for setup. The shipped helper trusts this project's publisher; independent hosts should coordinate signing or build with their own reviewed key. Reclamation integration is ready for review, **not already deployed in their Hub**.
 
-## Copy-paste message to Reclamation
+## Historical beta.1 integration message
 
 We've released BF2142 VR 0.2.0-beta.1, including a lightweight flat-player addon so desktop players can see VR players' tracked heads, arms, hand poses and equipped/holstered weapons. VR users already have the receiver; flat users don't need SteamVR or a headset.
 

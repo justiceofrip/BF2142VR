@@ -1,5 +1,39 @@
 # BFVR AI and Developer Handoff
 
+## Flat Viewer launcher (2026-10-03)
+
+`src/flat-launcher` is the separate desktop-only WinForms bootstrap. It shares
+PackageStore signature/hash validation with the NativeAOT community helper;
+no native transport/server/gameplay changes. `updates:flat.json` is a signed
+ServerManifest with independent Id bf2142-flat-viewer and only one flat package.
+Keep the existing updates:test.json VR channel and older release assets intact.
+The signed package contains launcher/BF2142FlatViewer.exe, the AOT helper,
+x86 client/launcher and licenses. It has no presenter, VR asset worker or game
+archives. The launcher's compiled publisher key comes from the community project.
+
+Verify before caching/launching. Signature, identity and rollback failures must
+not fall back to cached metadata. Network failures may use the last signed,
+reverified package. Repair renames the prior exact package directory, never
+recursively deletes arbitrary paths. Community joining.lock serializes updates
+against a running helper. New launcher EXEs are kept by hash outside package
+repair folders; future updates hand off to the verified EXE and refresh the
+shortcut. No unknown publisher/unsigned server selection is permitted.
+
+The GUI retains the background helper until the game exits. Redact launcher
+messages before logging/export; do not collect account/profile/game/audio data.
+Microphone toggle only changes ProximityMicMuted under [VR]; native squad/team
+voice is separate. In-game login stays native. Reachable means the pinned TLS
+bridge answered, not proof of map/player population. No new outside-PC live
+voice or IK verification was completed during this launcher release.
+
+Build: dotnet publish src/flat-launcher/BF2142FlatViewer.csproj -c Release
+-r win-x64 --self-contained true -p:DebugType=none -p:DebugSymbols=false.
+Tests: dotnet run --project src/flat-launcher-tests -c Release; add
+-- --package SIGNED_JSON EXACT_ZIP for exact release install verification.
+The tests also support --render PNG to inspect the real form without running
+updates or the game. Package and render fixtures are not distributed.
+
+
 ## Water texture compatibility and EU sight artwork candidate (2026-10-03)
 
 NativeExResources extends the existing managed 2D SYSTEMMEM shadow rule to

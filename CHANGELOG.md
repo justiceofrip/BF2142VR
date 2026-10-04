@@ -1,5 +1,14 @@
 # BFVR Changelog
 
+## BF2142 Flat Viewer 0.2.0-beta.2 (2026-10-03)
+
+- Dedicated desktop launcher with Play, automatic game detection, a remembered game folder and desktop shortcut.
+- Signed automatic addon/launcher updates on a separate flat channel. Retain verified cached play when the update service is unavailable; reject invalid signatures and rollback revisions.
+- Repair, server reachability, microphone toggle, and redacted copy/save error reports. GitHub opens a user-reviewed draft issue.
+- Single-file self-contained Windows EXE and ModDB ZIP; no SteamVR, .NET or Python installation. Current accepted native observer runtime; no new gameplay changes.
+- Both native builds, 76 native tests, 279 community checks, 25 flat-launcher/package checks and rendered window verification passed. Separate-PC live IK/audio acceptance is not newly claimed.
+
+
 ## BF2142 VR 0.2.0-beta.4-hotfix.2 (2026-10-03)
 
 - Preserve native managed cube/volume texture layouts in the fast D3D9Ex path,
