@@ -12,7 +12,7 @@ VehicleRole StockVehicleRole(const char* name) noexcept {
  if(name)for(const auto& e:entries)if(!std::strcmp(name,e.name))return e.role;
  return VehicleRole::Unknown;
 }
-std::optional<stereo::Matrix4> VehicleView::Update(const VehicleSample& s,const stereo::Matrix4& native) noexcept {
+std::optional<stereo::Matrix4> VehicleView::Update(const VehicleSample& s,const stereo::Matrix4& native,bool horizonLock) noexcept {
  const auto inverse=InverseRigid(s.rootWorld);
  if(!s.owner||!s.seat||!s.root||s.role==VehicleRole::Unknown||!inverse||!InverseRigid(native)){Reset();return {};}
  const float hullYaw=std::atan2(s.rootWorld.values[2][0],s.rootWorld.values[2][2]);
@@ -24,7 +24,7 @@ std::optional<stereo::Matrix4> VehicleView::Update(const VehicleSample& s,const 
  // Anchor to the chassis, not the moving turret/camera. Head motion will be
  // applied once by the common stereo path; turret-follow cannot rotate it again.
  auto world=Multiply(localCamera,s.rootWorld);
- return MakeComfortCamera(world,(hullYaw+yawOffset)*57.295779513f);
+ return horizonLock?MakeComfortCamera(world,(hullYaw+yawOffset)*57.295779513f):std::optional<stereo::Matrix4>(world);
 }
 void VehicleControls::Update(const VehicleSample& s,const shared::SharedControllerSample& input,
  const stereo::Matrix4* native,const stereo::Matrix4* target,ControllerCommand& c) noexcept {

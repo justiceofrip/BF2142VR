@@ -14,6 +14,8 @@ struct HandFrame {
     std::optional<stereo::Matrix4> torso; // level input frame in skeleton coordinates
     bool leftValid=false,rightValid=false,supportPressed=false,wasSupporting=false;
     bool supportReady=true;
+    float weaponPitchDegrees=0, supportReleaseDistance=.30f;
+    bool holdSupportUntilRelease=false;
     bool fingerPoses=false;
     std::array<float,5> leftCurls{},rightCurls{};
     bool knifeGrip=false,pistolGrip=false,weaponHeld=true;
@@ -30,5 +32,7 @@ bool PoseFreeFingers(HandBones&,int wrist,const std::array<float,5>& curls) noex
 struct ArmSolution { stereo::Vec3 elbow{},wrist{}; };
 std::optional<ArmSolution> SolveArm(stereo::Vec3 shoulder,stereo::Vec3 wrist,
     float upperLength,float lowerLength,bool left) noexcept;
-bool SupportGripEligible(bool pressed,bool previous,float distance,float handSeparation) noexcept;
+bool SupportGripEligible(bool pressed,bool previous,float distance,float handSeparation,
+    bool holdUntilRelease=false,float releaseDistance=.30f) noexcept;
+stereo::Matrix4 CalibrateWeaponAim(const stereo::Matrix4&,float pitchDegrees) noexcept;
 }

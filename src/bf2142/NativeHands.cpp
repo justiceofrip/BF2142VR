@@ -42,7 +42,7 @@ std::array<std::array<float,5>,2> filteredCurls{};LONGLONG fingerTime=0;
 wchar_t tracePath[32768]{};unsigned traceFrames=0,traceRecords=0;
 bool installed=false,reported=false,fireReported=false;volatile LONG supporting=0;
 SRWLOCK sampleLock=SRWLOCK_INIT;
-struct Sample { RadioFrame radio{};shared::SharedControllerSample input{};stereo::Pose reference{},head{};float scale=1,height=0;ULONGLONG tick=0;bool enabled=false; } current;
+struct Sample { RadioFrame radio{};shared::SharedControllerSample input{};stereo::Pose reference{},head{};float scale=1,height=0,weaponPitch=0,releaseDistance=.30f;bool holdSupport=false;ULONGLONG tick=0;bool enabled=false; } current;
 template<class T>T Read(const void* p,size_t offset){T v{};std::memcpy(&v,static_cast<const BYTE*>(p)+offset,sizeof(v));return v;}
 stereo::Pose Pose(const shared::SharedPresentationPose& p){return {{p.positionX,p.positionY,p.positionZ},{p.orientationX,p.orientationY,p.orientationZ,p.orientationW}};}
 constexpr DWORD gripFlags=shared::kControllerHandFlagGripActive|shared::kControllerHandFlagGripPositionValid|shared::kControllerHandFlagGripOrientationValid|
@@ -171,7 +171,7 @@ void Apply(void* soldier){
         if(inverse && ReadNativeComfortCamera(Multiply(native[0],body),&stable,soldier))
             trackingCamera=Multiply(stable,*inverse);
     }
-    HandFrame f{};f.torso=trackingCamera;f.bindings=bindings.value;f.supportReady=bindings.supportReady;const auto head=Compose(trackingCamera,s,s.head);if(!head)return;f.head=*head;
+    HandFrame f{};f.weaponPitchDegrees=s.weaponPitch;f.holdSupportUntilRelease=s.holdSupport;f.supportReleaseDistance=s.releaseDistance;f.torso=trackingCamera;f.bindings=bindings.value;f.supportReady=bindings.supportReady;const auto head=Compose(trackingCamera,s,s.head);if(!head)return;f.head=*head;
     const auto& right=s.input.hands[1];const auto& left=s.input.hands[0];
     if(!Tracked(right))return;
     const auto rg=Compose(trackingCamera,s,Pose(right.gripPose)),ra=Compose(trackingCamera,s,Pose(right.aimPose));if(!rg||!ra)return;
@@ -376,8 +376,8 @@ bool InstallNativeHands(LogFunction logger){
     logger("Support crate launch profile: %s",crateAdapterReady?"available":"unavailable; off-hand crates disabled");
     InstallNetworkClient(logger);installed=true;logger("Native hands connected: local first-person animation, pre-velocity launch pose and firearm adapters; tracking and owner guards enabled.");return true;
 }
-void PublishNativeHands(const shared::SharedControllerSample* sample,const stereo::Pose& reference,const stereo::Pose& head,float scale,float height,const RadioFrame& radio){
-    Sample s{};s.radio=radio;s.reference=reference;s.head=head;s.scale=scale;s.height=height;s.tick=GetTickCount64();
+void PublishNativeHands(const shared::SharedControllerSample* sample,const stereo::Pose& reference,const stereo::Pose& head,float scale,float height,const RadioFrame& radio,float weaponPitch,bool holdSupport,float releaseDistance){
+    Sample s{};s.weaponPitch=weaponPitch;s.holdSupport=holdSupport;s.releaseDistance=releaseDistance;s.radio=radio;s.reference=reference;s.head=head;s.scale=scale;s.height=height;s.tick=GetTickCount64();
     if(sample && (sample->flags&shared::kControllerSampleFlagSessionFocused) && Tracked(sample->hands[1])){s.input=*sample;s.enabled=true;}
     AcquireSRWLockExclusive(&sampleLock);current=s;ReleaseSRWLockExclusive(&sampleLock);if(!s.enabled)InterlockedExchange(&supporting,0);
 }
@@ -448,7 +448,7 @@ namespace bfvr::bf2142 {void EnableFingerPoses(bool enabled){fingerPosesEnabled=
 namespace bfvr::bf2142 {
 void ConfigureMotionActions(bool enabled){motionEnabled=enabled;motionPolicy.Reset();}
 void ResetMotionActions(){motionPolicy.Reset();AcquireSRWLockExclusive(&sampleLock);gesture={};ReleaseSRWLockExclusive(&sampleLock);}
-bool UpdateNativeMotion(const shared::SharedControllerSample* input,const stereo::Pose& head,ControllerCommand& command){
+bool UpdateNativeMotion(const shared::SharedControllerSample* input,const stereo::Pose& head,ControllerCommand& command,bool knifeTrigger){
     FirePose pose;Sample s;AcquireSRWLockShared(&sampleLock);pose=firePose;s=current;ReleaseSRWLockShared(&sampleLock);
     Target local;const auto kind=motionEnabled && input && FindTarget(bindingSoldier,&local)?Kind(local.weapon):MotionKind::None;
     // Consume virtual fire as soon as a supported item is equipped, including
@@ -460,7 +460,7 @@ bool UpdateNativeMotion(const shared::SharedControllerSample* input,const stereo
     if(!Compose(pose.tracking,s,Pose(input->hands[1].gripPose))){ResetMotionActions();return false;}
     const auto& hand=input->hands[1];
     MotionInput in{};in.owner=(std::uint64_t(reinterpret_cast<std::uintptr_t>(pose.soldier))<<32)|reinterpret_cast<std::uintptr_t>(pose.weapon);
-    in.time=input->predictedDisplayTime;in.kind=kind;in.active=true;in.hand=Pose(hand.gripPose).position;in.head=head.position;
+    in.triggerAttack=knifeTrigger;in.time=input->predictedDisplayTime;in.kind=kind;in.active=true;in.hand=Pose(hand.gripPose).position;in.head=head.position;
     in.grip=(hand.flags&shared::kControllerHandFlagSqueezeActive)&&std::isfinite(hand.squeezeValue)&&hand.squeezeValue>.55f;
     in.trigger=(hand.flags&shared::kControllerHandFlagTriggerActive)&&std::isfinite(hand.triggerValue)&&hand.triggerValue>.55f;
     const auto action=motionPolicy.Update(in);
@@ -479,6 +479,9 @@ bool UpdateNativeMotion(const shared::SharedControllerSample* input,const stereo
         x={x.x/a,x.y/a,x.z/a};const stereo::Vec3 y{z.y*x.z-z.z*x.y,z.z*x.x-z.x*x.z,z.x*x.y-z.y*x.x};
         g.launch.values[0]={x.x,x.y,x.z,0};g.launch.values[1]={y.x,y.y,y.z,0};g.launch.values[2]={z.x,z.y,z.z,0};
     }
+    // A trigger strike follows the visible blade. Motion strikes retain their
+    // measured stroke direction. Both retain native reach, speed and damage.
+    if(action.triggerStrike)g.launch=pose.world;
     g.serial=++nextGesture;if(!g.serial)g.serial=++nextGesture;
     AcquireSRWLockExclusive(&sampleLock);gesture=g;ReleaseSRWLockExclusive(&sampleLock);return action.primeEdge;
 }

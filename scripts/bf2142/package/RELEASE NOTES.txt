@@ -1,3 +1,18 @@
+BF2142 VR 0.2.0-beta.4-hotfix.4
+
+- Gun pitch calibration and support-hand retention/radius options.
+- Ten gameplay action bindings, including fallen-kit pickup and deployment.
+- Vehicle/gun-anchored HUD, optional cockpit pitch/roll, and post-vehicle-death
+  deployment on a fresh right-grip squeeze. LT + right grip opens deployment.
+- Optional right-trigger knife strike alongside physical stabbing/swinging.
+- One particle lifecycle update per stereo frame, with per-view camera refresh,
+  targeting transient effects disappearing between the two views.
+- Existing installer, rendering, water, optics and multiplayer bridge retained.
+
+See CONTROLS.txt and VR CONTROLS > NEXT for options. No new headset acceptance
+yet; the specific one-eye effects and knife-hit report require confirmation on
+the affected setup. See release CHECKS.txt for exact automated/package checks.
+
 BF2142 VR 0.2.0-beta.4-hotfix.3
 
 - Community Multiplayer launches the installed VR build with authenticated

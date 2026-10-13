@@ -23,8 +23,26 @@ bool VrControlsMenu::Interact(float x,float y,bool click,bool back,VrSettings& s
  dirty=true;
  if(h==0){open=true;return true;}
  if(h==10){open=false;return true;}
- if(h==11){voicePage=!voicePage;return true;}
- if(voicePage){
+ if(h==11){page=(page+1)%5;capture.Cancel();return true;}
+ if(page==1){
+  switch(h){
+   case 1:s.weaponPitchDegrees=std::max(-45.f,s.weaponPitchDegrees-2.f);break;
+   case 2:s.weaponPitchDegrees=std::min(45.f,s.weaponPitchDegrees+2.f);break;
+   case 3:s.weaponPitchDegrees=0;break;
+   case 4:s.holdSupportUntilRelease=!s.holdSupportUntilRelease;break;
+   case 5:s.supportReleaseDistance=s.supportReleaseDistance<.79f?s.supportReleaseDistance+.05f:.20f;break;
+   case 6:s.vehicleHorizonLock=!s.vehicleHorizonLock;break;
+   case 7:s.knifeTriggerAttack=!s.knifeTriggerAttack;break;
+   case 8:s.vehicleHudLocked=!s.vehicleHudLocked;break;
+   default:return true;
+  }saveFailed=!SaveVrPreferences(s);return true;
+ }
+ if(page==2||page==3){
+  if(h==9){s.bindings={};capture.Cancel();saveFailed=!SaveVrPreferences(s);return true;}
+  const unsigned index=(page-2)*8+unsigned(h-1);
+  if(index<bindCount){capture.Begin(index);}return true;
+ }
+ if(page==4){
   const auto cycle=[](unsigned selected,const std::vector<voice::Device>& devices){
    if(devices.empty())return ~0u;if(selected==~0u)return devices.front().id;
    for(size_t i=0;i+1<devices.size();++i)if(devices[i].id==selected)return devices[i+1].id;return ~0u;
@@ -77,8 +95,21 @@ const std::vector<DWORD>& VrControlsMenu::Artwork(UINT w,UINT h,DXGI_FORMAT form
    rect(.055f,.10f,.89f,.81f,RGB(13,26,36));rect(.055f,.10f,.006f,.81f,accent);
    label(.085f,.133f,L"BATTLEFIELD 2142  /  VR CONTROLS",30,ink,true);
    rect(.83f,.12f,.10f,.07f,hover==10?RGB(40,104,112):RGB(32,53,64));label(.845f,.137f,L"CLOSE",23,ink,true);
-   rect(.70f,.12f,.12f,.07f,hover==11?RGB(40,104,112):RGB(32,53,64));label(.712f,.137f,voicePage?L"CONTROLS":L"VOICE",21,ink,true);
-   if(voicePage){
+   rect(.70f,.12f,.12f,.07f,hover==11?RGB(40,104,112):RGB(32,53,64));label(.712f,.137f,L"NEXT >",21,ink,true);
+   if(page==1){
+    const std::wstring v[]={L"GUN PITCH - 2     "+std::to_wstring(int(s.weaponPitchDegrees))+L" deg",L"GUN PITCH + 2",L"RESET GUN ANGLE",L"SUPPORT: "+std::wstring(s.holdSupportUntilRelease?L"HOLD UNTIL RELEASE":L"DISTANCE RELEASE"),L"RELEASE RADIUS: "+std::to_wstring(int(s.supportReleaseDistance*100))+L" cm",L"VEHICLE: "+std::wstring(s.vehicleHorizonLock?L"LEVEL HORIZON":L"COCKPIT FOLLOW"),L"KNIFE TRIGGER: "+std::wstring(s.knifeTriggerAttack?L"ON":L"OFF"),L"VEHICLE HUD: "+std::wstring(s.vehicleHudLocked?L"VEHICLE AIM":L"HEAD")};
+    for(int i=0;i<8;++i){float y=.245f+i*.064f;rect(.09f,y,.39f,.0544f,hover==i+1?RGB(32,89,102):RGB(26,45,58));label(.103f,y+.012f,v[i],21,ink);}
+    label(.535f,.24f,L"AIM + VEHICLE COMFORT",25,accent,true);
+    const wchar_t* help[]={L"Negative pitch lowers the gun muzzle.",L"Sights and shots use the same angle.",L"Two-hand aim follows your hand positions.",L"Acquire near the gun, then keep gripping.",L"Release radius applies in distance mode.",L"Cockpit follow retains vehicle pitch/roll.",L"Head movement remains independent.",L"Knife: stab/swing, or press right trigger.",L"The game still controls reach and damage.",L"After death: release, then squeeze R grip.",L"Deploy anytime: left trigger + right grip."};
+    for(int i=0;i<11;++i)label(.535f,.292f+i*.038f,help[i],20,ink);
+   }else if(page==2||page==3){
+    for(unsigned row=0;row<8;++row){const unsigned index=(page-2)*8+row;if(index>=bindCount)break;const float y=.245f+row*.064f;rect(.09f,y,.39f,.0544f,hover==int(row)+1?RGB(32,89,102):RGB(26,45,58));
+     label(.103f,y+.005f,bindLabels[index],17,accent,true);label(.103f,y+.028f,capture.Selected()==int(index)?L"Release all, then press binding...":BindingLabel(s.bindings.keys[index]),18,ink);}
+    rect(.09f,.757f,.39f,.0544f,hover==9?RGB(32,89,102):RGB(26,45,58));label(.103f,.769f,L"RESTORE DEFAULT BINDINGS",21,ink);
+    label(.535f,.24f,L"CONTROLLER BINDINGS",25,accent,true);
+    const wchar_t* help[]={L"Choose an action on the left.",L"Release all buttons, then press a button.",L"For a combo: hold left trigger, then press.",L"PRIMARY is A / X on Touch-style controls.",L"SECONDARY is B / Y on Touch controls.",L"Available inputs depend on the runtime.",L"These bindings apply during gameplay.",L"Menu laser and physical grips stay fixed.",L"NEXT opens more bindings and voice.",L"Pickup kit: use near a dropped kit."};
+    for(int i=0;i<10;++i)label(.535f,.292f+i*.041f,help[i],20,ink);
+   }else if(page==4){
     const std::wstring voiceValues[]={L"PROXIMITY     "+std::wstring(s.proximityVoice?L"ON":L"OFF"),L"PROX MIC     "+std::wstring(s.proximityMuted?L"MUTED":L"VOICE ACTIVATED"),L"ACTIVATION     "+std::to_wstring(int(s.voiceThreshold))+L" dB",L"PROX VOLUME     "+std::to_wstring(int(s.voiceVolume*100))+L"%",L"MIC: "+std::wstring(s.voiceInput==~0u?L"DEFAULT":std::to_wstring(s.voiceInput)),L"OUTPUT: "+std::wstring(s.voiceOutput==~0u?L"DEFAULT":std::to_wstring(s.voiceOutput))};
     for(int i=0;i<6;++i){float y=.245f+i*.064f;rect(.09f,y,.39f,.0544f,hover==i+1?RGB(32,89,102):RGB(26,45,58));label(.103f,y+.012f,voiceValues[i],23,ink);}
     label(.535f,.24f,L"PROXIMITY + SQUAD RADIO",25,accent,true);
@@ -90,7 +121,7 @@ const std::vector<DWORD>& VrControlsMenu::Artwork(UINT w,UINT h,DXGI_FORMAT form
    }else{
    const std::wstring values[]={L"TURNING     "+std::wstring(s.snapTurning?L"SNAP":L"SMOOTH"),L"SNAP ANGLE     "+std::to_wstring(int(s.snapAngle))+L" degrees",L"CROSSHAIR     "+std::wstring(s.hideCrosshair?L"HIDDEN":L"VISIBLE"),L"PHYSICAL STANCE     "+std::wstring(s.physicalStance?L"ON":L"OFF"),L"CALIBRATE STANDING HEIGHT",L"GRIP TO HOLSTER     "+std::wstring(s.toggleWeaponGrip?L"ON":L"OFF"),L"GRENADE AIMING ARC     "+std::wstring(s.grenadeArc?L"ON":L"OFF"),L"3D MENU ROOM     "+std::wstring(s.menuRoom?L"ON":L"OFF"),L"MOVE: "+std::wstring(s.controllerRelativeMovement?L"LEFT CONTROLLER":L"HEAD / HMD")};
    for(int i=0;i<9;++i){float y=.245f+i*.064f;rect(.09f,y,.39f,.0544f,hover==i+1?RGB(32,89,102):RGB(26,45,58));label(.103f,y+.012f,values[i],23,ink);}
-   label(.535f,.24f,L"QUEST CONTROLLERS",25,accent,true);
+   label(.535f,.24f,L"DEFAULT CONTROLS",25,accent,true);
    const wchar_t* help[]={L"Left stick: move  /  click: sprint",L"Right stick: turn  /  click: recenter",L"Right trigger: fire or throw grenade",L"Right grip: holster / squeeze hand",L"Left grip near gun: support hand",L"Raise sights to your eye: aim",L"Look at left wrist: Deploy button",L"A: jump   B: game menu / back",L"X: reload   Y: use / enter vehicle",L"Left trigger + X / Y: cycle equipment",L"Left trigger + A: pick up fallen kit",L"Duck or lie down to change stance"};
    const wchar_t* vehicleHelp[]={L"Left stick: drive / steer",L"Look toward targets: aim movable guns",L"Right stick: aim / pilot pitch and roll",L"Right trigger: primary fire",L"Right grip: alternate fire / APC pod",L"Y: enter / exit vehicle or launcher",L"Hold left trigger + X: driver (seat 1)",L"Hold left trigger + Y: cycle seats 2-8",L"Press again if a seat is unavailable",L"Titan pod: enter, then right trigger",L"Right stick click: recenter",L"Aircraft pilot weapons stay fixed"};
    for(int i=0;i<12;++i)label(.535f,.292f+i*.038f,vehicle?vehicleHelp[i]:help[i],22,ink);

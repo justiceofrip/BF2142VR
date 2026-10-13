@@ -1,5 +1,52 @@
 # BFVR AI and Developer Handoff
 
+## Controller and vehicle feedback update (2026-10-13)
+
+Gun pitch is applied once in SolveTrackedHands before the accepted native hand
+binding. Two-hand aim still follows physical hand positions. Do not independently
+rotate native shots, scopes, network poses or the observer IK: they consume the
+same solved weapon. Zero pitch preserves the old pose. Support hold mode only
+removes the authored-grip distance release after acquisition; tracking validity,
+owner changes, release and physical hand-separation guards remain mandatory.
+
+ControllerBindings maps ten gameplay actions to runtime-exposed buttons/chords.
+Capture waits for release and consumes menu input, and assigning a button clears
+an existing identical binding. A modifier suppresses its base only when a chord
+actually uses that button, preserving sprint/recenter. Native menu laser/back,
+physical grips, vehicle seat shortcuts and firing are not generalized bindings.
+Steam Frame extra controls must be exposed by the active runtime; this does not
+introduce a new controller extension. Pickup emits stock G, not an inventory swap.
+
+NativeDeploymentAvailable reads the signature-checked local soldier independently
+of infantry inventory and vehicle adapters. Missing inventory alone is not death.
+DeployGrip requires release before a fresh squeeze and emits a 120-ms Enter pulse.
+LT + right grip is an explicit deployment fallback; consume its grip before
+holster/body-inventory policy. Unknown native ownership fails closed.
+
+VehicleView keeps the accepted chassis-local camera, optionally retaining its
+pitch/roll. VehicleHudAnchor inverts ComposeRuntimeHeadWithD3D8Camera to place the
+native aim camera in runtime space through the comfort base/recenter reference.
+The existing UI world-anchor IPC fields carry that pose; no protocol change.
+Validate owner/seat/root and freshness before anchoring. Pilot weapons remain
+fixed; turret steering and server authority are unchanged. The whole vehicle
+HUD follows this anchor; infantry HUD behavior is unchanged.
+
+NativeParticleReplay validates the supported renderer's update/camera callsites
+and vtables. The stock zero-delta particle update still processes lifecycle
+queues and callbacks, so right-eye/scope replay refreshes only camera-dependent
+particle data. First-eye/native flat updates retain their original delta. Unknown
+profiles/owners/cameras fall back to the native path. This is not proof every
+screen-space EMP/vehicle effect is fixed: headset reproduction is outstanding.
+
+KnifeTriggerAttack creates a fresh-press gesture through the existing validated
+native motion-fire path, using the visible blade pose. It retains focus/owner,
+settling, cooldown and tracking-jump guards; no extra reach or server damage.
+It is an alternative input, not confirmed resolution of the tester's missed hits.
+
+Regression coverage: FeedbackPolicyTests, NativeParticleReplayTests, expanded
+NativeHudStateTests/TrackingInputTests, all-page MenuGpuSmoke and existing suite.
+Release CHECKS.txt records exact artifact validation and headset limitations.
+
 ## Installed VR community launch (2026-10-03)
 
 Plain Player.ps1 did not set BF2142VR_NETWORK. Supported-server ADS, movement

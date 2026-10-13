@@ -1,8 +1,8 @@
 # Battlefield 2142 VR — beta.4
 
-**[Download the VR launcher / installer](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.4-hotfix.3/BF2142VRSetup.exe)** — choose BF2142.exe, then **Install / Update**. Connect your headset and click **Play VR**.
+**[Download the VR launcher / installer](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-beta.4-hotfix.4/BF2142VRSetup.exe)** — choose BF2142.exe, then **Install / Update**. Connect your headset and click **Play VR**.
 
-One launcher provides **Check for updates**, **Repair**, **Save error report** and **Report on GitHub**. Updates verify signed file hashes and preserve settings/backups. Reports stay local until you review and attach them. [ZIP, release notes and validation](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-hotfix.3).
+One launcher provides **Check for updates**, **Repair**, **Save error report** and **Report on GitHub**. Updates verify signed file hashes and preserve settings/backups. Reports stay local until you review and attach them. [ZIP, release notes and validation](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-beta.4-hotfix.4).
 
 **Desktop / monitor players: [Download BF2142 Flat Viewer](https://github.com/justiceofrip/BF2142VR/releases/download/v0.2.0-flat-beta.2/BF2142FlatViewer.exe)** — open it and click **Play**. Automatic updates, desktop shortcut, repair and readable error reports. **No headset or SteamVR required.** [ModDB-ready ZIP and instructions](https://github.com/justiceofrip/BF2142VR/releases/tag/v0.2.0-flat-beta.2).
 

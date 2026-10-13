@@ -1,4 +1,5 @@
 #include "StereoSession.h"
+#include "NativeHudState.h"
 #include "RenderProfile.h"
 #include "FramePixels.h"
 #include "GpuFrameTransfer.h"
@@ -79,6 +80,7 @@ void RestoreFramePacing(){
     if(savedNativeFrameCap>0)SetNativeFrameRate(savedNativeFrameCap,nullptr,true);
     savedNativeFrameCap=-1;frameLimitAttempted=false;
 }
+DeployGrip deployGrip;
 WristMenu wristMenu;WristMenuGpu wristGpu;WristFrame wristFrame;
 InventoryNames inventoryNames{};
 int equippedItem=0;bool bodyActive=false;
@@ -242,14 +244,15 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     const bool chuteHands=traversalValid&&traversal.mode==TraversalMode::Parachute;
     const bool mounted=(traversalValid && traversal.mode!=TraversalMode::Foot)||vehicleKnown;
     RequestAutomaticAds(accepted && gameplay && !showMenu && !mounted && settings.motionHands);
+    const bool bindingCapture=controlsMenu.Capture(accepted?&sample:nullptr,settings);
     ControllerCommand command{};
     const bool nativeSnap=accepted && gameplay && !showMenu && settings.snapTurning && NativeSnapTurnAvailable();
     if(!nativeSnap)ClearNativeSnapTurn();
     const float movementYaw=vehicleKnown?0.f:LocomotionYaw(settings.controllerRelativeMovement,reference,Pose(request.headPose),sample);
     const bool nativeMovement=ConfigureNativeMovement(accepted&&gameplay&&!showMenu&&!mounted,movementYaw);
     ConfigureNativeLookPitch(accepted&&gameplay&&!showMenu&&!mounted&&settings.motionHands,Pose(request.headPose));
-    if(accepted) {
-        command=MapControllers(controllerPolicy,sample,gameplay && !showMenu,nativeMovement?0.f:movementYaw,settings.turnSpeed,settings.motionHands&&!vehicleKnown,nativeSnap,settings.snapAngle);
+    if(accepted&&!bindingCapture) {
+        command=MapControllers(controllerPolicy,sample,gameplay && !showMenu,nativeMovement?0.f:movementYaw,settings.turnSpeed,settings.motionHands&&!vehicleKnown,nativeSnap,settings.snapAngle,settings.bindings);
         if(command.snapDegrees && !command.recenter)
             RequestNativeSnapTurn(command.snapDegrees,sample.predictedDisplayTime);
         if(gameplay && !showMenu && !mounted && HandlesAutomaticAds())command.buttons[1]=0;
@@ -264,11 +267,16 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
             ConfigureNativeTracking(settings.worldScale,settings.heightOffset,&gripHead,&gripReference,&grip);
         }
     } else { controllerPolicy={}; }
+    // The deploy chord owns this squeeze; opening a menu must not also draw or
+    // holster a weapon. Keep inventory/owner state alive while consuming grip.
+    const bool deployIntent=command.keys[0x1c]!=0;
+    auto interactionSample=sample;
+    if(deployIntent){interactionSample.hands[1].squeezeValue=0;command.buttons[0]=command.buttons[1]=0;}
     std::array<bool,10> inventory{};
     std::uint64_t inventoryOwner=0;
     const bool inventoryValid=accepted && gameplay && !showMenu && !mounted && settings.motionHands && ReadNativeInventory(&inventory,&equippedItem,&inventoryNames,&inventoryOwner);
     bodyActive=inventoryValid && settings.bodyInventory;
-    auto body=bodyInventory.Update(inventoryValid,sample,Pose(request.headPose),inventory,equippedItem);
+    auto body=bodyInventory.Update(inventoryValid,interactionSample,Pose(request.headPose),inventory,equippedItem);
     if(!settings.bodyInventory){body.hovered=body.selected=-1;body.key=0;}
     bodyActive=bodyActive && body.anchorValid;
     if(bodyActive){
@@ -278,7 +286,7 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     bodyFrame=body;
     constexpr DWORD gripFlags=shared::kControllerHandFlagGripActive|shared::kControllerHandFlagGripPositionValid|shared::kControllerHandFlagGripOrientationValid|
         shared::kControllerHandFlagGripPositionTracked|shared::kControllerHandFlagGripOrientationTracked|shared::kControllerHandFlagSqueezeActive;
-    const auto& right=sample.hands[1];
+    const auto& right=interactionSample.hands[1];
     const bool gripTracked=(right.flags&gripFlags)==gripFlags;
     if(!settings.toggleWeaponGrip || (accepted && gameplay && !showMenu && !mounted && !inventoryValid))weaponGrip.Reset();
     bool held=weaponGrip.Update({settings.toggleWeaponGrip && inventoryValid && gripTracked && !command.recenter,
@@ -323,8 +331,8 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
         RequestAutomaticAds(false);
     }
     PublishNativeHands(accepted && gameplay && !showMenu && !command.recenter && (!mounted||chuteHands) && settings.motionHands?&sample:nullptr,
-        reference,Pose(request.headPose),settings.worldScale,settings.heightOffset,radioFrame);
-    if(UpdateNativeMotion(accepted && gameplay && !showMenu && !mounted && settings.motionHands && held && !command.recenter && !body.key && !supportFrame.busy && !wristFrame.hovered && !wristMenu.Consuming()?&sample:nullptr,Pose(request.headPose),command))
+        reference,Pose(request.headPose),settings.worldScale,settings.heightOffset,radioFrame,settings.weaponPitchDegrees,settings.holdSupportUntilRelease,settings.supportReleaseDistance);
+    if(UpdateNativeMotion(accepted && gameplay && !showMenu && !mounted && settings.motionHands && held && !command.recenter && !body.key && !supportFrame.busy && !wristFrame.hovered && !wristMenu.Consuming()?&sample:nullptr,Pose(request.headPose),command,settings.knifeTriggerAttack))
         InterlockedIncrement(&b->hapticNativeMenuHoverSequence);
     int stance=0;
     const bool physical=accepted && gameplay && !showMenu && settings.physicalStance && inventoryValid && ReadNativeStance(&stance);
@@ -335,8 +343,9 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     if(traversalValid&&!command.recenter)traversalControls.Update(traversal,sample,Pose(request.headPose),command);
     else traversalControls.Reset();
     if(vehicleValid&&accepted){command.keys[0x22]=0;command.keys[0x39]=(sample.hands[1].buttons&shared::kControllerHandButtonPrimary)?0x80:0;}
-    UpdateNativeVehicle(vehicleValid&&!command.recenter?&vehicle:nullptr,accepted?&sample:nullptr,reference,Pose(request.headPose),settings.worldScale,settings.heightOffset,command);
-    menuPointer.Update(showMenu,accepted?&sample:nullptr,request,width,height,
+    UpdateNativeVehicle(vehicleValid&&!command.recenter?&vehicle:nullptr,accepted?&sample:nullptr,reference,Pose(request.headPose),settings.worldScale,settings.heightOffset,command,settings.vehicleHorizonLock);
+    if(bindingCapture)command={};
+    menuPointer.Update(showMenu,accepted&&!bindingCapture?&sample:nullptr,request,width,height,
         (diagnostic||desktop)?(widescreenUi?1600:width):b->requirements.uiWidth,(diagnostic||desktop)?(widescreenUi?900:height):b->requirements.uiHeight,command,&controlsMenu,&settings,widescreenUi,desktop);
     if(controlsMenu.RecenterRequested()){Recenter(true);ClearNativeHands();command.keys[0x2f]=0;}
     SetCrosshairHidden(settings.hideCrosshair);
@@ -346,6 +355,10 @@ bool GetRequest(bool gameplay=false,bool pausedMenu=false) {
     if(fistBumps&1)InterlockedIncrement(&b->hapticFistLeftSequence);
     if(fistBumps&2)InterlockedIncrement(&b->hapticFistRightSequence);
     voice::PublishControls(voice::VoicePreferences(settings),accepted&&gameplay&&!showMenu&&!command.recenter&&runtimeFocus.value_or(false)&&foregroundPid==GetCurrentProcessId(),radioFrame.pressed);
+    const bool deadDeploy=NativeDeploymentAvailable();
+    if(deployGrip.Update(accepted&&gameplay&&!showMenu&&!command.recenter,deadDeploy,
+        accepted&&RawControllerButton(sample,11),sample.predictedDisplayTime))command.keys[0x1c]=0x80;
+    if(deadDeploy&&accepted)command.buttons[1]=0;
     wristMenu.Apply(command,showMenu);
     if(desktop)BlockDesktopHotkeys(command);
     if(command.selection.gesture>0&&sample.predictedDisplayTime>=command.selection.gesture)
@@ -455,15 +468,16 @@ void Publish(bool world) {
         desktopCaptureHeld=captureNow;
     }
     const bool menu=menuPointer.Active();
-    if(menu) {
-        const auto& a=menuPointer.Anchor();
+    const auto vehicleHud=world&&!menu&&settings.vehicleHudLocked?ReadVehicleHudAnchor(reference,settings.worldScale):std::nullopt;
+    if(menu||vehicleHud) {
+        const auto& a=menu?menuPointer.Anchor():*vehicleHud;
         b->frameUiWorldAnchor={};
         b->frameUiWorldAnchor.positionX=a.position.x;b->frameUiWorldAnchor.positionY=a.position.y;b->frameUiWorldAnchor.positionZ=a.position.z;
         b->frameUiWorldAnchor.orientationX=a.orientation.x;b->frameUiWorldAnchor.orientationY=a.orientation.y;
         b->frameUiWorldAnchor.orientationZ=a.orientation.z;b->frameUiWorldAnchor.orientationW=a.orientation.w;
     }
-    InterlockedExchange(&b->frameUiWorldAnchorValid,menu?1:0);
-    InterlockedExchange(&b->frameUiReferenceMode,static_cast<LONG>(menu || !world?shared::UiReferenceMode::WorldLocked:shared::UiReferenceMode::HeadLocked));
+    InterlockedExchange(&b->frameUiWorldAnchorValid,menu||vehicleHud?1:0);
+    InterlockedExchange(&b->frameUiReferenceMode,static_cast<LONG>(menu || vehicleHud || !world?shared::UiReferenceMode::WorldLocked:shared::UiReferenceMode::HeadLocked));
     InterlockedIncrement(&b->producedFrameCount);
     InterlockedExchange(&b->frameSequence,pending);
     if (diagnostic||desktop) InterlockedExchange(&b->consumedFrameSequence,pending);

@@ -258,8 +258,14 @@ int main(){
     if(GetPrivateProfileIntW(L"VR",L"HideWorldMarkers",0,values.configPath.c_str())!=1)return 92;
     values.hideWorldMarkers=false;
     if(!bf2142::SaveVrPreferences(values)||GetPrivateProfileIntW(L"VR",L"HideWorldMarkers",1,values.configPath.c_str())!=0)return 93;
-    // Voice settings are independent from locomotion and native radio.
+    // Aim/comfort controls persist without changing the accepted locomotion.
     if(!options.Interact(.75f,.15f,true,false,values,1.7f))return 107;
+    if(!options.Interact(.2f,.26f,true,false,values,1.7f)||values.weaponPitchDegrees!=-2)return 133;
+    if(GetPrivateProfileIntW(L"VR",L"WeaponPitchDegrees",0,values.configPath.c_str())!=-2)return 134;
+    if(!options.Interact(.2f,.58f,true,false,values,1.7f)||values.vehicleHorizonLock)return 135;
+    if(!options.Interact(.2f,.45f,true,false,values,1.7f)||values.holdSupportUntilRelease)return 136;
+    for(int page=0;page<3;++page)if(!options.Interact(.75f,.15f,true,false,values,1.7f))return 137;
+    // Voice settings remain independent on their own page.
     if(!options.Interact(.2f,.32f,true,false,values,1.7f)||!values.proximityMuted)return 108;
     if(GetPrivateProfileIntW(L"VR",L"ProximityMicMuted",0,values.configPath.c_str())!=1)return 109;
     if(!values.snapTurning||!values.proximityVoice)return 110;

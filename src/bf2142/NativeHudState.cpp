@@ -62,4 +62,24 @@ NativeHudState& State(){
 }
 bool NativeHudMenuActive(HudTarget* target){return State().Read(target);}
 bool NativeHudTarget(HudTarget* target){return State().Read(target,false);}
+bool NativeDeploymentAvailable(const BYTE* g,const BYTE* r){
+    // Read the local soldier independently of the infantry/seat adapters. A
+    // missing inventory is not death: drivers and passengers have no inventory.
+    __try {
+        const BYTE getter[]={0x8b,0x41,0x6c,0xc3};
+        if(!g||!r||std::memcmp(g+0xb7530,getter,sizeof(getter))||Get<const BYTE*>(g,0x5292a0+0x30)!=g+0xb7530)return false;
+        const auto pm=Get<const BYTE*>(r,0x221a58);
+        if(!pm||Get<const BYTE*>(pm)!=g+0x5292a0)return false;
+        const auto player=Get<const BYTE*>(pm,0x6c);
+        if(!player||Get<const BYTE*>(player)!=g+0x566cd8)return false;
+        const auto weak=Get<const BYTE*>(player,0xcc);
+        const auto soldier=weak?Get<const BYTE*>(weak,4):nullptr;
+        return !soldier||(Get<const BYTE*>(soldier)==g+0x566150&&(Get<DWORD>(soldier,0x14)&0x20));
+    }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
+}
+bool NativeDeploymentAvailable(){
+    auto r=reinterpret_cast<const BYTE*>(GetModuleHandleW(L"RendDX9_ori.dll"));
+    if(!r)r=reinterpret_cast<const BYTE*>(GetModuleHandleW(L"RendDX9.dll"));
+    return NativeDeploymentAvailable(reinterpret_cast<const BYTE*>(GetModuleHandleW(nullptr)),r);
+}
 }

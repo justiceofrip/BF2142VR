@@ -1,12 +1,20 @@
-BATTLEFIELD 2142 VR - QUEST CONTROLLERS
+BATTLEFIELD 2142 VR - DEFAULT CONTROLS
+
+Names A/B/X/Y below correspond to primary/secondary buttons on Touch-style
+controllers. VR CONTROLS > NEXT offers gun/vehicle options and two rebinding
+pages. Inputs available for binding depend on your OpenXR runtime.
 
 Right trigger: fire; click a menu with the laser.
 Right grip while holding equipment: click to holster it.
 Right grip while empty: squeeze the hand; it does not recall the last gun.
 Left grip near rifle foregrip: support with both hands.
+Keep squeezing to retain support when bringing the gun into line. To restore
+distance release, choose it in AIM + VEHICLE COMFORT and adjust its radius.
 Left grip while cupping your right hand: stabilize a pistol/revolver.
 Bring a supported sight to either eye: automatic ADS, no button required.
-Knife: draw from the chest, let the grip settle, then swing/stab.
+Knife: draw from the chest, let the grip settle, then swing/stab or press right
+trigger for a strike. Release before the next trigger strike. Native reach,
+cooldown and hit rules still apply. Trigger strikes can be disabled.
 Grenade: right trigger throws. The trajectory guide currently has known issues.
 Thumb/index touch, grip and trigger animate fingers; no bare-hand tracking.
 
@@ -16,6 +24,19 @@ A: jump / native parachute action. B: menu/back.
 X: reload. Y: interact / enter / exit a vehicle.
 Left trigger + X/Y while on foot: equipment cycling.
 Left trigger + A while on foot: pick up a fallen kit (stock G action).
+Stand close to the dropped kit; hold the combination briefly for native input.
+Left trigger + right grip: open the native deployment/loadout screen.
+After death: release right grip, then squeeze it to open deployment.
+
+AIM CALIBRATION AND REBINDING
+VR CONTROLS > NEXT > GUN PITCH: negative values lower the muzzle. Two-hand aim
+still follows the positions of your hands. RESET GUN ANGLE restores the original.
+On CONTROLLER BINDINGS, select an action, release all buttons, then press its
+new button. For a chord, hold left trigger and press the second button. An
+identical existing binding is cleared. RESTORE DEFAULT BINDINGS resets all ten.
+Bindings cover jump, reload, use, kit pickup, deploy, sprint, recenter, menu and
+equipment cycling. Menu laser/back, physical grips and fire retain their normal
+controls. Extra hardware buttons must be exposed by the runtime first.
 
 BODY SLOTS
 Main weapon: behind right shoulder. Pistol: right hip. Knife: chest.
@@ -42,6 +63,9 @@ Titan: Y enters the pod launcher; right trigger launches (right grip also works)
 Movable stock guns follow head aim within native traverse limits. Aircraft
 pilot guns stay fixed to aircraft direction; looking does not steer flight.
 Nekomata main gun follows head pitch; steer its hull for horizontal aim.
+The vehicle HUD now follows vehicle/gun aim. AIM + VEHICLE COMFORT can switch
+it back to head-follow. VEHICLE: COCKPIT FOLLOW retains chassis pitch/roll;
+LEVEL HORIZON remains the default. Head movement stays independent in both.
 
 MENUS
 Look directly at the left wrist for 0.4 seconds to reveal the smaller DEPLOY

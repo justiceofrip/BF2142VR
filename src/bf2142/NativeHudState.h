@@ -11,6 +11,8 @@ private:
 };
 bool NativeHudMenuActive(HudTarget* target=nullptr);
 bool NativeHudTarget(HudTarget* target);
+bool NativeDeploymentAvailable();
+bool NativeDeploymentAvailable(const BYTE* game,const BYTE* renderer);
 // Mirrors HUDManager::isInMenu, with unknown modes rejected.
 bool InteractiveHudMode(int mode) noexcept;
 }

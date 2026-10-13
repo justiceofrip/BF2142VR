@@ -1,6 +1,7 @@
 #pragma once
 #include "StereoSession.h"
 #include "ComfortControls.h"
+#include "ControllerBindings.h"
 #include "stereo/DirectionalLocomotion.h"
 #include <array>
 namespace bfvr::bf2142 {
@@ -28,5 +29,5 @@ bool MatchingControllerSample(const shared::SharedControllerSample& sample,LONG 
 float LocomotionYaw(bool controllerRelative,const stereo::Pose& reference,const stereo::Pose& head,
     const shared::SharedControllerSample& sample) noexcept;
 ControllerCommand MapControllers(ControllerPolicyState& state,
-    const shared::SharedControllerSample& sample,bool gameplay,float movementYaw,float turnSpeed,bool motionHands=false,bool snapTurning=false,float snapAngle=30.f) noexcept;
+    const shared::SharedControllerSample& sample,bool gameplay,float movementYaw,float turnSpeed,bool motionHands=false,bool snapTurning=false,float snapAngle=30.f,const ControllerBindings& bindings={}) noexcept;
 }

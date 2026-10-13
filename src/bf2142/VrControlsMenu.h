@@ -9,6 +9,13 @@ class VrControlsMenu {
 public:
  void Vehicle(bool value){if(vehicle!=value){vehicle=value;dirty=true;}}
  bool Open() const {return open;}
+ bool Capture(const shared::SharedControllerSample* sample,VrSettings& s){
+    const bool active=capture.Selected()>=0;
+    if(!open){capture.Cancel();return false;}
+    if(capture.Update(sample,s.bindings)){saveFailed=!SaveVrPreferences(s);dirty=true;}
+    if(active&&capture.Selected()<0)dirty=true;
+    return active;
+ }
  void Hotkey(bool down);
  bool FilterBack(bool pressed){if(!pressed)backHeld=false;return pressed && backHeld;}
  bool Interact(float x,float y,bool click,bool back,VrSettings& settings,float headHeight);
@@ -18,7 +25,7 @@ public:
  void Reset(){open=false;hover=-1;dirty=true;}
  bool RecenterRequested(){bool r=recenter;recenter=false;return r;}
 private:
- bool vehicle=false,voicePage=false,cachedWidescreen=false;
+ bool vehicle=false,cachedWidescreen=false;unsigned page=0;BindingCapture capture;
  bool open=false,keyHeld=false,dirty=true,recenter=false,saveFailed=false,backHeld=false;
  int hover=-1;UINT cachedWidth=0,cachedHeight=0;DXGI_FORMAT cachedFormat=DXGI_FORMAT_UNKNOWN;
  std::vector<DWORD> art;UINT64 revision=0;

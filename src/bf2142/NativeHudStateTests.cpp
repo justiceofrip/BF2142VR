@@ -33,5 +33,19 @@ int main(){
     for(size_t off:{size_t(0xc2db0),size_t(0x3515c0),size_t(0x3515d9),size_t(0x46dcd0),size_t(0x5a6b50+0x30),size_t(0x5a6b50+0x228),size_t(0x5b8528+0x4c),size_t(0x5cb870+0x48)}){
         game[off]^=1;if(state.Connect(game,render)||state.Read())return 11;game[off]^=1;if(!state.Connect(game,render)||!state.Read())return 12;
     }
-    puts("HUD deployment/spawn/Flash transitions, hidden cursor, native GUI dimensions and stale/unknown owner guards passed.");
+    // Death does not depend on having an infantry inventory: a living driver
+    // is not dead, and a missing/dead soldier permits redeploy after any seat.
+    std::array<BYTE,0x80> manager{};std::array<BYTE,0xe0> player{};
+    std::array<BYTE,8> weak{};std::array<BYTE,0x20> soldier{};
+    const BYTE getter[]={0x8b,0x41,0x6c,0xc3};std::memcpy(game+0xb7530,getter,sizeof(getter));
+    Put(game,0x5292a0+0x30,game+0xb7530);Put(render,0x221a58,manager.data());
+    Put(manager.data(),0,game+0x5292a0);Put(manager.data(),0x6c,player.data());Put(player.data(),0,game+0x566cd8);
+    if(!NativeDeploymentAvailable(game,render))return 20;
+    Put(player.data(),0xcc,weak.data());Put(weak.data(),4,soldier.data());Put(soldier.data(),0,game+0x566150);
+    if(NativeDeploymentAvailable(game,render))return 21;
+    Put(soldier.data(),0x14,DWORD(0x20));if(!NativeDeploymentAvailable(game,render))return 22;
+    Put(soldier.data(),0,game+0x566154);if(NativeDeploymentAvailable(game,render))return 23;
+    Put(weak.data(),4,static_cast<BYTE*>(nullptr));if(!NativeDeploymentAvailable(game,render))return 24;
+    game[0xb7530]^=1;if(NativeDeploymentAvailable(game,render))return 25;
+    puts("HUD deployment/spawn/Flash transitions, vehicle death, hidden cursor, native GUI dimensions and stale/unknown owner guards passed.");
 }

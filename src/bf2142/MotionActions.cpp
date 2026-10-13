@@ -40,7 +40,10 @@ MotionResult MotionActions::Update(const MotionInput& in) noexcept {
             travel+=Length(Sub(step,headStep));
             if(in.time-swingSince>350000000){rested=false;travel=0;}
         }
-        if(ready && rested && speed>.65f && travel>.045f && in.time-lastStrike>550000000 && Length(Sub(in.hand,in.head))>.20f){
+        const bool triggerStrike=in.triggerAttack&&in.trigger&&!previous.trigger;
+        const bool stroke=rested&&speed>.65f&&travel>.045f&&Length(Sub(in.hand,in.head))>.20f;
+        if(ready && (triggerStrike||stroke) && in.time-lastStrike>550000000){
+            out.triggerStrike=triggerStrike;
             out.action=MotionKind::Knife;out.position=in.hand;out.velocity=relativeVelocity;
             pressedUntil=in.time+140000000;lastStrike=in.time;rested=false;travel=0;swingSince=0;
         }

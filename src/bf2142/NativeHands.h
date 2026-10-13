@@ -9,7 +9,7 @@ struct TrackedWeaponFrame {void* weapon=nullptr;stereo::Matrix4 world{};std::arr
 bool ReadTrackedWeaponFrame(TrackedWeaponFrame* result,bool previousSample=false);
 bool InstallNativeHands(LogFunction logger);
 void PublishNativeHands(const shared::SharedControllerSample* sample,const stereo::Pose& reference,
-    const stereo::Pose& head,float worldScale,float heightOffset,const RadioFrame& radio={});
+    const stereo::Pose& head,float worldScale,float heightOffset,const RadioFrame& radio={},float weaponPitch=0,bool holdSupport=false,float releaseDistance=.30f);
 void ClearNativeHands();
 void DrawNativeOptic(std::vector<DWORD>& pixels,UINT width,UINT height,DXGI_FORMAT format,const EyeCamera& eye);
 }
@@ -32,7 +32,7 @@ namespace bfvr::bf2142 {
 struct ControllerCommand;
 void ConfigureMotionActions(bool enabled);
 void ResetMotionActions();
-bool UpdateNativeMotion(const shared::SharedControllerSample*,const stereo::Pose& head,ControllerCommand&);
+bool UpdateNativeMotion(const shared::SharedControllerSample*,const stereo::Pose& head,ControllerCommand&,bool knifeTrigger=true);
 }
 
 namespace bfvr::bf2142 {

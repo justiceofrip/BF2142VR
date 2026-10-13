@@ -5,6 +5,7 @@
 #include "NativeComfort.h"
 #include "NativeVehicle.h"
 #include "NativeHudPointer.h"
+#include "NativeParticleReplay.h"
 #include "NativeCrosshair.h"
 #include "NativeWorldMarkers.h"
 #include <MinHook.h>
@@ -270,6 +271,7 @@ bool InstallNativeStereo(LogFunction logger) {
     if(!InstallNativeComfort(logger))logger("Infantry VR comfort unavailable: native heading/recoil profile or hook mismatch.");
     if(!InstallNativeQueryGuard(image,logger))logger("Native renderer query guard unavailable: profile or hook mismatch.");
     if(!InstallNativeMenus(image,logger)) logger("Native Flash menu hook unavailable; HUD capture remains active.");
+    if(!InstallNativeParticleReplay(image,logger))logger("Stereo particle lifecycle profile unavailable; native fallback retained.");
     logMessage("Native stereo camera/frame/HUD hooks installed; renderer=%p; native aiming retained.",image);
     return true;
 }

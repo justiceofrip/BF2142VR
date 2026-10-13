@@ -111,7 +111,8 @@ bool ConfigureNativeMovement(bool,float){return false;}
 bool ConfigureNativeLookPitch(bool,const stereo::Pose&){return false;}
 bool ReadNativeTraversal(TraversalSample*){return false;}
 bool ReadNativeVehicle(VehicleSample*){return false;}
-void UpdateNativeVehicle(const VehicleSample*,const shared::SharedControllerSample*,const stereo::Pose&,const stereo::Pose&,float,float,ControllerCommand&){}
+void UpdateNativeVehicle(const VehicleSample*,const shared::SharedControllerSample*,const stereo::Pose&,const stereo::Pose&,float,float,ControllerCommand&,bool){}
+std::optional<stereo::Pose> ReadVehicleHudAnchor(const stereo::Pose&,float){return {};}
 void RecenterNativeVehicle(){}
 void ConfigurePhysicalCamera(bool){}
 void SetCrosshairHidden(bool){}
@@ -129,7 +130,7 @@ bool BeginNativeScope(void*,const stereo::Matrix4& world,const stereo::FovTangen
     const auto camera=MakeEyeCamera({world,.04f,100}, {}, {},fov);if(!camera)return false;currentEye=*camera;return true;
 }
 bool InstallNativeHands(LogFunction){return true;}
-void PublishNativeHands(const shared::SharedControllerSample*,const stereo::Pose&,const stereo::Pose&,float,float,const RadioFrame&){}
+void PublishNativeHands(const shared::SharedControllerSample*,const stereo::Pose&,const stereo::Pose&,float,float,const RadioFrame&,float,bool,float){}
 void ClearNativeHands(){}
 unsigned TakeNetworkFistBumps(bool){return 0;}
 bool ReadNativeWeaponProjection(stereo::Matrix4* p){*p=currentEye.projection;return true;}
@@ -328,7 +329,7 @@ namespace bfvr::bf2142 {void EnableFingerPoses(bool){}}
 
 namespace bfvr::bf2142 {void SetDesktopInput(bool){}}
 
-namespace bfvr::bf2142 {void ConfigureMotionActions(bool){} void ResetMotionActions(){} bool UpdateNativeMotion(const shared::SharedControllerSample*,const stereo::Pose&,ControllerCommand&){return false;} }
+namespace bfvr::bf2142 {void ConfigureMotionActions(bool){} void ResetMotionActions(){} bool UpdateNativeMotion(const shared::SharedControllerSample*,const stereo::Pose&,ControllerCommand&,bool){return false;} }
 
 namespace bfvr::bf2142 {void HideNativeWeaponForReplay(bool hide){hiddenWeapon=hide;} bool ReadTrackedWeaponFrame(TrackedWeaponFrame* frame,bool){
     if(!solidFixture)return false;frame->world=currentEye.world;strcpy_s(frame->name.data(),frame->name.size(),"fixture");return true;}}

@@ -69,3 +69,5 @@ int main(){
     puts("Native first-person camera refresh, no duplicate IPD, scope/legacy overrides and restoration passed.");
     return 0;
 }
+
+namespace bfvr::bf2142 {bool InstallNativeParticleReplay(BYTE*,LogFunction){return false;}}

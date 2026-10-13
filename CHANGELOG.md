@@ -1,5 +1,27 @@
 # BFVR Changelog
 
+## BF2142 VR 0.2.0-beta.4-hotfix.4 (2026-10-13)
+
+- Add gun pitch calibration, support-hand hold-until-release (default), and an
+  adjustable release radius for players who prefer distance-based release.
+- Add in-game rebinding for ten gameplay actions, including fallen-kit pickup
+  and deployment. Default kit pickup remains left trigger + A; deployment is
+  left trigger + right grip. Runtime-exposed controller inputs are supported.
+- Anchor the vehicle HUD to native vehicle/gun aim, with a head-follow option.
+  Add optional cockpit pitch/roll; level-horizon comfort remains the default.
+- Read death independently of infantry inventory so a fresh right-grip squeeze
+  can request deployment after dying in a vehicle as well as on foot.
+- Add a right-trigger knife strike alongside physical swings/stabs. Native
+  reach, cooldown and damage rules remain in charge.
+- Stop repeating particle lifecycle updates for the second eye and scope;
+  refresh camera-dependent particle data for each view. This targets effects
+  disappearing between views without advancing their simulation twice.
+- Keep the previous installer repairs, water/optics work, launcher multiplayer
+  bridge and network protocol. New settings save without replacing old settings.
+- These changes have automated policy, native-profile, GPU and package checks;
+  there is no new headset acceptance yet. The specific one-eye explosion/EMP
+  effects and knife-hit report still need confirmation on the affected setup.
+
 ## BF2142 VR 0.2.0-beta.4-hotfix.3 (2026-10-03)
 
 - Add Community Multiplayer to the launcher, connecting the authenticated

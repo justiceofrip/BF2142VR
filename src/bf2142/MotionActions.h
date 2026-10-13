@@ -11,12 +11,12 @@ struct MotionInput {
     std::uint64_t owner=0;std::int64_t time=0;
     stereo::Vec3 hand{},head{};
     MotionKind kind=MotionKind::None;
-    bool active=false,grip=false,trigger=false;
+    bool active=false,grip=false,trigger=false,triggerAttack=false;
 };
 struct MotionResult {
     MotionKind action=MotionKind::None;
     stereo::Vec3 position{},velocity{};
-    bool primary=false,primed=false,primeEdge=false;
+    bool primary=false,primed=false,primeEdge=false,triggerStrike=false;
 };
 class MotionActions {
 public:

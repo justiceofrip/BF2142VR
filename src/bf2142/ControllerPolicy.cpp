@@ -27,7 +27,7 @@ float LocomotionYaw(bool controllerRelative,const stereo::Pose& reference,const 
     return std::hypot(x,z)>.2f?PoseYaw(*pose):fallback;
 }
 ControllerCommand MapControllers(ControllerPolicyState& state,const shared::SharedControllerSample& sample,
-    bool gameplay,float movementYaw,float turnSpeed,bool motionHands,bool snapTurning,float snapAngle) noexcept {
+    bool gameplay,float movementYaw,float turnSpeed,bool motionHands,bool snapTurning,float snapAngle,const ControllerBindings& bindings) noexcept {
     ControllerCommand out{};
     if (!(sample.flags&shared::kControllerSampleFlagSessionFocused)) {state={};return out;}
     const auto& l=sample.hands[0];const auto& r=sample.hands[1];
@@ -54,19 +54,19 @@ ControllerCommand MapControllers(ControllerPolicyState& state,const shared::Shar
         state.remainderX=x-float(out.mouseX);state.remainderY=y-float(out.mouseY);
     }
     if((r.flags&shared::kControllerHandFlagTriggerActive) && std::isfinite(r.triggerValue) && r.triggerValue>.55f)out.buttons[0]=0x80;
+    const auto action=[&](BindAction a){return BoundAction(sample,bindings,a);};
     if(gameplay) {
-        const bool a=pressed(r,shared::kControllerHandButtonPrimary);
-        out.keys[DIK_SPACE]=a&&!modifier?0x80:0;
-        out.keys[DIK_G]=a&&modifier?0x80:0;
-        const bool leftPrimary=pressed(l,shared::kControllerHandButtonPrimary);
-        const bool leftSecondary=pressed(l,shared::kControllerHandButtonSecondary);
-        out.keys[DIK_R]=leftPrimary && !modifier?0x80:0;
-        out.keys[DIK_E]=leftSecondary && !modifier?0x80:0;
-        const bool next=modifier && leftPrimary,previous=modifier && leftSecondary;
+        const bool a=action(BindAction::Jump);
+        out.keys[DIK_SPACE]=a?0x80:0;
+        out.keys[DIK_G]=action(BindAction::PickupKit)?0x80:0;
+        out.keys[DIK_RETURN]=action(BindAction::Deploy)?0x80:0;
+        out.keys[DIK_R]=action(BindAction::Reload)?0x80:0;
+        out.keys[DIK_E]=action(BindAction::Use)?0x80:0;
+        const bool next=action(BindAction::NextItem),previous=action(BindAction::PreviousItem);
         if(next && !state.nextWeaponHeld)out.wheel=-120;
         if(previous && !state.previousWeaponHeld)out.wheel=120;
         state.nextWeaponHeld=next;state.previousWeaponHeld=previous;
-        const bool stickClick=pressed(l,shared::kControllerHandButtonThumbstick);
+        const bool stickClick=action(BindAction::Sprint);
         out.keys[DIK_LSHIFT]=stickClick?0x80:0;
         out.keys[DIK_LCONTROL]=(!motionHands || modifier) && (l.flags&shared::kControllerHandFlagSqueezeActive) && std::isfinite(l.squeezeValue) && l.squeezeValue>.65f?0x80:0;
         out.buttons[1]= (r.flags&shared::kControllerHandFlagSqueezeActive) && std::isfinite(r.squeezeValue) && r.squeezeValue>.65f?0x80:0;
@@ -75,10 +75,12 @@ ControllerCommand MapControllers(ControllerPolicyState& state,const shared::Shar
         if(leftStick) {out.keys[DIK_UP]=l.thumbstickY>.6f?0x80:0;out.keys[DIK_DOWN]=l.thumbstickY<-.6f?0x80:0;}
         state.nextWeaponHeld=false;state.previousWeaponHeld=false;
     }
-    const bool recenter=pressed(r,shared::kControllerHandButtonThumbstick);
+    const bool recenter=action(BindAction::Recenter);
     out.recenter=recenter && !state.recenterHeld;state.recenterHeld=recenter;
-    out.keys[DIK_TAB]=gameplay && pressed(l,shared::kControllerHandButtonMenu)?0x80:0;
-    out.keys[DIK_ESCAPE]=pressed(r,shared::kControllerHandButtonSecondary)?0x80:0;
+    bool menuBound=false;
+    for(unsigned i=0;i<bindCount;++i)if((bindings.keys[i]&15)==3&&action(BindAction(i)))menuBound=true;
+    out.keys[DIK_TAB]=gameplay && !menuBound && pressed(l,shared::kControllerHandButtonMenu)?0x80:0;
+    out.keys[DIK_ESCAPE]=(gameplay?action(BindAction::Menu):pressed(r,shared::kControllerHandButtonSecondary))?0x80:0;
     return out;
 }
 }

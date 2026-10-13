@@ -6,7 +6,7 @@ VehicleRole StockVehicleRole(const char* name) noexcept;
 struct VehicleSample {std::uint64_t owner=0,seat=0,root=0;VehicleRole role=VehicleRole::Unknown;stereo::Matrix4 rootWorld{};};
 class VehicleView {
 public:
- std::optional<stereo::Matrix4> Update(const VehicleSample&,const stereo::Matrix4& camera) noexcept;
+ std::optional<stereo::Matrix4> Update(const VehicleSample&,const stereo::Matrix4& camera,bool horizonLock=true) noexcept;
  void Reset() noexcept {*this={};}
 private:
  std::uint64_t owner=0,seat=0,root=0;float yawOffset=0;stereo::Matrix4 localCamera{};

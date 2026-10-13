@@ -1,12 +1,13 @@
 #include "NativeVehicle.h"
 #include "TrackingMath.h"
+#include "VehicleHud.h"
 #include <cstring>
 #include <cmath>
 namespace bfvr::bf2142 {
 namespace {
 BYTE* game=nullptr;BYTE* render=nullptr;bool installed=false;LogFunction logger=nullptr;
 SRWLOCK lock=SRWLOCK_INIT;VehicleView view;VehicleControls controls;
-stereo::Matrix4 stableCamera{};VehicleSample cached{};ULONGLONG cameraTime=0;
+stereo::Matrix4 stableCamera{},aimCamera{};VehicleSample cached{};ULONGLONG cameraTime=0;
 template<class T>T Read(const void* p,size_t o){T v{};std::memcpy(&v,static_cast<const BYTE*>(p)+o,sizeof(v));return v;}
 bool Object(void* p){
  if(!p)return false;auto* vt=Read<BYTE*>(p,0);
@@ -73,7 +74,7 @@ bool ReadNativeVehicle(VehicleSample* out){
  }__except(EXCEPTION_EXECUTE_HANDLER){return false;}
 }
 void UpdateNativeVehicle(const VehicleSample* s,const shared::SharedControllerSample* input,const stereo::Pose& reference,
- const stereo::Pose& head,float scale,float height,ControllerCommand& command){
+ const stereo::Pose& head,float scale,float height,ControllerCommand& command,bool horizonLock){
  AcquireSRWLockExclusive(&lock);
  if(!s||!input){controls.Reset();cameraTime=0;VehicleSample occupied;
   if(!ReadNativeVehicle(&occupied))view.Reset();
@@ -82,8 +83,8 @@ void UpdateNativeVehicle(const VehicleSample* s,const shared::SharedControllerSa
  if(NativeCamera(&native)){
   // Ignore detached third-person/death cameras. The saved native eye must
   // remain reasonably near the controlled object's transform.
-  if(NearSeat(s->seat,native))stable=view.Update(*s,native);
-  if(stable){target=stereo::ComposeRuntimeHeadWithD3D8Camera(*stable,reference,head,scale);if(target)target->values[3][1]+=height;stableCamera=*stable;cached=*s;cameraTime=GetTickCount64();}
+  if(NearSeat(s->seat,native))stable=view.Update(*s,native,horizonLock);
+  if(stable){target=stereo::ComposeRuntimeHeadWithD3D8Camera(*stable,reference,head,scale);if(target)target->values[3][1]+=height;stableCamera=*stable;aimCamera=native;cached=*s;cameraTime=GetTickCount64();}
  }
  controls.Update(*s,*input,stable?&native:nullptr,target?&*target:nullptr,command);
  ReleaseSRWLockExclusive(&lock);
@@ -92,6 +93,13 @@ bool ReadNativeVehicleCamera(const stereo::Matrix4& native,stereo::Matrix4* stab
  if(!stable)return false;VehicleSample s;if(!ReadNativeVehicle(&s))return false;
  AcquireSRWLockShared(&lock);const bool valid=cameraTime&&GetTickCount64()-cameraTime<=150&&s.owner==cached.owner&&s.seat==cached.seat&&s.root==cached.root&&InverseRigid(native).has_value();
  if(valid)*stable=stableCamera;ReleaseSRWLockShared(&lock);return valid;
+}
+std::optional<stereo::Pose> ReadVehicleHudAnchor(const stereo::Pose& reference,float scale){
+ VehicleSample s;if(!ReadNativeVehicle(&s))return {};
+ AcquireSRWLockShared(&lock);
+ const bool valid=cameraTime&&GetTickCount64()-cameraTime<=150&&s.owner==cached.owner&&s.seat==cached.seat&&s.root==cached.root;
+ const auto result=valid?VehicleHudAnchor(aimCamera,stableCamera,reference,scale):std::nullopt;
+ ReleaseSRWLockShared(&lock);return result;
 }
 void RecenterNativeVehicle(){AcquireSRWLockExclusive(&lock);view.Reset();controls.Reset();cameraTime=0;ReleaseSRWLockExclusive(&lock);}
 }

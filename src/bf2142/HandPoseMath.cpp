@@ -149,8 +149,19 @@ bool PoseFingerContact(HandBones& bones,int base,V target) noexcept {
     const auto inverse=InverseRigid(bones[base+2]);if(!inverse)return false;
     out[base+3]=Multiply(bones[base+3],Multiply(*inverse,out[base+2]));SetPos(out[base+3],p[3]);bones=out;return true;
 }
-bool SupportGripEligible(bool pressed,bool previous,float distance,float separation) noexcept {
-    return pressed && std::isfinite(distance)&&std::isfinite(separation)&&distance>=0 && distance<(previous?.30f:.20f)&&separation>.12f&&separation<.80f;
+bool SupportGripEligible(bool pressed,bool previous,float distance,float separation,bool hold,float release) noexcept {
+    if(!pressed||!std::isfinite(distance)||!std::isfinite(separation)||distance<0||separation<=.12f||separation>=.80f)return false;
+    if(previous&&hold)return true;
+    const float radius=std::isfinite(release)?std::clamp(release,.20f,.80f):.30f;
+    return distance<(previous?radius:.20f);
+}
+stereo::Matrix4 CalibrateWeaponAim(const M& aim,float degrees) noexcept {
+    if(!std::isfinite(degrees)||degrees==0)return aim;
+    const float angle=std::clamp(degrees,-45.f,45.f)*.01745329252f;
+    M rotation{};for(int i=0;i<4;++i)rotation.values[i][i]=1;
+    rotation.values[1][1]=rotation.values[2][2]=std::cos(angle);
+    rotation.values[2][1]=std::sin(angle);rotation.values[1][2]=-std::sin(angle);
+    return Multiply(rotation,aim);
 }
 std::optional<ArmSolution> SolveArm(V shoulder,V wrist,float upper,float lower,bool left) noexcept {
     if(!Finite(shoulder)||!Finite(wrist)||!std::isfinite(upper)||!std::isfinite(lower)||upper<.05f||lower<.05f||upper>.6f||lower>.6f)return {};
@@ -184,7 +195,8 @@ std::optional<HandResult> SolveTrackedHands(const HandBones& native,const HandFr
     if(!InverseRigid(binding->leftFromWeapon) || !InverseRigid(handFromWeapon))return {};
     const auto weaponFromHand=InverseRigid(handFromWeapon);if(!weaponFromHand)return {};
     // Ordinary firearms keep the accepted right wrist binding and held fingers.
-    M weapon=f.rightAim;M wrist=Multiply(handFromWeapon,weapon);SetPos(wrist,Pos(f.rightGrip));weapon=Multiply(*weaponFromHand,wrist);
+    const M calibratedAim=CalibrateWeaponAim(f.rightAim,f.weaponPitchDegrees);
+    M weapon=calibratedAim;M wrist=Multiply(handFromWeapon,weapon);SetPos(wrist,Pos(f.rightGrip));weapon=Multiply(*weaponFromHand,wrist);
     const bool emptyHands=!f.weaponHeld&&f.handReference&&f.leftPalm&&f.rightPalm;
     HandResult result{};result.bones=native;HandBones handSource=(f.knifeGrip||emptyHands)&&f.handReference?*f.handReference:native;
     if((f.knifeGrip||emptyHands)&&f.handReference)for(const auto& bone:handSource)if(!InverseRigid(bone))return {};
@@ -213,7 +225,7 @@ std::optional<HandResult> SolveTrackedHands(const HandBones& native,const HandFr
         const float separation=Length(Sub(Pos(f.leftGrip),Pos(f.rightGrip)));
         const bool pressed=f.weaponHeld&&f.supportPressed&&f.supportReady&&!f.knifeGrip;
         result.supporting=f.pistolGrip ? leftPalm&&rightPalm&&PistolSupportEligible(pressed,f.wasSupporting,separation) :
-            SupportGripEligible(pressed,f.wasSupporting,Length(Sub(Pos(left),Pos(f.leftGrip))),separation);
+            SupportGripEligible(pressed,f.wasSupporting,Length(Sub(Pos(left),Pos(f.leftGrip))),separation,f.holdSupportUntilRelease,f.supportReleaseDistance);
         if(result.supporting && f.pistolGrip){
             // Cup the firing hand, not the barrel. Close palms provide no
             // useful two-point aiming baseline: preserve right-hand direction.
@@ -223,7 +235,7 @@ std::optional<HandResult> SolveTrackedHands(const HandBones& native,const HandFr
             left=Multiply(leftPalm->bones[0],Multiply(cup,firingPalm));
         }else if(result.supporting){
             const V localDirection=Sub(Pos(binding->leftFromWeapon),Pos(binding->rightFromWeapon));
-            M aimed=Facing(f.rightAim,Sub(Pos(f.leftGrip),Pos(f.rightGrip)));
+            M aimed=Facing(calibratedAim,Sub(Pos(f.leftGrip),Pos(f.rightGrip)));
             M correction=Facing(Identity(),localDirection);const auto inverse=InverseRigid(correction);if(!inverse)return {};
             weapon=Multiply(*inverse,aimed);wrist=Multiply(handFromWeapon,weapon);SetPos(wrist,Pos(f.rightGrip));weapon=Multiply(*weaponFromHand,wrist);
             left=Multiply(binding->leftFromWeapon,weapon);

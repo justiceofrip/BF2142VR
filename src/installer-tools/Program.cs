@@ -10,7 +10,9 @@ string payload=Path.GetFullPath(args[1]),outDir=Path.GetFullPath(args[5]),tag=ar
 if(Directory.Exists(outDir))throw new IOException("Use a new output directory.");
 if(tag.Any(c=>!char.IsAsciiLetterOrDigit(c)&&c!='.'&&c!='-'))throw new ArgumentException("Unsafe tag.");
 using var key=ECDsa.Create();key.ImportFromPem(File.ReadAllText(args[2]));
-if(key.ExportSubjectPublicKeyInfoPem()!=ReleaseFeed.PublicKey().Trim())throw new CryptographicException("Publishing key does not match the installer's pinned key.");
+using var pinned=ECDsa.Create();pinned.ImportFromPem(ReleaseFeed.PublicKey());
+// Compare key bytes; a Windows checkout may use CRLF in the embedded PEM.
+if(!CryptographicOperations.FixedTimeEquals(key.ExportSubjectPublicKeyInfo(),pinned.ExportSubjectPublicKeyInfo()))throw new CryptographicException("Publishing key does not match the installer's pinned key.");
 var previous=args[6]=="-"?null:ReleaseFeed.Verify(File.ReadAllBytes(args[6]),ReleaseFeed.PublicKey());
 if(previous is not null&&revision<=previous.Revision)throw new InvalidDataException("Revision must increase.");
 using var document=JsonDocument.Parse(File.ReadAllBytes(Path.Combine(payload,"payload.json")));string version=document.RootElement.GetProperty("version").GetString()!;

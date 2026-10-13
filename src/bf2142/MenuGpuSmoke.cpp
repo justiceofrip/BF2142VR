@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
+#include <fstream>
 using namespace bfvr;using namespace bfvr::bf2142;
 using Microsoft::WRL::ComPtr;
 namespace bfvr::bf2142 {void PublishNativeHudPointer(bool,float,float,bool){} }
@@ -62,7 +63,24 @@ int wmain(int argc,wchar_t** argv){
   size_t differences=0;for(size_t i=0;i<pixels.size();++i)differences+=pixels[i]!=expected[i];
   printf("Overlay wide=%d open=%d pressed=%d pixel differences=%zu\n",wide,open,pressed,differences);if(differences)for(size_t i=0,n=0;i<pixels.size()&&n<12;++i)if(pixels[i]!=expected[i]){printf("diff %zu,%zu got=%08lx wanted=%08lx\n",i%w,i/w,pixels[i],expected[i]);++n;}CHECK(differences==0);++cases;
  }
+ // Every controls page uses the same GPU upload and hit-test canvas. Emit a
+ // preview only when explicitly requested by the developer's smoke command.
+ if(!controls.Open()){controls.Hotkey(false);controls.Hotkey(true);controls.Hotkey(false);}
+ for(unsigned page=0;page<5;++page){
+  pointer={};const auto& pageArt=controls.Artwork(w,h,DXGI_FORMAT_B8G8R8A8_UNORM,settings,true);
+  CHECK(stage());CHECK(overlay.Draw({transfer.Surface(0),transfer.Surface(1),transfer.Surface(2)},pointer,request,pageArt,controls.ArtworkRevision()));CHECK(stateIntact());
+  CHECK(SUCCEEDED(capture.ReadSurface(device.Get(),transfer.Surface(2),DXGI_FORMAT_B8G8R8A8_UNORM,pixels,true)));
+  for(size_t i=0;i<pixels.size();++i)CHECK(pixels[i]==(pageArt[i]?pageArt[i]:0xff345678));
+  if(argc>3){
+   BITMAPFILEHEADER header{};header.bfType=0x4d42;header.bfOffBits=sizeof(header)+sizeof(BITMAPINFOHEADER);header.bfSize=header.bfOffBits+DWORD(pixels.size()*4);
+   BITMAPINFOHEADER info{};info.biSize=sizeof(info);info.biWidth=LONG(w);info.biHeight=-LONG(h);info.biPlanes=1;info.biBitCount=32;
+   std::ofstream output(std::wstring(argv[3])+L"-"+std::to_wstring(page)+L".bmp",std::ios::binary);
+   output.write(reinterpret_cast<char*>(&header),sizeof(header));output.write(reinterpret_cast<char*>(&info),sizeof(info));output.write(reinterpret_cast<char*>(pixels.data()),pixels.size()*4);CHECK(output.good());
+  }
+  CHECK(controls.Interact(.75f,.15f,true,false,settings,1.7f));++cases;
+ }
  // Laser projection is shared with the CPU path; eyes differ with IPD and preserve UI hit coordinates.
+ pointer.visible=true;pointer.pressed=true;pointer.point.pixelX=w*.62f;pointer.point.pixelY=h*.43f;
  pointer.ray=MenuRayHit{pointer.point,{.15f,-.1f,-.2f},{0,0,-1.5f}};
  auto a=ProjectMenuBeam(w,h,{},*pointer.ray,request.views[0]),b=ProjectMenuBeam(w,h,{},*pointer.ray,request.views[1]);CHECK(a&&b&&a->x1>b->x1);
  CHECK(!ProjectMenuBeam(0,h,{},*pointer.ray,request.views[0]));

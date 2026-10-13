@@ -14,6 +14,16 @@ VrSettings LoadVrSettings(const std::wstring& logPath) {
         wchar_t* end=nullptr;const float v=std::wcstof(text,&end);
         return end!=text && *end==0 && std::isfinite(v) && v>=low && v<=high?v:fallback;
     };
+    for(unsigned i=0;i<bindCount;++i){
+        const auto key=GetPrivateProfileIntW(L"VRBindings",bindNames[i],s.bindings.keys[i],path.c_str());
+        if(ValidBinding(key))s.bindings.keys[i]=key;
+    }
+    s.weaponPitchDegrees=value(L"WeaponPitchDegrees",0,-45,45);
+    s.supportReleaseDistance=value(L"SupportReleaseDistance",.30f,.20f,.80f);
+    s.holdSupportUntilRelease=GetPrivateProfileIntW(L"VR",L"HoldSupportUntilRelease",1,path.c_str())!=0;
+    s.vehicleHudLocked=GetPrivateProfileIntW(L"VR",L"VehicleHudLocked",1,path.c_str())!=0;
+    s.vehicleHorizonLock=GetPrivateProfileIntW(L"VR",L"VehicleHorizonLock",1,path.c_str())!=0;
+    s.knifeTriggerAttack=GetPrivateProfileIntW(L"VR",L"KnifeTriggerAttack",1,path.c_str())!=0;
     s.proximityVoice=GetPrivateProfileIntW(L"VR",L"ProximityVoice",1,path.c_str())!=0;
     s.proximityMuted=GetPrivateProfileIntW(L"VR",L"ProximityMicMuted",0,path.c_str())!=0;
     s.voiceThreshold=value(L"VoiceThresholdDb",-40,-65,-15);s.voiceVolume=value(L"VoiceVolume",1,0,2);
@@ -53,10 +63,17 @@ VrSettings LoadVrSettings(const std::wstring& logPath) {
 bool SaveVrPreferences(const VrSettings& s) {
     if(s.configPath.empty())return false;bool ok=true;
     const auto put=[&](const wchar_t* key,const std::wstring& v){ok=WritePrivateProfileStringW(L"VR",key,v.c_str(),s.configPath.c_str()) && ok;};
+    for(unsigned i=0;i<bindCount;++i)ok=WritePrivateProfileStringW(L"VRBindings",bindNames[i],std::to_wstring(s.bindings.keys[i]).c_str(),s.configPath.c_str())&&ok;
     put(L"ProximityVoice",s.proximityVoice?L"1":L"0");put(L"ProximityMicMuted",s.proximityMuted?L"1":L"0");
     put(L"VoiceThresholdDb",std::to_wstring(s.voiceThreshold));put(L"VoiceVolume",std::to_wstring(s.voiceVolume));
     put(L"VoiceInputDevice",std::to_wstring(s.voiceInput));put(L"VoiceOutputDevice",std::to_wstring(s.voiceOutput));
     put(L"WorldMSAASamples",std::to_wstring(s.worldSamples));
+    put(L"WeaponPitchDegrees",std::to_wstring(s.weaponPitchDegrees));
+    put(L"SupportReleaseDistance",std::to_wstring(s.supportReleaseDistance));
+    put(L"HoldSupportUntilRelease",s.holdSupportUntilRelease?L"1":L"0");
+    put(L"VehicleHudLocked",s.vehicleHudLocked?L"1":L"0");
+    put(L"VehicleHorizonLock",s.vehicleHorizonLock?L"1":L"0");
+    put(L"KnifeTriggerAttack",s.knifeTriggerAttack?L"1":L"0");
     put(L"MovementDirection",s.controllerRelativeMovement?L"controller":L"head");
     put(L"SnapTurning",s.snapTurning?L"1":L"0");put(L"SnapAngle",std::to_wstring(s.snapAngle));
     put(L"HideWorldMarkers",s.hideWorldMarkers?L"1":L"0");
